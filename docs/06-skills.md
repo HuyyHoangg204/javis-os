@@ -33,8 +33,6 @@ Javis chia skill làm 2 loại:
 
 Bạn vẫn **Sửa** được skill hệ thống. Khi đó bản trong brain trở thành bản riêng của bạn: Javis giữ đúng chỉnh sửa đó và ngừng tự cập nhật đè lên. Muốn quay về bản chuẩn (kèm tự cập nhật), xoá thư mục skill đó trong `skills/` của brain (bằng trang Tệp tin) rồi khởi động lại - bản hệ thống mới nhất sẽ được cài lại sạch.
 
-Cùng cơ chế này, loop **Tự cải tiến Javis** (trang Loop) cũng là năng lực hệ thống: phần nội dung nhiệm vụ được cập nhật theo phiên bản app, còn trạng thái bạn chỉnh (bật/tắt, chế độ, chu kỳ) luôn được giữ nguyên.
-
 ## Mở ở đâu trong Javis
 
 Mở dashboard (mặc định tại cổng 7777), nhìn thanh điều hướng bên trái và bấm mục **Skills** (biểu tượng 🧩). Trang này cùng khu với Workflows và Agents, đều tách ra từ Studio.

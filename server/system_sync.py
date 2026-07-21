@@ -533,9 +533,6 @@ def ensure_synced(brain_root) -> Optional[dict]:
 # Hash các bản seed đã ship TRƯỚC khi có manifest (v0.7.9 → v0.8.3; nội dung không đổi giữa
 # các bản nên mỗi item 1 hash). Sinh từ git history meta_tools.py (fe33c2c/703fe54/0d3c953/f4fe71c).
 LEGACY_HASHES.update({
-    "loops/tu-cai-tien-javis": {
-        "4028fbc34972449c072e750d7b2fe3c458b97ff7eee35d9d486af7efe98625bb",
-    },
     "skills/ingest-source": {
         "313675bc61ad2aae69b282e9289a1a126ce89eb7688e1e2bfa3cfa409428878d",
     },

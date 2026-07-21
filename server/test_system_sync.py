@@ -478,9 +478,10 @@ shutil.rmtree(_R8, ignore_errors=True)
 # không sinh ra, mirror_skills thoát ở early-return và KHÔNG BAO GIỜ chạm tới chỗ có thể
 # deadlock -> check thời gian ở dưới báo "ok" trong ~0.5s trong khi deadlock vẫn nằm nguyên
 # trong code (đã tái hiện được: mutation còn sống + nguồn rỗng = xanh giả). Hôm nay repo ship
-# 5 skill + 1 loop nên may mà chạy đúng, nhưng một lần reorg repo / sparse checkout / dời
+# vài skill hệ thống nên may mà chạy đúng, nhưng một lần reorg repo / sparse checkout / dời
 # .claude/skills sẽ âm thầm THÁO NGÒI cái guard này mà không có tín hiệu đỏ nào - đúng kiểu
-# "cửa sổ không bao giờ mở ra mà vẫn xanh" mà dự án này đã dính một lần.
+# "cửa sổ không bao giờ mở ra mà vẫn xanh" mà dự án này đã dính một lần. (Repo không còn loop
+# hệ thống nào - guard này bám vào skill hệ thống nên vẫn mở được cửa sổ deadlock.)
 # Nên: sau khi sync_brain trả về, BẮT BUỘC khẳng định vòng copy của mirror_skills đã CHẠY
 # THẬT - ít nhất 1 skill hệ thống có mặt ở CẢ <root>/skills/*/SKILL.md LẪN
 # <root>/.claude/skills/*/SKILL.md. Giao của hai tập chứng minh đúng điều đó: trên brain tạm
