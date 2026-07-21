@@ -251,8 +251,8 @@ class LoopFeature:
         # CLAUDE.md và khớp cả 2 đường tạo loop (plugin javis_schedule ép 'goal: custom';
         # form web /loops mặc định 'custom'). TRƯỚC ĐÂY rơi về 'business' → _build_prompt BỎ
         # HOÀN TOÀN thân file, chỉ bơm số liệu MCP: loop thiếu dòng 'goal:' (viết tay trong
-        # Obsidian, tạo bằng bản cũ, hay loop hệ thống tu-cai-tien-javis) chạy sai việc - vd
-        # loop "nhắc uống thuốc" lại đi đọc POS. 'business' giờ phải KHAI TƯỜNG MINH mới bật.
+        # Obsidian hay tạo bằng bản cũ) chạy sai việc - vd loop "nhắc uống thuốc" lại đi đọc
+        # POS. 'business' giờ phải KHAI TƯỜNG MINH mới bật.
         goal = str(fm.get("goal", "custom") or "custom").strip().lower()
         if goal not in GOALS:
             goal = "custom"
@@ -367,8 +367,8 @@ class LoopFeature:
 
         Copy nguyên byte file (KHÔNG round-trip qua save_loop - nó chỉ render lại các field
         chuẩn nên sẽ nuốt mọi frontmatter lạ user tự thêm trong Obsidian). Định danh loop = TÊN
-        FILE, nên đích đã có file cùng slug thì TỪ CHỐI, không ghi đè (builtin tu-cai-tien-javis
-        có ở MỌI brain -> đây là va chạm thật sẽ gặp). Trả {"ok":bool, "error":str}."""
+        FILE, nên đích đã có file cùng slug thì TỪ CHỐI, không ghi đè (2 brain có loop trùng
+        slug -> đây là va chạm thật sẽ gặp). Trả {"ok":bool, "error":str}."""
         src_fp = self._loop_path(from_brain, slug)
         if src_fp is None or not src_fp.exists():
             return {"ok": False, "error": "không thấy việc ở brain nguồn"}
