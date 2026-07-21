@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.148] - 2026-07-21
+Sửa lỗi nhắc hẹn tạo qua chat khi đang dùng brain khác (vd My Bullet Journal) lại rơi vào Brain Default.
+### Sửa lỗi
+- **Nhắc hẹn rơi nhầm Brain Default dù đang chat ở brain khác**: khi đặt nhắc hẹn từ Telegram hoặc dashboard, Javis hay dùng lệnh curl mẫu có sẵn trong hướng dẫn để gọi kho nhắc hẹn, mà lệnh mẫu đó lại KHÔNG kèm brain đang chọn. Lệnh curl chạy từ sandbox nên không mang phiên đăng nhập, brain chỉ đi được qua nội dung lệnh; thiếu nó thì kho nhắc hẹn âm thầm dùng Brain Default. Hậu quả: đang chọn brain My Bullet Journal, đặt nhắc hẹn, nhưng nhắc lại nằm ở Default. Nay lệnh mẫu tự kèm brain của phiên, và ưu tiên gọi thẳng tool javis_schedule (vốn luôn gắn đúng brain). Kho nhắc hẹn cũng ghi log khi nhận nhắc thiếu brain để dễ soi nếu tái diễn.
+
+## [0.9.147] - 2026-07-21
+Thêm lệnh /notes trên Telegram để lưu nhanh tin nhắn (kèm ảnh) vào Sources của brain, giống bản chat web.
+### Thêm mới
+- **Lệnh /notes trên Telegram**: trước đây chỉ bản chat web mới có /notes để chộp nhanh một ghi chú vào Second Brain, trên Telegram không thấy trong menu lệnh. Nay /notes đã nằm trong menu lệnh Telegram (gõ "/" là thấy), lưu nguyên văn tin nhắn vào Sources rồi tự chưng cất lên wiki nếu đáng, đúng như bản web.
+- **Gửi ảnh kèm /notes**: gửi một tấm ảnh với chú thích "/notes ..." nay được nhận đúng là lệnh, ảnh được tải về và đính vào note. Trước đây chú thích lệnh bị chôn trong đoạn mô tả tệp đính kèm nên không chạy như lệnh, mà đây lại đúng ca dùng hay gặp nhất là chụp cái gì đó rồi lưu ngay vào brain.
+### Kiểm thử
+- Thêm test cho danh sách lệnh Telegram và cho việc tách lệnh từ chú thích ảnh (giữ đường dẫn ảnh cho skill dùng).
+
 ## [0.9.146] - 2026-07-21
 Thêm chế độ "tool gọn" cho MCP: khi đấu nhiều nguồn, Javis không còn nạp sẵn hàng trăm công cụ vào mỗi câu nữa mà chỉ mở đúng công cụ khi ngữ cảnh cần, tiết kiệm token đáng kể.
 ### Thêm mới
