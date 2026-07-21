@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.149] - 2026-07-21
+Sửa lỗi việc lặp không khai mục tiêu bị chạy nhầm thành phân tích kinh doanh, và gỡ việc lặp mặc định "Tự cải tiến Javis" khỏi app.
+### Sửa lỗi
+- **Việc lặp thiếu khai mục tiêu bị chạy nhầm thành báo cáo kinh doanh**: một việc lặp (loop) mà file định nghĩa không ghi rõ dòng mục tiêu thì bị mặc định thành "cải thiện chỉ số kinh doanh", nên nó bỏ qua hẳn nội dung việc đã viết và quay sang đọc số liệu bán hàng. Ví dụ việc "nhắc uống thuốc" lại đi đọc doanh thu POS rồi bàn chuyện đơn hàng thay vì nhắc thuốc. Nay mặc định là chạy đúng nội dung việc viết trong file; muốn việc lặp tự bơm số liệu kinh doanh mỗi vòng thì phải khai rõ mục tiêu kinh doanh. Hai đường tạo việc lặp (qua chat và qua trang Việc) vốn đã đặt đúng, chỉ khâu đọc lại file là còn lệch nên mới lọt.
+### Cải thiện
+- **Gỡ việc lặp mặc định "Tự cải tiến Javis"**: bỏ hẳn loop hệ thống tự cải tiến khỏi app, không còn tự cài vào brain nào nữa. Brain nào đang có sẵn bản cũ thì vào trang Việc xoá một lần là dứt, từ bản này nó không tự mọc lại.
+### Kiểm thử
+- Thêm test chốt mặc định mục tiêu việc lặp là chạy đúng nội dung file (không rơi về kinh doanh), và test xác nhận app không còn loop hệ thống thì cơ chế đồng bộ vẫn chạy đúng.
+
 ## [0.9.148] - 2026-07-21
 Sửa lỗi nhắc hẹn tạo qua chat khi đang dùng brain khác (vd My Bullet Journal) lại rơi vào Brain Default.
 ### Sửa lỗi
