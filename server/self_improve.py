@@ -247,7 +247,13 @@ class LoopFeature:
         return Path(self.deps.brain_root(brain)) / "Javis" / "loop-state.json"
 
     def _norm_loop(self, fm: dict, body: str, stem: str) -> dict:
-        goal = str(fm.get("goal", "business") or "business").strip().lower()
+        # MẶC ĐỊNH 'custom' (thân file = việc loop làm mỗi vòng) - đúng "format ĐƠN GIẢN" ở
+        # CLAUDE.md và khớp cả 2 đường tạo loop (plugin javis_schedule ép 'goal: custom';
+        # form web /loops mặc định 'custom'). TRƯỚC ĐÂY rơi về 'business' → _build_prompt BỎ
+        # HOÀN TOÀN thân file, chỉ bơm số liệu MCP: loop thiếu dòng 'goal:' (viết tay trong
+        # Obsidian, tạo bằng bản cũ, hay loop hệ thống tu-cai-tien-javis) chạy sai việc - vd
+        # loop "nhắc uống thuốc" lại đi đọc POS. 'business' giờ phải KHAI TƯỜNG MINH mới bật.
+        goal = str(fm.get("goal", "custom") or "custom").strip().lower()
         if goal not in GOALS:
             goal = "custom"
         mode = str(fm.get("mode", "suggest") or "").strip().lower()

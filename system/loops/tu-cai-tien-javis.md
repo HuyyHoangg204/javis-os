@@ -4,6 +4,7 @@ name: Tự cải tiến Javis
 slug: tu-cai-tien-javis
 enabled: false
 mode: suggest
+goal: custom
 interval_min: 720
 updated: {today}
 ---
