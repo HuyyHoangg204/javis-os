@@ -147,6 +147,77 @@ lt_auto, _ = mcp_hub._apply_lazy(tools3, route3)
 check("_apply_lazy auto: 5 tool < ngưỡng → không lazy", lt_auto is tools3)
 
 
+# ============================================================
+# AMBIENT - connector đấu vào TÀI KHOẢN Claude (Drive/Gmail...): tool native mcp__*, hub chỉ
+# KỂ cho model biết + chỉ cách gọi (không qua run). Trước đây lazy layer mù với nhóm này.
+# ============================================================
+_AMB = [{"name": "Google Drive", "url": "https://g"}, {"name": "Gmail", "url": ""}]
+
+# ---- _ambient_prefix / _match_ambient (pure) ----
+check("_ambient_prefix: 'Google Drive' → 'Google_Drive'", mcp_hub._ambient_prefix("Google Drive") == "Google_Drive")
+check("_ambient_prefix: rỗng → 'mcp'", mcp_hub._ambient_prefix("") == "mcp")
+check("_match_ambient: 'tìm file trên drive' → Google Drive",
+      [s["name"] for s in mcp_hub._match_ambient(_AMB, "tìm file trên drive")] == ["Google Drive"])
+check("_match_ambient: khớp theo prefix 'google_drive'",
+      any(s["name"] == "Google Drive" for s in mcp_hub._match_ambient(_AMB, "đọc google_drive")))
+check("_match_ambient: query rỗng → []", mcp_hub._match_ambient(_AMB, "") == [])
+check("_match_ambient: không khớp → []", mcp_hub._match_ambient(_AMB, "doanh thu pos") == [])
+
+# ---- _ambient_enabled / _ambient_servers theo settings (không đụng CLI khi tắt) ----
+set_lazy({"ambient_hint": False})
+check("_ambient_enabled: tắt qua settings", mcp_hub._ambient_enabled() is False)
+check("_ambient_servers: tắt → [] (không đụng CLI)", mcp_hub._ambient_servers() == [])
+set_lazy({})
+check("_ambient_enabled: mặc định bật", mcp_hub._ambient_enabled() is True)
+
+# ---- _ambient_refresh: nạp từ claude mcp list, chỉ lấy 'connected' ----
+import claude_cli  # noqa: E402
+_orig_native = claude_cli.mcp_native_list
+claude_cli.mcp_native_list = lambda: [
+    {"name": "Google Drive", "url": "https://g", "connected": True},
+    {"name": "Gmail", "url": "", "connected": True},
+    {"name": "Chưa auth", "url": "https://x", "connected": False},
+]
+try:
+    mcp_hub._ambient_refresh()
+    _got = [s["name"] for s in mcp_hub._ambient_cache["servers"]]
+    check("_ambient_refresh: lấy đúng server 'connected'", _got == ["Google Drive", "Gmail"])
+    check("_ambient_refresh: bỏ server chưa connected", "Chưa auth" not in _got)
+finally:
+    claude_cli.mcp_native_list = _orig_native
+    mcp_hub._ambient_cache.update({"ts": 0.0, "servers": [], "refreshing": False})
+
+# ---- _connector_menu kèm ambient ----
+menu_amb = mcp_hub._connector_menu(pool, _AMB)
+check("_connector_menu ambient: nêu Google Drive + tiền tố native",
+      "Google Drive" in menu_amb and "mcp__Google_Drive__" in menu_amb)
+check("_connector_menu không ambient: KHÔNG có tài khoản Claude",
+      "Google Drive" not in mcp_hub._connector_menu(pool))
+
+# ---- _connections_json(include_ambient) + _apply_lazy(include_ambient) - monkeypatch nguồn ----
+_orig_amb = mcp_hub._ambient_servers
+mcp_hub._ambient_servers = lambda: list(_AMB)
+try:
+    cj = mcp_hub._connections_json(include_ambient=True)
+    check("_connections_json ambient: có source claude_account", "claude_account" in cj)
+    check("_connections_json ambient: chỉ tool native mcp__Google_Drive__", "mcp__Google_Drive__" in cj)
+    check("_connections_json KHÔNG ambient: bỏ tài khoản Claude",
+          "claude_account" not in mcp_hub._connections_json(include_ambient=False))
+
+    set_lazy({"lazy_tools": True})
+    tools_a, route_a = _fixture()
+    lta, _lra = mcp_hub._apply_lazy(tools_a, route_a, include_ambient=True)
+    search_a = next(t for t in lta if t["fn"] == mcp_hub._LAZY_SEARCH)
+    check("_apply_lazy ambient: mô tả search nhúng connector tài khoản",
+          "mcp__Google_Drive__" in search_a["description"])
+    ltn, _lrn = mcp_hub._apply_lazy(_fixture()[0], _fixture()[1])   # include_ambient mặc định False
+    search_n = next(t for t in ltn if t["fn"] == mcp_hub._LAZY_SEARCH)
+    check("_apply_lazy KHÔNG ambient: search không nhúng tài khoản Claude",
+          "Google Drive" not in search_n["description"])
+finally:
+    mcp_hub._ambient_servers = _orig_amb
+
+
 async def _dispatch_tests():
     set_lazy({"lazy_tools": True})
     tools, route = _fixture()
@@ -196,6 +267,29 @@ async def _dispatch_tests():
     _ltd, lrd = mcp_hub._apply_lazy(tools_d, route_d)
     r_deny = await mcp_client_call(lrd, mcp_hub._LAZY_RUN, {"name": "pos__pos_refund", "args": {}})
     check("dispatch run: giữ lớp _guard (tool bị chặn → ERROR quyền)", "bị chặn quyền" in r_deny)
+
+    # ---- AMBIENT trong search: query khớp connector tài khoản → chỉ tool native (không qua run) ----
+    set_lazy({"lazy_tools": True})
+    _orig_amb = mcp_hub._ambient_servers
+    mcp_hub._ambient_servers = lambda: [{"name": "Google Drive", "url": "https://g"}]
+    try:
+        tools_am, route_am = _fixture()
+        _lam, lram = mcp_hub._apply_lazy(tools_am, route_am, include_ambient=True)
+        # "drive" KHÔNG có trong pool (pos/ads) → chỉ ra tool native mcp__Google_Drive__
+        res_dr = await mcp_client_call(lram, mcp_hub._LAZY_SEARCH, {"query": "tìm file trên drive"})
+        obj_dr = json.loads(res_dr)
+        check("dispatch search ambient: trả tai_khoan_claude", bool(obj_dr.get("tai_khoan_claude")))
+        check("dispatch search ambient: chỉ tool native mcp__Google_Drive__",
+              "mcp__Google_Drive__" in str(obj_dr.get("tai_khoan_claude")))
+        check("dispatch search ambient: KHÔNG bịa tool pool cho drive", "tools" not in obj_dr)
+        # query POS vẫn ra tool pool bình thường, không dính ambient
+        res_pos = await mcp_client_call(lram, mcp_hub._LAZY_SEARCH, {"query": "doanh thu pos"})
+        obj_pos = json.loads(res_pos)
+        check("dispatch search ambient: query pos vẫn trả tool pool",
+              any(t["name"] == "pos__pos_order" for t in obj_pos.get("tools", [])))
+        check("dispatch search ambient: query pos KHÔNG kèm tài khoản Claude", "tai_khoan_claude" not in obj_pos)
+    finally:
+        mcp_hub._ambient_servers = _orig_amb
 
 
 async def mcp_client_call(route, fn, args):

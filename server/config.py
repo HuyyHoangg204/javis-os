@@ -91,7 +91,10 @@ _DEFAULT = {
     # MCP vượt lazy_threshold (mặc định); True/False = ép bật/tắt. Khi bật, hub chỉ phơi
     # 2 meta-tool javis_search_tools/javis_run_tool thay cho hàng trăm schema -> model tự
     # tìm tool theo NGỮ CẢNH rồi mới nạp. lazy_top_k = số tool search trả về mỗi lần.
-    "mcp": {"strict": False, "hub": True, "lazy_tools": "auto", "lazy_threshold": 40, "lazy_top_k": 8},
+    # ambient_hint: kèm connector đấu vào TÀI KHOẢN Claude (Drive/Gmail...) vào javis_connections
+    # + lazy search cho engine Claude, để model biết chúng tồn tại (gọi qua tool native mcp__*).
+    "mcp": {"strict": False, "hub": True, "lazy_tools": "auto", "lazy_threshold": 40,
+            "lazy_top_k": 8, "ambient_hint": True},
 }
 
 

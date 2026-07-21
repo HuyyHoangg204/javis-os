@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.150] - 2026-07-21
+Sửa lỗi Javis (chạy bằng Claude) báo "chưa đấu" các nguồn kết nối vào tài khoản Claude (Google Drive, Gmail, Lịch...) khi đang bật chế độ tool gọn, dù thực ra vẫn gọi được.
+### Sửa lỗi
+- **Không thấy MCP của tài khoản Claude khi bật tool gọn (lazy)**: các connector đấu thẳng vào tài khoản Claude (Google Drive, Gmail, Lịch... đồng bộ từ claude.ai) vốn là công cụ native của engine Claude, KHÔNG đi qua hub của Javis. Nhưng bảng liệt kê nguồn (javis_connections) và ô tìm công cụ của chế độ tool gọn chỉ biết các nguồn do Javis quản lý (POS, Substack...), nên Javis tra danh sách thấy "chỉ có POS và Substack" rồi kết luận nhầm là "chưa đấu Drive" dù người dùng đã kết nối. Nay hub tự đọc danh sách MCP của tài khoản Claude (các cái đang "Connected") và kèm vào cả javis_connections lẫn kết quả tìm công cụ, chỉ rõ đây là công cụ gọi THẲNG (mcp__<tên>__...), không bọc qua tool chạy của hub. Javis không còn phủ nhận nguồn đã đấu sẵn trong tài khoản.
+### Cải thiện
+- Danh sách nguồn tài khoản Claude được đọc ở luồng nền và nhớ tạm (cache) vì lệnh liệt kê hơi chậm, nên không làm chậm câu trả lời. Chỉ engine Claude mới được kèm gợi ý này (Codex và các engine API không có công cụ native đó nên không kèm, tránh chỉ nhầm sang tool không tồn tại). Tắt được ở settings `mcp.ambient_hint` nếu không muốn.
+### Kiểm thử
+- Thêm test cho việc đọc danh sách MCP tài khoản (chỉ lấy cái đang "Connected"), khớp nguồn theo tên/tiền tố, kèm đúng vào javis_connections và ô tìm công cụ, và chốt rằng engine API (đường in-process) không bị kèm nhầm gợi ý tài khoản.
+
 ## [0.9.149] - 2026-07-21
 Sửa lỗi việc lặp không khai mục tiêu bị chạy nhầm thành phân tích kinh doanh, và gỡ việc lặp mặc định "Tự cải tiến Javis" khỏi app.
 ### Sửa lỗi
