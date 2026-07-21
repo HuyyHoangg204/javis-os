@@ -14,6 +14,7 @@ import os
 import re
 import secrets as _secrets
 import sys
+import threading
 import time
 from collections import deque
 from datetime import datetime
@@ -165,6 +166,79 @@ def _guard(ent, fn, mode):
 
 
 # ============================================================
+# AMBIENT / ACCOUNT MCP - connector đấu vào TÀI KHOẢN Claude (claude.ai: Drive/Gmail/lịch...).
+# Chúng KHÔNG đi qua hub: engine Claude nạp thẳng qua setting_sources thành tool NATIVE
+# mcp__<server>__*. Trước đây lazy layer + javis_connections MÙ với nhóm này → model tưởng chỉ
+# có connector của hub, báo "không có Drive" dù tài khoản đã đấu. Ở đây hub ĐỌC danh sách
+# (claude mcp list, cache nền vì chậm) để KỂ cho model biết + chỉ cách gọi (native, KHÔNG qua run).
+# ============================================================
+_AMBIENT_TTL = 300          # giây - danh sách connector tài khoản ít đổi, cache rộng
+_ambient_cache = {"ts": 0.0, "servers": [], "refreshing": False}
+
+
+def _ambient_enabled():
+    """Có kèm gợi ý connector tài khoản Claude không (settings mcp.ambient_hint, mặc định True)."""
+    try:
+        return bool(config.read_settings().get("mcp", {}).get("ambient_hint", True))
+    except Exception:
+        return True
+
+
+def _ambient_prefix(name):
+    """Tiền tố tool native Claude sinh cho 1 MCP server (vd 'Google Drive' → 'Google_Drive')."""
+    return re.sub(r"[^0-9A-Za-z]+", "_", str(name or "")).strip("_") or "mcp"
+
+
+def _ambient_refresh():
+    """Nạp danh sách MCP tài khoản (claude mcp list) trong THREAD nền - chậm (health check),
+    TUYỆT ĐỐI không chạy trên event loop. Nuốt mọi lỗi (thiếu CLI, timeout...) → []."""
+    servers = []
+    try:
+        import claude_cli
+        for s in claude_cli.mcp_native_list() or []:
+            name = str(s.get("name") or "").strip()
+            if name and s.get("connected"):
+                servers.append({"name": name, "url": s.get("url") or ""})
+    except Exception as e:
+        print(f"[hub ambient] {type(e).__name__}: {e}", file=sys.stderr)
+    finally:
+        _ambient_cache["servers"] = servers
+        _ambient_cache["ts"] = time.time()
+        _ambient_cache["refreshing"] = False
+
+
+def _ambient_servers():
+    """Connector tài khoản Claude đang 'Connected' (KHÔNG chặn): trả cache, làm mới ở thread nền
+    khi hết hạn. Lần đầu trả [] rồi ấm dần các lần sau. Tắt qua settings mcp.ambient_hint=false."""
+    if not _ambient_enabled():
+        return []
+    c = _ambient_cache
+    if not c["refreshing"] and time.time() - c["ts"] > _AMBIENT_TTL:
+        c["refreshing"] = True
+        try:
+            threading.Thread(target=_ambient_refresh, daemon=True).start()
+        except Exception:
+            c["refreshing"] = False
+    return list(c["servers"])
+
+
+def _match_ambient(ambient, query):
+    """Connector tài khoản khớp query (tên xuất hiện trong query, hoặc chung từ khoá). query
+    rỗng → []. Dùng cho javis_search_tools chỉ model sang tool native khi hỏi đúng nguồn đó."""
+    q = (query or "").strip().lower()
+    if not q or not ambient:
+        return []
+    terms = set(_WORD_RE.findall(q))
+    out = []
+    for s in ambient:
+        name = str(s.get("name") or "")
+        nwords = set(_WORD_RE.findall(name.lower()))
+        if (name.lower() and name.lower() in q) or (nwords & terms) or _ambient_prefix(name).lower() in q:
+            out.append(s)
+    return out
+
+
+# ============================================================
 # Builtin tools (engine API): file trong vault + use_skill + meta connections
 # ============================================================
 def _safe_path(vault_root, p):
@@ -175,13 +249,21 @@ def _safe_path(vault_root, p):
     return target
 
 
-def _connections_json():
+def _connections_json(include_ambient=False):
     out = []
     for c in mcp_store.list_connections():
         con = mcp_catalog.get(c.get("connector_id")) or {}
         out.append({"connector": con.get("name") or c.get("connector_id"), "label": c.get("label"),
                     "namespace": c.get("slug"), "perm": c.get("perm"), "enabled": c.get("enabled"),
-                    "is_default": c.get("is_default"), "transport": c.get("transport")})
+                    "is_default": c.get("is_default"), "transport": c.get("transport"),
+                    "source": "javis_hub"})
+    # Connector đấu vào TÀI KHOẢN Claude (Drive/Gmail/lịch...): engine Claude đã có sẵn dưới dạng
+    # tool native mcp__<server>__* → chỉ model gọi THẲNG, KHÔNG bọc qua javis_run_tool/hub.
+    if include_ambient:
+        for s in _ambient_servers():
+            out.append({"connector": s["name"], "label": s["name"], "source": "claude_account",
+                        "goi_the_nao": f"Đã có sẵn trong danh sách tool: mcp__{_ambient_prefix(s['name'])}__* "
+                                       "- GỌI THẲNG, không qua javis_run_tool."})
     return json.dumps(out, ensure_ascii=False, indent=1)
 
 
@@ -195,9 +277,11 @@ def _list_skills(vault_root):
     return skill_router.enabled_slugs(vault_root)
 
 
-def _builtin_tools(mode, vault_root):
+def _builtin_tools(mode, vault_root, include_ambient=False):
     """(tools_spec, route) các tool nội bộ cho engine API. Claude/Codex có tool file native
-    nên hub HTTP không trả nhóm này (chỉ meta javis_connections)."""
+    nên hub HTTP không trả nhóm này (chỉ meta javis_connections).
+    include_ambient=True (đường engine Claude): javis_connections kèm cả connector tài khoản
+    Claude (Drive/Gmail...) để model biết chúng tồn tại (gọi qua tool native mcp__*, không qua hub)."""
     tools, route = [], {}
 
     def add(name, description, props, required, call):
@@ -206,8 +290,10 @@ def _builtin_tools(mode, vault_root):
         route[name] = {"call": call}
 
     add("javis_connections", "Liệt kê các nguồn dữ liệu (connector/tài khoản MCP) đang đấu vào Javis, "
-        "kèm mức quyền. Dùng khi cần biết đang có nguồn nào / tài khoản nào là mặc định.",
-        {}, [], lambda args: _async_const(_connections_json()))
+        "kèm mức quyền. Gồm cả connector đấu vào TÀI KHOẢN Claude (Drive/Gmail/lịch...) - loại "
+        "source='claude_account' gọi THẲNG qua tool native mcp__<tên>__*, KHÔNG qua javis_run_tool. "
+        "Dùng khi cần biết đang có nguồn nào / tài khoản nào là mặc định.",
+        {}, [], lambda args: _async_const(_connections_json(include_ambient)))
 
     if not vault_root:
         return tools, route
@@ -324,9 +410,11 @@ def _lazy_on(pool_n):
     return pool_n > thr   # 'auto': chỉ bật khi thật sự đông tool
 
 
-def _connector_menu(pool):
+def _connector_menu(pool, ambient=None):
     """Thực đơn MỎNG các nguồn đang đấu (namespace + tên + số tool + mô tả 1 dòng) để model
-    biết CÓ GÌ mà với tới. Đây là phần LUÔN bật (rẻ, vài trăm token) thay cho cả rừng schema."""
+    biết CÓ GÌ mà với tới. Đây là phần LUÔN bật (rẻ, vài trăm token) thay cho cả rừng schema.
+    ambient: connector tài khoản Claude (gọi native mcp__*, không qua run) - nêu để model khỏi
+    tưởng chỉ có nguồn của hub."""
     seen = {}
     for t in pool:
         ns = t.get("namespace") or t.get("server") or "?"
@@ -339,6 +427,9 @@ def _connector_menu(pool):
     for ns, v in seen.items():
         d = (": " + v["desc"][:70]) if v["desc"] else ""
         parts.append(f"{ns} ({v['label']}, {v['n']} tool){d}")
+    for s in (ambient or []):
+        parts.append(f"mcp__{_ambient_prefix(s['name'])}__* ({s['name']}, tài khoản Claude - "
+                     "tool native, gọi thẳng)")
     return "; ".join(parts)
 
 
@@ -364,22 +455,37 @@ def _rank_tools(pool, query, top_k):
     return [t for _s, t in scored[:top_k]]
 
 
-def _lazy_tools_and_route(visible_tools, visible_route, pool, full_route, top_k):
+def _lazy_tools_and_route(visible_tools, visible_route, pool, full_route, top_k, ambient=None):
     """Dựng (tools_spec, route) chế độ lazy: builtins/plugin hiện trực tiếp + 2 meta-tool.
     _search đóng gói `pool` (full tools_spec để xếp hạng); _run đóng gói `full_route` (dispatch
-    qua call_route → giữ nguyên _guard quyền/audit/rate-limit)."""
-    menu = _connector_menu(pool)
+    qua call_route → giữ nguyên _guard quyền/audit/rate-limit).
+    ambient: connector tài khoản Claude - _search chỉ model sang tool native mcp__* khi khớp
+    (chúng KHÔNG nằm trong pool nên _run không gọi được; phải gọi thẳng)."""
+    ambient = ambient or []
+    menu = _connector_menu(pool, ambient)
 
     async def _search(args):
-        hits = _rank_tools(pool, (args or {}).get("query") or "", top_k)
-        if not hits:
+        q = (args or {}).get("query") or ""
+        hits = _rank_tools(pool, q, top_k)
+        amb = _match_ambient(ambient, q)
+        if not hits and not amb:
             return ("Không thấy tool khớp. Nguồn đang đấu: " + (menu or "(chưa có nguồn nào)")
                     + f". Nêu rõ nguồn hoặc việc cần làm rồi gọi lại {_LAZY_SEARCH}.")
-        out = [{"name": t.get("fn"), "description": (t.get("description") or "")[:400],
-                "schema": t.get("schema") or {"type": "object", "properties": {}}} for t in hits]
-        return json.dumps({"tools": out,
-                           "goi_the_nao": f"Gọi tool bằng {_LAZY_RUN}(name=<name>, args={{...}})."},
-                          ensure_ascii=False)
+        payload = {}
+        if hits:
+            payload["tools"] = [{"name": t.get("fn"), "description": (t.get("description") or "")[:400],
+                                 "schema": t.get("schema") or {"type": "object", "properties": {}}}
+                                for t in hits]
+            payload["goi_the_nao"] = f"Gọi tool bằng {_LAZY_RUN}(name=<name>, args={{...}})."
+        if amb:
+            # Connector tài khoản Claude: tool native đã có sẵn trong danh sách tool của engine.
+            payload["tai_khoan_claude"] = [
+                {"connector": s["name"],
+                 "goi_the_nao": f"Tool native mcp__{_ambient_prefix(s['name'])}__* đã có sẵn - GỌI THẲNG "
+                                f"(KHÔNG qua {_LAZY_RUN}). Không thấy trong danh sách tool thì nguồn này "
+                                "chưa được engine nạp (kiểm tra kết nối ở trang Model/Kết nối)."}
+                for s in amb]
+        return json.dumps(payload, ensure_ascii=False)
 
     async def _run(args):
         name = str((args or {}).get("name") or "").strip()
@@ -406,7 +512,8 @@ def _lazy_tools_and_route(visible_tools, visible_route, pool, full_route, top_k)
                   "description": ("TÌM tool MCP theo NHU CẦU rồi mới nạp (tiết kiệm token: tool chỉ vào "
                                   "ngữ cảnh khi cần). query = mô tả việc cần làm hoặc tên nguồn. Nguồn "
                                   "đang đấu: " + (menu or "(chưa có nguồn nào)") + f". Kết quả trả tên + "
-                                  f"tham số tool để gọi tiếp qua {_LAZY_RUN}."),
+                                  f"tham số tool để gọi tiếp qua {_LAZY_RUN}; nếu khớp nguồn tài khoản "
+                                  "Claude thì trả hướng dẫn gọi thẳng tool native mcp__<tên>__*."),
                   "schema": {"type": "object", "properties": {
                       "query": {"type": "string",
                                 "description": "Việc cần làm / nguồn / từ khoá, vd 'doanh thu POS hôm nay'"}},
@@ -424,10 +531,12 @@ def _lazy_tools_and_route(visible_tools, visible_route, pool, full_route, top_k)
     return tools, route
 
 
-def _apply_lazy(tools_spec, route):
+def _apply_lazy(tools_spec, route, include_ambient=False):
     """Nếu bật lazy: giấu tool MCP (pool) sau meta-tool search/run; không bật → trả nguyên.
     Pool = tool có route entry mang 'conn' (đến từ connection MCP). Builtins + plugin (entry
-    'call' không 'conn') LUÔN hiện trực tiếp - chúng ít và luôn hữu dụng."""
+    'call' không 'conn') LUÔN hiện trực tiếp - chúng ít và luôn hữu dụng.
+    include_ambient (đường engine Claude): kèm connector tài khoản Claude vào menu/search để
+    model biết còn nhóm tool native mcp__* ngoài pool của hub."""
     pool = [t for t in tools_spec if (route.get(t["fn"]) or {}).get("conn")]
     if not _lazy_on(len(pool)):
         return tools_spec, route
@@ -435,7 +544,8 @@ def _apply_lazy(tools_spec, route):
     visible_tools = [t for t in tools_spec if t["fn"] not in pool_fns]
     visible_route = {fn: ent for fn, ent in route.items() if fn not in pool_fns}
     _, _, top_k = _lazy_config()
-    return _lazy_tools_and_route(visible_tools, visible_route, pool, route, top_k)
+    ambient = _ambient_servers() if include_ambient else []
+    return _lazy_tools_and_route(visible_tools, visible_route, pool, route, top_k, ambient)
 
 
 # ============================================================
@@ -448,12 +558,16 @@ def _store_mtime():
         return 0
 
 
-async def discover_all(mode="full", vault_root=None, include_plugins=True):
+async def discover_all(mode="full", vault_root=None, include_plugins=True, include_ambient=False):
     """(tools_spec, route) đầy đủ cho 1 mode. route entries ĐÃ bọc quyền + audit.
     include_plugins=False: bỏ nhóm tool plugin - dùng khi engine SDK đã đấu plugin
-    IN-PROCESS (header X-Javis-No-Plugins) để model không thấy tool trùng chức năng."""
+    IN-PROCESS (header X-Javis-No-Plugins) để model không thấy tool trùng chức năng.
+    include_ambient=True (đường engine Claude, header X-Javis-Engine=claude): javis_connections +
+    lazy search kèm connector tài khoản Claude (Drive/Gmail...) - chúng là tool native mcp__* của
+    engine, KHÔNG qua hub, hub chỉ mách chỗ cho model. Engine API (in-process) để False (không có
+    tool native để mà chỉ tới)."""
     mode = (mode or "full").strip().lower()
-    key = (mode, str(vault_root or ""), bool(include_plugins))
+    key = (mode, str(vault_root or ""), bool(include_plugins), bool(include_ambient))
     ent = _cache.get(key)
     mt = _store_mtime()
     if ent and time.time() - ent["ts"] < _CACHE_TTL and ent["mtime"] == mt:
@@ -485,7 +599,7 @@ async def discover_all(mode="full", vault_root=None, include_plugins=True):
         tools_spec.append(t)
         route[t["fn"]] = {"call": _guard(raw, t["fn"], mode), "conn": conn, "tool": raw["tool"]}
 
-    b_tools, b_route = _builtin_tools(mode, vault_root)
+    b_tools, b_route = _builtin_tools(mode, vault_root, include_ambient)
     tools_spec += b_tools
     route.update(b_route)
 
@@ -514,7 +628,7 @@ async def discover_all(mode="full", vault_root=None, include_plugins=True):
     # LAZY: đông tool MCP thì giấu pool sau meta-tool search/run (giữ full route để dispatch).
     # Đặt SAU builtin+plugin để chúng luôn hiện; cache lưu bản ĐÃ biến đổi (route lazy vẫn dispatch
     # được vì _run đóng gói route đầy đủ). Đổi setting → làm mới theo TTL cache (60s) hoặc invalidate.
-    tools_spec, route = _apply_lazy(tools_spec, route)
+    tools_spec, route = _apply_lazy(tools_spec, route, include_ambient)
     _cache[key] = {"tools": tools_spec, "route": route, "ts": time.time(), "mtime": mt}
     return tools_spec, route
 
@@ -522,6 +636,7 @@ async def discover_all(mode="full", vault_root=None, include_plugins=True):
 def invalidate_cache():
     """Gọi sau khi thêm/sửa/xoá connection - làm mới tool list + đóng session cũ."""
     _cache.clear()
+    _ambient_cache["ts"] = 0.0   # ép nạp lại danh sách connector tài khoản ở lần discover kế
     try:
         for c in mcp_store.list_connections():
             mcp_client.pool.invalidate(c["id"])
@@ -536,7 +651,7 @@ def _rpc_error(mid, code, message):
     return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
 
 
-async def _handle_one(msg, mode, include_plugins=True):
+async def _handle_one(msg, mode, include_plugins=True, include_ambient=False):
     mid = msg.get("id")
     method = msg.get("method") or ""
     params = msg.get("params") or {}
@@ -551,13 +666,15 @@ async def _handle_one(msg, mode, include_plugins=True):
     if method == "ping":
         return {"jsonrpc": "2.0", "id": mid, "result": {}}
     if method == "tools/list":
-        tools, _ = await discover_all(mode, include_plugins=include_plugins)   # Claude/Codex có tool file native → không builtin file
+        tools, _ = await discover_all(mode, include_plugins=include_plugins,
+                                      include_ambient=include_ambient)   # Claude/Codex có tool file native → không builtin file
         return {"jsonrpc": "2.0", "id": mid, "result": {"tools": [
             {"name": t["fn"], "description": (t.get("description") or t["fn"]),
              "inputSchema": t.get("schema") or {"type": "object", "properties": {}}}
             for t in tools]}}
     if method == "tools/call":
-        _, route = await discover_all(mode, include_plugins=include_plugins)
+        _, route = await discover_all(mode, include_plugins=include_plugins,
+                                      include_ambient=include_ambient)
         name = params.get("name") or ""
         result = await mcp_client.call_route(route, name, params.get("arguments") or {})
         return {"jsonrpc": "2.0", "id": mid, "result": {
@@ -577,17 +694,21 @@ async def handle_http(request):
     mode = (request.headers.get("x-javis-mode") or "full").strip().lower()
     # Engine SDK đấu plugin in-process gửi header này để hub bỏ nhóm plugin (tránh tool trùng)
     include_plugins = (request.headers.get("x-javis-no-plugins") or "").strip() != "1"
+    # Chỉ engine Claude (config claude_config_path gắn X-Javis-Engine=claude) mới có tool native
+    # mcp__* của connector tài khoản Claude → chỉ nó cần gợi ý ambient. Codex/engine API không có.
+    include_ambient = (request.headers.get("x-javis-engine") or "").strip().lower() == "claude"
     try:
         body = await request.json()
     except Exception:
         return JSONResponse(_rpc_error(None, -32700, "parse error"), status_code=400)
     try:
         if isinstance(body, list):
-            out = [r for r in [await _handle_one(m, mode, include_plugins) for m in body] if r is not None]
+            out = [r for r in [await _handle_one(m, mode, include_plugins, include_ambient)
+                               for m in body] if r is not None]
             if not out:
                 return Response(status_code=202)
             return JSONResponse(out)
-        res = await _handle_one(body, mode, include_plugins)
+        res = await _handle_one(body, mode, include_plugins, include_ambient)
         if res is None:
             return Response(status_code=202)
         return JSONResponse(res)
@@ -614,9 +735,12 @@ def claude_config_path(mode="full"):
     if not _has_connections():
         return None
     p = STATE_DIR / f".mcp_hub_{mode}.json"
+    # X-Javis-Engine=claude: báo hub đây là engine Claude (có tool native mcp__* của connector
+    # tài khoản Claude) → javis_connections/lazy search kèm gợi ý ambient. Codex/engine API không gắn.
     p.write_text(json.dumps({"mcpServers": {"javis": {
         "type": "http", "url": hub_url(),
-        "headers": {"Authorization": f"Bearer {hub_token()}", "X-Javis-Mode": mode},
+        "headers": {"Authorization": f"Bearer {hub_token()}", "X-Javis-Mode": mode,
+                    "X-Javis-Engine": "claude"},
     }}}, ensure_ascii=False), encoding="utf-8")
     try:
         os.chmod(p, 0o600)   # file chứa hub token - siết như .hub_token
