@@ -569,11 +569,17 @@ class LoopFeature:
         d = Path(self.deps.brain_root(brain)) / "Javis" / "loop-log"
         entries: List[str] = []
         if d.is_dir():
-            for f in sorted(d.glob("*.md"), reverse=True)[:3]:
+            # Đọc file mới nhất trước; trong mỗi file entry mới nằm DƯỚI (ghi nối) nên đảo lại để
+            # nhật ký xếp MỚI NHẤT TRƯỚC. Đọc tiếp file cho tới khi gom đủ 'limit' (dashboard phân
+            # trang nên có thể xin nhiều), thay vì cứng 3 file như trước.
+            for f in sorted(d.glob("*.md"), reverse=True):
+                if len(entries) >= limit:
+                    break
                 try:
                     txt = f.read_text(encoding="utf-8")
                 except Exception:
                     continue
+                chunks: List[str] = []
                 for chunk in re.split(r"(?=^## \[)", txt, flags=re.MULTILINE):
                     chunk = chunk.strip()
                     if not chunk.startswith("## ["):
@@ -581,7 +587,8 @@ class LoopFeature:
                     # entry mới có "] <slug> · loop (...)"; entry cũ (trước multi-loop) không slug
                     if slug and f"] {slug} · " not in chunk.split("\n", 1)[0]:
                         continue
-                    entries.append(chunk)
+                    chunks.append(chunk)
+                entries.extend(reversed(chunks))
         return entries[:limit]
 
     # ══════════════════════ 1 vòng (giữ khung 4 bước bản gốc) ══════════════════════

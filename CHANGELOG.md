@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.151] - 2026-07-21
+Cải thiện trang Việc định kỳ và khung Hội thoại trên dashboard: thêm ô tìm việc, phân trang nhật ký, và sửa link dài bị tràn ra ngoài khung chat.
+### Thêm mới
+- **Ô tìm kiếm ở trang Việc định kỳ**: khi có nhiều việc lặp và nhắc hẹn, giờ gõ vài chữ để lọc nhanh theo tên (bỏ dấu và không phân biệt hoa thường, vd gõ "email" hay "kho" đều khớp). Việc không hợp và cả nhóm brain rỗng tự ẩn đi; xoá ô tìm là hiện lại đầy đủ.
+### Cải thiện
+- **Nhật ký gần đây phân trang 10 mục mỗi trang**: trước đây đổ nhiều dòng ra cùng lúc gây dài và nặng trang; nay chia trang 10 mục, có nút Trước/Sau và số trang. Phần đọc nhật ký ở máy chủ cũng sửa lại để xếp mới nhất lên đầu và gom đủ tin qua nhiều ngày (không còn giới hạn cứng 3 tệp gần nhất).
+### Sửa lỗi
+- **Link dài trong tin nhắn tràn ra ngoài khung chat**: đường link không có khoảng trắng (vd link Google Docs, Google Drive) trước đây kéo dài quá mép phải của bong bóng tin nhắn. Nay link tự xuống dòng gói gọn trong khung, cho cả tin của Javis lẫn tin người dùng.
+
 ## [0.9.150] - 2026-07-21
 Sửa lỗi Javis (chạy bằng Claude) báo "chưa đấu" các nguồn kết nối vào tài khoản Claude (Google Drive, Gmail, Lịch...) khi đang bật chế độ tool gọn, dù thực ra vẫn gọi được.
 ### Sửa lỗi

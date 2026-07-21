@@ -821,6 +821,11 @@
           <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
         </div>
       </div>
+      <div class="lp-search-row" style="margin:6px 0 10px">
+        <input id="lpSearch" type="search" autocomplete="off" placeholder="🔍 Tìm việc theo tên..."
+          style="width:100%;max-width:340px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#cdd8ee;font-size:14px;outline:none">
+        <span class="dim" id="lpSearchNote" style="display:none;font-size:12px;color:#8794ac;margin-left:8px"></span>
+      </div>
       <div id="lpGroups">Đang tải...</div>
       <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
@@ -980,6 +985,39 @@
 
     el.querySelector("#lpStop").onclick = async () => { await fetch("/loops/stop", { method: "POST" }); loadAll(); };
 
+    // Chuẩn hoá chuỗi để tìm kiếm: thường + bỏ dấu tiếng Việt (gõ "email" khớp "Email", "kho"
+    // khớp "khô") + đ→d. Dùng cho cả gắn nhãn thẻ việc lẫn từ khoá người dùng gõ.
+    function _lpNorm(s) {
+      return String(s == null ? "" : s).toLowerCase()
+        .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+    }
+    // Lọc các thẻ việc trong #lpGroups theo ô tìm kiếm. Ẩn thẻ không khớp; ẩn luôn tiêu đề brain /
+    // "Nhắc hẹn đang chờ" khi cả nhóm/mục không còn thẻ nào hiện. Gọi lại sau mỗi lần render danh sách.
+    function applyLpSearch() {
+      const input = el.querySelector("#lpSearch");
+      const note = el.querySelector("#lpSearchNote");
+      const q = _lpNorm(input ? input.value.trim() : "");
+      let shown = 0, totalCards = 0;
+      el.querySelectorAll("#lpGroups .lp-group").forEach(group => {
+        let groupShown = 0, remShown = 0;
+        group.querySelectorAll(".wf-card").forEach(card => {
+          totalCards++;
+          const hit = !q || (card.dataset.search || "").indexOf(q) !== -1;
+          card.style.display = hit ? "" : "none";
+          if (hit) { groupShown++; shown++; if (card.dataset.kind === "rem") remShown++; }
+        });
+        const remHead = group.querySelector('[data-lp="remhead"]');
+        if (remHead) remHead.style.display = (q && !remShown) ? "none" : "";
+        const emptyRow = group.querySelector('[data-lp="empty"]');
+        if (emptyRow) emptyRow.style.display = q ? "none" : "";
+        group.style.display = (q && !groupShown) ? "none" : "";
+      });
+      if (note) {
+        if (q && !shown && totalCards) { note.style.display = ""; note.textContent = "Không có việc nào khớp."; }
+        else note.style.display = "none";
+      }
+    }
+
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
       const dot = lp.running ? `<span style="color:#3fdc86">⏳ đang chạy</span>`
@@ -1000,6 +1038,8 @@
       ].filter(Boolean).join(" · ");
       const div = document.createElement("div");
       div.className = "wf-card" + (lp.enabled ? "" : " off");
+      div.dataset.kind = "loop";
+      div.dataset.search = _lpNorm(`${lp.name} ${lp.slug} ${lp.goal || ""} ${GNAME[lp.goal] || ""}`);
       div.innerHTML = `
         <div class="wf-top"><div class="wf-name">🔁 ${esc(lp.name)} <span class="dim" style="font-size:12px">${esc(lp.slug)}</span></div><div>${dot}</div></div>
         <div class="wf-desc">${extra}</div>
@@ -1054,6 +1094,8 @@
       const kind = MODE_LBL[r.mode] || "nhắc";
       const div = document.createElement("div");
       div.className = "wf-card";
+      div.dataset.kind = "rem";
+      div.dataset.search = _lpNorm(`${title} ${when} ${kind}`);
       div.innerHTML = `<b>${esc(title)}</b>
         <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
         <div class="wf-actions" style="margin-top:8px">
@@ -1118,30 +1160,37 @@
         const cur = isCurrentBrain(g);
         if (!loops.length && !rems.length && !cur) return;   // brain rỗng không phải brain đang xem → ẩn
         if (loops.length || rems.length) anyItem = true;
+        // Mỗi brain gói vào 1 wrapper .lp-group để ô tìm kiếm ẩn/hiện cả nhóm gọn gàng.
+        const group = document.createElement("div");
+        group.className = "lp-group";
         const head = document.createElement("div");
         head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:#cdd8ee;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px";
         head.innerHTML = `<span>🧠 ${esc(g.name)}</span>`
           + (cur ? `<span style="font-size:11px;color:#3fdc86;font-weight:500">đang xem</span>` : "")
           + (g.is_default ? `<span style="font-size:11px;color:#6b7894;font-weight:400">mặc định</span>` : "");
-        box.appendChild(head);
+        group.appendChild(head);
         if (!loops.length && !rems.length) {
           const e2 = document.createElement("div");
           e2.className = "empty"; e2.style.margin = "0 0 10px";
+          e2.dataset.lp = "empty";
           e2.innerHTML = `Chưa có việc nào ở brain này. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat.`;
-          box.appendChild(e2);
+          group.appendChild(e2);
         }
-        loops.forEach(lp => { allLoops.push(lp); box.appendChild(loopCard(lp)); });
+        loops.forEach(lp => { allLoops.push(lp); group.appendChild(loopCard(lp)); });
         if (rems.length) {
           const rh = document.createElement("div");
           rh.style.cssText = "font-size:13px;color:#9fb0cf;margin:10px 0 6px";
+          rh.dataset.lp = "remhead";
           rh.textContent = "Nhắc hẹn đang chờ";
-          box.appendChild(rh);
-          rems.forEach(r => box.appendChild(reminderCard(r)));
+          group.appendChild(rh);
+          rems.forEach(r => group.appendChild(reminderCard(r)));
         }
+        box.appendChild(group);
       });
       if (!anyItem) {
         box.innerHTML = `<div class="empty">Chưa có việc định kỳ hay nhắc hẹn nào. Bấm <b>+ Thêm việc</b>, hoặc nói với Javis trong chat (vd "tạo loop mỗi 2 tiếng đọc 1 source rồi đề xuất").</div>`;
       }
+      applyLpSearch();   // giữ nguyên bộ lọc tìm kiếm sau mỗi lần render lại danh sách
       // Bộ lọc nhật ký: mọi loop mọi brain (value = index vào allLoops → biết cả brain lẫn slug).
       const sel = el.querySelector("#lpLogFilter");
       const cur = sel.value;
@@ -1150,19 +1199,49 @@
       clearTimeout(pollTimer);
       if (d.running) pollTimer = setTimeout(loadAll, 5000);   // đang có vòng chạy → tự refresh
     }
+    // Nhật ký gần đây: tải 1 lần (mới nhất trước), rồi phân trang phía client 10 mục/trang - đỡ
+    // đổ cả trăm dòng DOM cùng lúc, có nút Trước/Sau để lật xem tin cũ hơn.
+    let logEntries = [];
+    let logPage = 0;
+    const LOG_PER_PAGE = 10;
     async function loadLog() {
       if (myGen !== _renderGen) return;
       const v = el.querySelector("#lpLogFilter").value;
       let brainQ = fbrain(), slugQ = "";
       if (v !== "") { const lp = allLoops[+v]; if (lp) { brainQ = lp.brain_path; slugQ = lp.slug; } }
       let d = { entries: [] };
-      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(brainQ)}&slug=${encodeURIComponent(slugQ)}&limit=10`)).json(); } catch (e) { }
+      try { d = await (await fetch(`/loops/log?brain=${encodeURIComponent(brainQ)}&slug=${encodeURIComponent(slugQ)}&limit=200`)).json(); } catch (e) { }
       if (myGen !== _renderGen) return;
+      logEntries = d.entries || [];
+      logPage = 0;
+      renderLog();
+    }
+    function renderLog() {
       const box = el.querySelector("#lpLog");
       if (!box) return;
-      box.innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`;
+      const total = logEntries.length;
+      if (!total) { box.innerHTML = `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`; return; }
+      const pages = Math.ceil(total / LOG_PER_PAGE);
+      if (logPage >= pages) logPage = pages - 1;
+      if (logPage < 0) logPage = 0;
+      const start = logPage * LOG_PER_PAGE;
+      const items = logEntries.slice(start, start + LOG_PER_PAGE)
+        .map(e => `<div class="le">${esc(e)}</div>`).join("");
+      let pager = "";
+      if (pages > 1) {
+        pager = `<div class="lp-pager" style="display:flex;align-items:center;gap:10px;margin-top:10px">
+          <button class="s-btn-ghost" id="lpLogPrev" ${logPage === 0 ? "disabled" : ""}>← Trước</button>
+          <span class="dim" style="font-size:13px;color:#8794ac">Trang ${logPage + 1}/${pages} · ${total} mục</span>
+          <button class="s-btn-ghost" id="lpLogNext" ${logPage >= pages - 1 ? "disabled" : ""}>Sau →</button>
+        </div>`;
+      }
+      box.innerHTML = items + pager;
+      const prev = el.querySelector("#lpLogPrev"), next = el.querySelector("#lpLogNext");
+      if (prev) prev.onclick = () => { if (logPage > 0) { logPage--; renderLog(); } };
+      if (next) next.onclick = () => { if (logPage < pages - 1) { logPage++; renderLog(); } };
     }
     el.querySelector("#lpLogFilter").onchange = loadLog;
+    { const s = el.querySelector("#lpSearch"); if (s) s.oninput = applyLpSearch; }
     ensureBrains();   // nạp sẵn danh sách brain cho ô chọn (không chờ /viec/all vốn nặng)
     loadAll(); loadLog();
   }
