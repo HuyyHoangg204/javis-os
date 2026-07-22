@@ -34,7 +34,13 @@ check("catalog: auth apikey + field cookie", fp["auth"].get("type") == "apikey"
 check("catalog: field cookie multiline", any(f["key"] == "cookie" and f.get("multiline") for f in fp["auth"]["fields"]))
 check("catalog: default_perm readonly", fp["default_perm"] == "readonly")
 check("catalog: risk cảnh báo khoá tài khoản", "KHO" in (fp.get("risk") or "").upper() and "cá nhân" in fp["risk"].lower())
-check("catalog: tool ghi ở danger", set(fp["tool_meta"].get("danger") or []) == {"fb_personal_post", "fb_personal_comment"})
+check("catalog: tool ghi ở danger",
+      set(fp["tool_meta"].get("danger") or [])
+      == {"fb_personal_post", "fb_personal_comment", "fb_personal_comment_reply",
+          "fb_personal_delete", "fb_personal_react", "fb_personal_share", "fb_message_send"})
+check("catalog: tool đọc (bình luận + Messenger) ở read",
+      {"fb_personal_comments", "fb_messages_read", "fb_message_thread"}
+      <= set(fp["tool_meta"].get("read") or []))
 import mcp_catalog  # noqa: E402
 check("mcp_catalog.get load được", mcp_catalog.get("facebook-personal") is not None)
 
@@ -75,10 +81,17 @@ class _Ctx:
 ctx = _Ctx()
 plug.register(ctx)
 byname = {t["name"]: t for t in ctx.tools}
-check("plugin: đủ 3 tool", set(byname) == {"fb_feed_read", "fb_personal_post", "fb_personal_comment"})
-check("plugin: fb_feed_read readonly", byname["fb_feed_read"]["min_mode"] == "readonly")
-check("plugin: đăng + bình luận full",
-      byname["fb_personal_post"]["min_mode"] == "full" and byname["fb_personal_comment"]["min_mode"] == "full")
+check("plugin: đủ 11 tool", set(byname) == {
+    "fb_feed_read", "fb_personal_post", "fb_personal_comment", "fb_personal_comments",
+    "fb_personal_comment_reply", "fb_personal_delete", "fb_personal_react", "fb_personal_share",
+    "fb_messages_read", "fb_message_thread", "fb_message_send"})
+check("plugin: tool đọc đều readonly",
+      all(byname[n]["min_mode"] == "readonly" for n in
+          ("fb_feed_read", "fb_personal_comments", "fb_messages_read", "fb_message_thread")))
+check("plugin: tool ghi đều full",
+      all(byname[n]["min_mode"] == "full" for n in
+          ("fb_personal_post", "fb_personal_comment", "fb_personal_comment_reply", "fb_personal_delete",
+           "fb_personal_react", "fb_personal_share", "fb_message_send")))
 
 # gate: chưa có cookie
 plug._connected_id = lambda: None
@@ -101,6 +114,20 @@ POSTPAGE = ('<html><body><div><h3>Nguyen Van A</h3><p>Hôm nay trời đẹp qu�
             '<input type="hidden" name="fb_dtsg" value="Cmt99">'
             '<textarea name="comment_text"></textarea>'
             '<input type="submit" name="submit" value="Bình luận"></form></body></html>')
+COMMENTS_PAGE = ('<html><body><div><h3>Nguyen Van A</h3><p>Hôm nay trời đẹp quá</p></div>'
+                 '<div id="1234500001"><h3><a href="/profile.php?id=700001">Tran Thi B</a></h3>'
+                 '<div>Anh cho hoi gia bao nhieu</div>'
+                 '<div><a href="/comment/replies/?ctoken=r1&cmt_id=1234500001">Trả lời</a> · '
+                 '<abbr>3 giờ</abbr></div></div>'
+                 '<div id="1234500002"><h3><a href="/profile.php?id=700002">Le Van C</a></h3>'
+                 '<div>Dep lam ban oi</div>'
+                 '<div><a href="/comment/replies/?ctoken=r2&cmt_id=1234500002">Trả lời</a> · '
+                 '<abbr>1 ngày</abbr></div></div>'
+                 '</body></html>')
+REPLYPAGE = ('<html><body><form method="post" action="/a/comment_replies.php?ctoken=r1">'
+             '<input type="hidden" name="fb_dtsg" value="Rpl77">'
+             '<textarea name="comment_text"></textarea>'
+             '<input type="submit" name="submit" value="Trả lời"></form></body></html>')
 
 check("_fb_dtsg: bóc được token", plug._fb_dtsg(HOME) == "AbC123")
 a, hid, ta = plug._find_form(HOME, ["xc_message", "status"])
@@ -109,6 +136,63 @@ check("_find_form: form soạn bài (action + fb_dtsg + textarea)",
 ac, hic, tc = plug._find_form(POSTPAGE, ["comment_text", "comment"])
 check("_find_form: form bình luận", ac == "/a/comment.php?ctoken=xyz" and hic.get("fb_dtsg") == "Cmt99" and tc == "comment_text")
 check("_strip: bỏ tag, còn chữ", "trời đẹp quá" in plug._strip(HOME) and "<" not in plug._strip(HOME))
+
+cmts = plug._parse_comments(COMMENTS_PAGE)
+check("_parse_comments: bóc đủ 2 bình luận, đúng id/tên/nội dung, bỏ nhiễu Trả lời/thời gian",
+      len(cmts) == 2
+      and cmts[0]["comment_id"] == "1234500001" and cmts[0]["author"] == "Tran Thi B"
+      and cmts[0]["text"] == "Anh cho hoi gia bao nhieu"
+      and "cmt_id=1234500001" in cmts[0]["reply_url"]
+      and cmts[1]["comment_id"] == "1234500002" and cmts[1]["text"] == "Dep lam ban oi")
+
+
+# ---- 4b. Fixture + helper cho thao tác mở rộng (xoá/react/share/messenger) ----
+DELPOST = ('<html><body><div><h3>Minh Quy</h3><p>Bai cua toi</p></div>'
+           '<a href="/story.php?story_fbid=555">Chi tiet</a>'
+           '<a href="/delete.php?story_fbid=555&confirm=1">Xoá bài viết</a>'
+           '<a href="/a/like.php?ft=555">Thích</a></body></html>')
+DELCONFIRM = ('<html><body><form method="post" action="/a/removecontent.php?story_fbid=555">'
+              '<input type="hidden" name="fb_dtsg" value="Del55">'
+              '<input type="submit" name="delete" value="Xoá">'
+              '<input type="submit" name="cancel" value="Huỷ"></form></body></html>')
+REACTPAGE = ('<html><body><div><h3>Ai do</h3><p>Bai viet</p></div>'
+             '<a href="/a/like.php?ft_ent_identifier=555&like">Thích</a>'
+             '<a href="/reactions/picker/?ft_ent_identifier=555">Cảm xúc</a></body></html>')
+PICKER = ('<html><body>'
+          '<a href="/a/reactions.php?ft=555&reaction_type=1">Thích</a>'
+          '<a href="/a/reactions.php?ft=555&reaction_type=2">Yêu thích</a>'
+          '<a href="/a/reactions.php?ft=555&reaction_type=4">Haha</a></body></html>')
+SHAREPAGE = ('<html><body><div><h3>Ai do</h3><p>Bai hay</p></div>'
+             '<a href="/story.php?story_fbid=555">Chi tiet</a>'
+             '<a href="/sharer.php?sid=555">Chia sẻ</a></body></html>')
+SHARECOMPOSER = ('<html><body><form method="post" action="/a/sharer.php?sid=555">'
+                 '<input type="hidden" name="fb_dtsg" value="Shr9">'
+                 '<textarea name="message"></textarea>'
+                 '<input type="submit" name="post" value="Chia sẻ"></form></body></html>')
+MSGLIST = ('<html><body>'
+           '<a href="/messages/read/?tid=cid.c.100">Tran Thi B<br/>Còn hàng không ạ</a>'
+           '<a href="/messages/read/?tid=cid.c.200">Le Van C<br/>Ok em lấy 2 cái</a></body></html>')
+THREADPAGE = ('<html><body><h3>Tran Thi B</h3>'
+              '<div>Chào shop, còn hàng không?</div><div>Dạ còn ạ</div>'
+              '<form method="post" action="/messages/send/?tid=cid.c.100">'
+              '<input type="hidden" name="fb_dtsg" value="Msg42">'
+              '<textarea name="body"></textarea>'
+              '<input type="submit" name="send" value="Gửi"></form></body></html>')
+
+check("_find_link: ưu tiên cụm cụ thể (Xoá bài viết) hơn Xoá chung",
+      plug._find_link(DELPOST, ["Xoá bài viết", "Xoá"]) == "/delete.php?story_fbid=555&confirm=1")
+check("_find_link: href_contains bắt đúng link like",
+      plug._find_link(REACTPAGE, [], href_contains="like.php") == "/a/like.php?ft_ent_identifier=555&like")
+check("_find_link: chọn đúng cảm xúc theo tên trong picker",
+      plug._find_link(PICKER, ["Haha"]) == "/a/reactions.php?ft=555&reaction_type=4")
+da, df = plug._find_button_form(DELCONFIRM, ["Xoá", "Delete"])
+check("_find_button_form: lấy đúng nút Xoá + fb_dtsg, BỎ nút Huỷ",
+      da == "/a/removecontent.php?story_fbid=555" and df.get("fb_dtsg") == "Del55"
+      and df.get("delete") == "Xoá" and "cancel" not in df)
+thr = plug._parse_threads(MSGLIST)
+check("_parse_threads: bóc 2 hội thoại đúng tên + thread_url + đoạn tin",
+      len(thr) == 2 and thr[0]["name"] == "Tran Thi B" and "tid=cid.c.100" in thr[0]["thread_url"]
+      and "Còn hàng không" in thr[0]["snippet"] and thr[1]["name"] == "Le Van C")
 
 
 # ---- 5. Handler (giả cookie + _client + _get/_post) ----
@@ -164,6 +248,117 @@ async def handler_tests():
     check("fb_personal_comment: thiếu post_url/post_id → ERROR", r_cmt_nopost.startswith("ERROR"))
     r_cmt_nomsg = await plug._comment({"post_url": "/x"}, None)
     check("fb_personal_comment: thiếu message → ERROR", r_cmt_nomsg.startswith("ERROR"))
+
+    # đọc bình luận: nạp trang bài rồi bóc danh sách
+    state["page"] = COMMENTS_PAGE
+    r_read = await plug._read_comments({"post_url": "/story.php?story_fbid=111"}, None)
+    d_read = json.loads(r_read)
+    check("fb_personal_comments: đọc đủ 2 bình luận kèm reply_url",
+          len(d_read["comments"]) == 2 and d_read["comments"][0]["author"] == "Tran Thi B"
+          and d_read["comments"][0]["reply_url"])
+    r_read_empty = await plug._read_comments({"message": "hi"}, None)
+    check("fb_personal_comments: thiếu post_url/post_id → ERROR", r_read_empty.startswith("ERROR"))
+
+    # trả lời bình luận qua reply_url thẳng: POST vào form của trang reply
+    state["page"] = REPLYPAGE
+    r_reply = await plug._reply_comment(
+        {"reply_url": "/comment/replies/?ctoken=r1&cmt_id=1234500001", "message": "Da nhan tin rieng nhe"}, None)
+    check("fb_personal_comment_reply: POST đúng form trang reply + comment_text + fb_dtsg",
+          state["posted"][0] == "/a/comment_replies.php?ctoken=r1"
+          and state["posted"][1].get("comment_text") == "Da nhan tin rieng nhe"
+          and state["posted"][1].get("fb_dtsg") == "Rpl77"
+          and '"ok": true' in r_reply.lower())
+
+    # trả lời qua comment_id + post_url: tự nạp trang bài tìm reply_url rồi mới nạp trang reply
+    pages = [COMMENTS_PAGE, REPLYPAGE]
+    async def _fake_get_seq(client, url):
+        return pages.pop(0), state["url"]
+    plug._get = _fake_get_seq
+    r_reply2 = await plug._reply_comment(
+        {"comment_id": "1234500001", "post_url": "/story.php?story_fbid=111", "message": "Oke ban nhe"}, None)
+    check("fb_personal_comment_reply: tự tìm reply_url qua comment_id rồi trả lời",
+          state["posted"][1].get("comment_text") == "Oke ban nhe" and '"ok": true' in r_reply2.lower())
+    plug._get = _fake_get
+
+    r_reply_nomsg = await plug._reply_comment({"reply_url": "/x"}, None)
+    check("fb_personal_comment_reply: thiếu message → ERROR", r_reply_nomsg.startswith("ERROR"))
+    r_reply_notarget = await plug._reply_comment({"message": "hi"}, None)
+    check("fb_personal_comment_reply: thiếu reply_url và comment_id/post → ERROR", r_reply_notarget.startswith("ERROR"))
+
+    # ---- Thao tác mở rộng: xoá / react / share / messenger ----
+    got = {"url": None}
+
+    def _seq_getter(seq):
+        box = list(seq)
+        async def _g(client, url):
+            got["url"] = url
+            return (box.pop(0) if box else seq[-1]), state["url"]
+        return _g
+
+    # xoá bài: nạp trang bài → trang xác nhận → POST form removecontent (đúng nút Xoá, bỏ Huỷ)
+    plug._get = _seq_getter([DELPOST, DELCONFIRM])
+    r_del = await plug._delete({"post_url": "/story.php?story_fbid=555"}, None)
+    check("fb_personal_delete: POST form removecontent + fb_dtsg + nút Xoá, KHÔNG kèm Huỷ",
+          state["posted"][0] == "/a/removecontent.php?story_fbid=555"
+          and state["posted"][1].get("fb_dtsg") == "Del55"
+          and state["posted"][1].get("delete") == "Xoá"
+          and "cancel" not in state["posted"][1]
+          and '"ok": true' in r_del.lower())
+    r_del_nopost = await plug._delete({}, None)
+    check("fb_personal_delete: thiếu post → ERROR", r_del_nopost.startswith("ERROR"))
+
+    # react like: GET đúng link like.php trên bài
+    plug._get = _seq_getter([REACTPAGE, REACTPAGE])
+    r_react = await plug._react({"post_url": "/story.php?story_fbid=555"}, None)
+    check("fb_personal_react: like GET đúng link like.php",
+          got["url"] == "/a/like.php?ft_ent_identifier=555&like" and '"ok": true' in r_react.lower())
+    # react haha: mở picker rồi GET đúng reaction_type
+    plug._get = _seq_getter([REACTPAGE, PICKER, PICKER])
+    r_haha = await plug._react({"post_url": "/story.php?story_fbid=555", "reaction": "haha"}, None)
+    check("fb_personal_react: haha mở picker rồi GET đúng reaction_type",
+          "reaction_type=4" in (got["url"] or "") and '"ok": true' in r_haha.lower())
+    r_react_bad = await plug._react({"post_url": "/x", "reaction": "xyz"}, None)
+    check("fb_personal_react: reaction lạ → ERROR", r_react_bad.startswith("ERROR"))
+
+    # chia sẻ: nạp trang bài → trang soạn chia sẻ → POST form sharer + message
+    plug._get = _seq_getter([SHAREPAGE, SHARECOMPOSER])
+    r_share = await plug._share({"post_url": "/story.php?story_fbid=555", "message": "Hay qua"}, None)
+    check("fb_personal_share: POST form sharer + message + fb_dtsg",
+          state["posted"][0] == "/a/sharer.php?sid=555"
+          and state["posted"][1].get("message") == "Hay qua"
+          and state["posted"][1].get("fb_dtsg") == "Shr9"
+          and '"ok": true' in r_share.lower())
+    r_share_nopost = await plug._share({"message": "x"}, None)
+    check("fb_personal_share: thiếu post → ERROR", r_share_nopost.startswith("ERROR"))
+
+    # messenger: đọc danh sách hội thoại
+    plug._get = _fake_get
+    state["page"] = MSGLIST
+    r_msgs = await plug._messages({}, None)
+    d_msgs = json.loads(r_msgs)
+    check("fb_messages_read: đọc 2 hội thoại kèm thread_url",
+          len(d_msgs["threads"]) == 2 and d_msgs["threads"][0]["name"] == "Tran Thi B"
+          and "tid=cid.c.100" in d_msgs["threads"][0]["thread_url"])
+
+    # messenger: đọc 1 cuộc trò chuyện + gửi tin
+    state["page"] = THREADPAGE
+    r_thr = await plug._thread({"tid": "cid.c.100"}, None)
+    d_thr = json.loads(r_thr)
+    check("fb_message_thread: đọc nội dung + can_send",
+          "còn hàng không" in d_thr["thread_text"].lower() and d_thr["can_send"] is True)
+    r_thr_notarget = await plug._thread({}, None)
+    check("fb_message_thread: thiếu thread_url/tid → ERROR", r_thr_notarget.startswith("ERROR"))
+
+    r_send = await plug._send_message({"tid": "cid.c.100", "message": "Da con hang"}, None)
+    check("fb_message_send: POST form send + body + fb_dtsg",
+          state["posted"][0] == "/messages/send/?tid=cid.c.100"
+          and state["posted"][1].get("body") == "Da con hang"
+          and state["posted"][1].get("fb_dtsg") == "Msg42"
+          and '"ok": true' in r_send.lower())
+    r_send_nomsg = await plug._send_message({"tid": "cid.c.100"}, None)
+    check("fb_message_send: thiếu message → ERROR", r_send_nomsg.startswith("ERROR"))
+    r_send_notarget = await plug._send_message({"message": "hi"}, None)
+    check("fb_message_send: thiếu thread_url/tid → ERROR", r_send_notarget.startswith("ERROR"))
 
 BASE_HOME = "https://mbasic.facebook.com/"
 asyncio.run(handler_tests())

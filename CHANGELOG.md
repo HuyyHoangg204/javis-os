@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.153] - 2026-07-22
+Mở rộng plugin Facebook cá nhân (cookie/mbasic) thêm loạt thao tác cơ bản của người dùng: xoá bài, thả cảm xúc, chia sẻ, đọc và gửi tin nhắn Messenger, lướt feed nhiều trang. Vẫn theo cách mbasic nhẹ (chỉ cần cookie, chạy VPS headless) nên không đăng được reel/video và không sửa bài đã đăng. Mọi thao tác ghi bằng tài khoản cá nhân có rủi ro khoá tài khoản; connector mặc định Chỉ đọc, các tool ghi chỉ chạy khi bật Toàn quyền.
+### Thêm mới
+- **Xoá bài, thả cảm xúc, chia sẻ**: `fb_personal_delete` (xoá bài của chính mình), `fb_personal_react` (like/love/care/haha/wow/sad/angry) và `fb_personal_share` (chia sẻ lên tường, kèm lời tuỳ chọn). Thao tác thật, mức Toàn quyền.
+- **Messenger**: `fb_messages_read` (danh sách hội thoại) và `fb_message_thread` (đọc một cuộc trò chuyện) ở mức Chỉ đọc; `fb_message_send` (gửi tin) ở mức Toàn quyền.
+### Cải thiện
+- **Lướt feed sâu hơn**: `fb_feed_read` trả thêm `next_url` và nhận `pages` (tối đa 5) để lướt liền nhiều trang, hoặc truyền `next_url` để đọc tiếp từ trang trước.
+
 ## [0.9.152] - 2026-07-22
 Điều hướng kiểu Wikipedia trong vault: bấm được đường dẫn file .md trong chat để mở đọc/sửa ngay, và bấm được wikilink [[..]] khi đọc note để nhảy sang note đích.
 ### Thêm mới
