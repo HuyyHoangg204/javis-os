@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.152] - 2026-07-22
+Điều hướng kiểu Wikipedia trong vault: bấm được đường dẫn file .md trong chat để mở đọc/sửa ngay, và bấm được wikilink [[..]] khi đọc note để nhảy sang note đích.
+### Thêm mới
+- **Đường dẫn file trong chat bấm mở được**: khi Javis nhắc tới một file kiểu `Javis/loops/x.md` trong khung chat (dạng inline code), giờ bấm thẳng vào là bung khung đọc/sửa file giữa màn hình, không phải tự dò trong trang Tệp tin. Chỉ nhận chuỗi trông đúng là đường dẫn file (có đuôi file, có thư mục hoặc là file .md); lệnh, URL và code thường không bị nhận nhầm.
+- **Wikilink [[..]] thành link điều hướng**: mọi chỗ render markdown (chat, khung sửa file, trình đọc note ở trang Bộ não/Tệp tin) giờ hiện `[[note]]` và `[[note|tên đẹp]]` thành link. Bấm vào là tự TÌM file đích trong vault (khớp đuôi đường dẫn kiểu Obsidian, hoặc khớp tên note ở bất kỳ thư mục nào, ưu tiên .md) rồi mở ngay tại chỗ: đang đọc trong editor cây thì chuyển note trong editor đó như Wikipedia, đang ở chat thì bung khung sửa. Không thấy note thì link báo đỏ nhẹ chứ không mở lung tung.
+### Cải thiện
+- **Tìm file không phân biệt dấu tiếng Việt ở máy chủ** (`/files/search`): gõ "chi nga" vẫn tìm ra "Chị Nga...". Ô tìm kiếm theo Nội dung ở trang Tệp tin hưởng lợi luôn.
+- **Lưu từ chế độ Sửa (WYSIWYG) giữ đúng cú pháp gốc**: wikilink giữ nguyên `[[..]]` (kèm cả alias `[[..|..]]`), link markdown `[chữ](đường-dẫn)` không còn bị đổi thành wikilink, ảnh nhúng `![[..]]` không mất dấu chấm than, đường dẫn trong inline code giữ nguyên là code.
+### Kiểm thử
+- Thêm test render wikilink/alias/đường dẫn trong code (test_chat_render.js) + test bộ tìm file đích wkResolve với fetch giả lập (test_wikilink.js mới); CI giờ chạy đủ 4 file test JS dashboard.
+
 ## [0.9.151] - 2026-07-21
 Cải thiện trang Việc định kỳ và khung Hội thoại trên dashboard: thêm ô tìm việc, phân trang nhật ký, và sửa link dài bị tràn ra ngoài khung chat.
 ### Thêm mới

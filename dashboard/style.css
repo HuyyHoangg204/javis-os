@@ -1036,6 +1036,16 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .code-block .tok-n { color: #f0883e; }
 .code-block .tok-k { color: #c792ea; font-weight: 600; }
 
+/* Wikilink [[..]] + duong dan file trong inline code: bam de mo/di chuyen toi note (chat-render.js) */
+a.jv-wikilink { color: var(--accent); text-decoration: none; cursor: pointer;
+  border-bottom: 1px dashed rgba(255,122,60,.55); }
+a.jv-wikilink:hover { border-bottom-style: solid; filter: brightness(1.12); }
+a.jv-wikilink.jv-wl-busy { opacity: .55; cursor: progress; }
+a.jv-wikilink.jv-wl-miss { color: #ff6b6b; border-bottom-color: #ff6b6b; }
+a.jv-fcode { text-decoration: none; }
+a.jv-fcode code { cursor: pointer; transition: color .12s; }
+a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
+
 /* The artifact trong luong chat */
 .jv-art { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 10px 12px;
   max-width: 420px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer;

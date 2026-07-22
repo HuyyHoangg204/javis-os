@@ -2518,12 +2518,20 @@ async def files_list(brain: str = Query("brain"), path: str = Query(None)):
             "items": items}
 
 
+def _fold_accents(s: str) -> str:
+    """Bỏ dấu tiếng Việt + thường hoá để so khớp tên file không phân biệt dấu (đ -> d)."""
+    import unicodedata
+    s = unicodedata.normalize("NFD", s or "")
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s.replace("đ", "d").replace("Đ", "D").lower()
+
+
 @app.get("/files/search")
 async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: int = Query(50)):
     """Tìm note trong GỐC BRAIN (KHÔNG phải trần duyệt - tránh quét cả ổ đĩa trên localhost).
-    Khớp TÊN file (mọi loại) + NỘI DUNG file text; bỏ file >1MB và thư mục ẩn/nặng. Path trả về
-    tính theo TRẦN (giống /files/list) để mở bằng cùng quy ước. Walk chạy trong threadpool để
-    không chặn event loop FastAPI."""
+    Khớp TÊN file (mọi loại, không phân biệt dấu tiếng Việt) + NỘI DUNG file text; bỏ file >1MB
+    và thư mục ẩn/nặng. Path trả về tính theo TRẦN (giống /files/list) để mở bằng cùng quy ước.
+    Walk chạy trong threadpool để không chặn event loop FastAPI."""
     from starlette.concurrency import run_in_threadpool
     q = (q or "").strip()
     if not q:
@@ -2531,6 +2539,7 @@ async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: i
     root = _files_root(brain)                        # trần (để tính path trả về, khớp /files/list)
     broot = Path(_brain_root(brain)).resolve()       # phạm vi quét = gốc brain
     ql = q.lower()
+    qf = _fold_accents(q)                            # bản không dấu (khớp tên kể cả gõ thiếu dấu)
     try:
         limit = max(1, min(int(limit), 200))
     except (TypeError, ValueError):
@@ -2546,7 +2555,7 @@ async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: i
                     return out
                 p = Path(dirpath) / fn
                 ext = p.suffix.lower()
-                name_hit = ql in fn.lower()
+                name_hit = ql in fn.lower() or qf in _fold_accents(fn)
                 content_hit = False
                 snippet, line_no = "", 0
                 if ext in _TEXT_EXTS:

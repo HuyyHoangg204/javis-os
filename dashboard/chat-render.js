@@ -48,10 +48,31 @@
   }
   // Thuoc tinh <a> mo trang Tep tin dung vi tri file/thu muc. Giu href deep-link (#open=..) de
   // Ctrl/giua chuot mo tab trinh duyet moi cung nhay dung cho; bam thuong -> mo trong app.
-  function vaultLoc(rawpath) {
+  function vaultLoc(rawpath, extraCls) {
     var clean = String(rawpath || "").replace(/^\.?\//, "");
     return 'href="#open=' + esc(encodeURIComponent(clean)) + '" data-vault-path="' + esc(clean) +
-      '" class="jv-floc" title="Mo vi tri trong Tep tin"';
+      '" class="jv-floc' + (extraCls ? " " + extraCls : "") + '" title="Mo vi tri trong Tep tin"';
+  }
+  // Inline code chua DUONG DAN FILE vault (vd `Javis/loops/x.md`)? Tra ve path da chuan hoa, "" neu khong phai.
+  // Chi nhan khi trong giong path that: co duoi file + (co thu muc / la .md tran), khong ky tu cam cua ten file
+  // Windows (":" loai luon URL va lenh co cong cu), khong leo thang "..".
+  function codeFilePath(c) {
+    var t = String(c == null ? "" : c).trim().replace(/\\/g, "/").replace(/^\.?\//, "");
+    if (t.length < 4 || t.length > 240) return "";
+    if (!isVaultRel(t)) return "";
+    if (/[:<>"|?*\[\]]/.test(t)) return "";
+    if (!/\.[a-z0-9]{1,6}$/i.test(t)) return "";
+    if (!(t.indexOf("/") >= 0 || /\.md$/i.test(t))) return "";
+    if (/(^|\/)\.\.(\/|$)/.test(t)) return "";
+    return t;
+  }
+  // Wikilink [[target]] / [[target|alias]] -> the <a> dieu huong kieu Wikipedia. data-vault-path giu target GOC
+  // (round-trip WYSIWYG -> markdown van ra [[..]]); click se tu TIM file dich trong vault (wkResolve ben duoi).
+  function wikiLinkHtml(target, alias) {
+    var label = (alias != null && alias.trim()) ? alias.trim() : target;
+    return '<a href="#open=' + esc(encodeURIComponent(target)) + '" data-vault-path="' + esc(target) + '"' +
+      (label !== target ? ' data-wiki-alias="' + esc(label) + '"' : "") +
+      ' class="jv-wikilink" title="Mở note: ' + esc(target) + '">' + esc(label) + "</a>";
   }
   // FNV-1a -> id ngan on dinh cho artifact (cung noi dung -> cung id qua cac lan re-render khi stream)
   function hashId(s) {
@@ -256,12 +277,22 @@
     raw = raw.replace(/```([^\n]*)\n([\s\S]*)$/, function (_m, info, code) {
       return "\n" + put(renderFence(info, code, true)) + "\n";
     });
-    // 2) inline code (truoc bang/anh/link va truoc nhan manh)
-    raw = raw.replace(/`([^`\n]+)`/g, function (_m, c) { return put("<code>" + esc(c) + "</code>"); });
+    // 2) inline code (truoc bang/anh/link va truoc nhan manh). Code chua duong dan file vault
+    //    (vd `Javis/loops/x.md`) -> boc link bam mo khung doc/sua luon.
+    raw = raw.replace(/`([^`\n]+)`/g, function (_m, c) {
+      var code = "<code>" + esc(c) + "</code>";
+      var p = codeFilePath(c);
+      if (p) return put("<a " + vaultLoc(p, "jv-fcode") + ">" + code + "</a>");
+      return put(code);
+    });
     // 3) anh vault ![[..]] + anh markdown ![]() (giu URL qua placeholder de khong bi escape)
     raw = raw.replace(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/g, function (_m, name) {
       name = name.trim();
       return put(imgHtml(resolveSrc(name), name, name));
+    });
+    // 3b) wikilink [[target]] / [[target|alias]] (anh ![[..]] da an o tren) -> link dieu huong nhu Wikipedia
+    raw = raw.replace(/\[\[([^\[\]\n|]+?)(?:\|([^\[\]\n]*))?\]\]/g, function (_m, target, alias) {
+      return put(wikiLinkHtml(target.trim(), alias));
     });
     // Duong dan trong () co the CO KHOANG TRANG + DAU NGOAC (vd "06 - Sources/Ten (Tu Duy Nguoc).md").
     // Bat ca cap ngoac can bang 1 tang, roi cat title markdown tuy chon o duoi ( "tieu de" / 'tieu de').
@@ -461,9 +492,98 @@
     });
   }
 
+  // ---------------------------------------------------------------- wikilink resolver (tim file dich trong vault)
+  // [[target]] thuong KHONG co duoi .md va co the chi la TEN note (kieu Obsidian) -> phai tim file that:
+  // 1) trung ca duong dan (path ket thuc bang "/<target>.md"), 2) trung TEN note o bat ky thu muc nao.
+  // Dung /files/search (server quet goc brain); uu tien .md, nhieu ket qua thi lay path ngan nhat.
+  var wkHome = null;      // { b: brain, v: home } - tien to 'nha' cua brain theo tran duyet
+  var wkCache = {};       // "brain|target" -> hit (chi cache khi TIM THAY)
+  function wkNoAccent(s) {
+    s = String(s == null ? "" : s);
+    try { s = s.normalize("NFD").replace(/[̀-ͯ]/g, ""); } catch (e) {}
+    return s.replace(/[đĐ]/g, "d").toLowerCase();
+  }
+  function wkGetHome(b) {
+    if (wkHome && wkHome.b === b) return Promise.resolve(wkHome.v);
+    return fetch("/files/list?brain=" + encodeURIComponent(b))
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (d) { var h = (d && d.home) || ""; wkHome = { b: b, v: h }; return h; })
+      .catch(function () { return ""; });
+  }
+  // Chi coi la "co duoi file" voi duoi THAT (ten note co dau cham kieu "Job ads N.bk" van la note .md)
+  var WK_EXT = /\.(md|markdown|txt|json|ya?ml|csv|pdf|png|jpe?g|gif|webp|bmp|svg|html?|css|js|ts|py|xlsx?|docx?|pptx?|mp[34]|wav|zip)$/i;
+  function wkResolve(target) {
+    var b = brainPath();
+    var t = String(target || "").split("#")[0].trim().replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+$/, "");
+    if (!t) return Promise.resolve(null);
+    var key = b + "|" + wkNoAccent(t);
+    if (wkCache[key]) return Promise.resolve(wkCache[key]);
+    var hasExt = WK_EXT.test(t);
+    var want = wkNoAccent(t + (hasExt ? "" : ".md"));
+    var base = t.split("/").pop();
+    var q = hasExt ? base.replace(WK_EXT, "") : base;
+    return Promise.all([
+      wkGetHome(b),
+      fetch("/files/search?brain=" + encodeURIComponent(b) + "&q=" + encodeURIComponent(q) + "&limit=200")
+        .then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }),
+    ]).then(function (rs) {
+      var home = rs[0] || "";
+      var items = (rs[1] && rs[1].items) || [];
+      var wantBase = wkNoAccent(q);
+      var best = null, bestScore = -1;
+      items.forEach(function (it) {
+        if (!it || !it.path) return;
+        var ceil = String(it.path).replace(/\\/g, "/");
+        var rel = (home && ceil.indexOf(home + "/") === 0) ? ceil.slice(home.length + 1) : ceil;
+        var n = wkNoAccent(rel);
+        var stem = wkNoAccent(String(it.name || "").replace(/\.[a-z0-9]+$/i, ""));
+        var score = -1;
+        if (n === want || n.slice(-(want.length + 1)) === "/" + want) score = 3;   // trung ca duong dan
+        else if (stem === wantBase) score = 2;                                     // trung ten note (khac thu muc)
+        if (score < 0) return;
+        if ((it.ext || "").toLowerCase() === ".md") score += 0.5;                  // uu tien note .md
+        if (score > bestScore || (score === bestScore && best && rel.length < best.rel.length)) {
+          best = { ceil: ceil, rel: rel, name: it.name, ext: it.ext }; bestScore = score;
+        }
+      });
+      if (best) wkCache[key] = best;   // miss KHONG cache: note co the duoc tao sau
+      return best;
+    });
+  }
+  function openWikilink(wl) {
+    if (wl.classList.contains("jv-wl-busy")) return;
+    var tgt = wl.getAttribute("data-vault-path") || "";
+    if (!tgt) return;
+    wl.classList.add("jv-wl-busy");
+    wkResolve(tgt).then(function (hit) {
+      wl.classList.remove("jv-wl-busy");
+      if (!hit) {
+        wl.classList.add("jv-wl-miss");
+        wl.title = "Không tìm thấy note này trong vault";
+        setTimeout(function () { wl.classList.remove("jv-wl-miss"); }, 1500);
+        return;
+      }
+      // Dang doc trong editor cay (trang Bo nao/Tep tin) -> dieu huong NGAY TRONG editor do (nhu Wikipedia);
+      // con lai (chat, khung sua giua man hinh) -> mo/thay noi dung khung sua giua man hinh.
+      if (wl.closest("#noteEditor") && typeof window.JavisOpenNote === "function")
+        window.JavisOpenNote(hit.ceil, { name: hit.name, ext: hit.ext, type: "file" });
+      else if (typeof window.JavisEditFile === "function") window.JavisEditFile(hit.rel);
+      else if (typeof window.JavisOpenFiles === "function") window.JavisOpenFiles(hit.rel);
+    });
+  }
+
   // ---------------------------------------------------------------- wiring (chi khi co DOM)
   if (typeof document !== "undefined") {
     document.addEventListener("click", function (e) {
+      // Wikilink [[..]]: bam la DI CHUYEN toi note dich - chay CA trong ban render dang sua (ne-wys/.jvfe-modal),
+      // vi y nghia cua wikilink la dieu huong; muon sua chu cua link thi dung che do Nguon.
+      var wl = e.target.closest ? e.target.closest("a.jv-wikilink") : null;
+      if (wl) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button > 0) return;   // de deep-link #open=.. mo tab moi
+        e.preventDefault();
+        openWikilink(wl);
+        return;
+      }
       // Dang SOAN trong editor (contenteditable/.ne-wys) hoac trong khung sua file -> khong mo gi ca,
       // de nguoi dung bam link/anh ma sua binh thuong (tranh bung editor long nhau).
       if (e.target.closest && e.target.closest('[contenteditable="true"], .jvfe-modal, .note-editor')) return;
@@ -506,6 +626,6 @@
     window.JavisArtifacts = { open: openArtifact, close: closePanel };
   }
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { mdToHtml: mdToHtml, highlight: highlight };
+    module.exports = { mdToHtml: mdToHtml, highlight: highlight, wkResolve: wkResolve };
   }
 })();

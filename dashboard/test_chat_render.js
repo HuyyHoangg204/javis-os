@@ -71,6 +71,49 @@ check("hai link vault: dung 2 link", (h.match(/jv-floc/g) || []).length === 2);
 check("hai link vault: path a dung", has(h, 'data-vault-path="thu muc/a.md"'));
 check("hai link vault: path b dung", has(h, 'data-vault-path="thu muc/b.md"'));
 
+// ---- 13. Wikilink [[..]] -> link dieu huong ----
+h = mdToHtml("Da cap nhat [[business/Danh Muc Du An - Minh Quy]] xong");
+check("wikilink: co the a jv-wikilink", has(h, "jv-wikilink"));
+check("wikilink: data-vault-path giu target goc", has(h, 'data-vault-path="business/Danh Muc Du An - Minh Quy"'));
+check("wikilink: chu hien thi = target", has(h, ">business/Danh Muc Du An - Minh Quy</a>"));
+
+// ---- 14. Wikilink co alias [[path|chu]] ----
+h = mdToHtml("Xem [[notes/abc|Ten dep]] nhe");
+check("wikilink alias: chu hien thi la alias", has(h, ">Ten dep</a>"));
+check("wikilink alias: giu alias cho round-trip", has(h, 'data-wiki-alias="Ten dep"'));
+check("wikilink alias: path van dung", has(h, 'data-vault-path="notes/abc"'));
+
+// ---- 15. Anh ![[..]] KHONG bi bat nham thanh wikilink ----
+h = mdToHtml("![[attachments/x.png]]");
+check("anh vault: van la img", has(h, "<img"));
+check("anh vault: khong sinh jv-wikilink", !has(h, "jv-wikilink"));
+
+// ---- 16. [[..]] nam TRONG inline code giu nguyen chu ----
+h = mdToHtml("dung cu phap `[[ten note]]` de link");
+check("wikilink trong code: khong thanh link", !has(h, "jv-wikilink"));
+
+// ---- 17. Inline code chua duong dan file vault -> bam mo duoc ----
+h = mdToHtml("Da tao `Javis/loops/ghi-ho-so.md` cho anh");
+check("code path: co link jv-floc", has(h, "jv-fcode") && has(h, 'data-vault-path="Javis/loops/ghi-ho-so.md"'));
+check("code path: van hien dang code", has(h, "<code>Javis/loops/ghi-ho-so.md</code>"));
+
+// ---- 18. Inline code thuong / lenh KHONG thanh link ----
+h = mdToHtml("Dat `enabled: false` trong frontmatter");
+check("code frontmatter: khong link", !has(h, "jv-floc"));
+h = mdToHtml("Goi `console.log` de debug");
+check("code khong slash khong .md: khong link", !has(h, "jv-floc"));
+h = mdToHtml("Chay `curl https://api.example.com/x.md` di");
+check("code lenh co URL: khong link", !has(h, "jv-floc"));
+
+// ---- 19. File .md tran (khong thu muc) trong code van bam duoc ----
+h = mdToHtml("Sua `MEMORY.md` roi bao em");
+check("code .md tran: co link", has(h, 'data-vault-path="MEMORY.md"'));
+
+// ---- 20. Path co khoang trang + tieng Viet trong code ----
+h = mdToHtml("Ho so o `07 - Wiki/_entities/Chi Nga - Khach Coaching.md` nhe");
+check("code path co space: bat dung ca duong dan",
+  has(h, 'data-vault-path="07 - Wiki/_entities/Chi Nga - Khach Coaching.md"'));
+
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));
   process.exit(1);

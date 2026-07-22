@@ -3633,7 +3633,17 @@
       _td = new window.TurndownService({ headingStyle: "atx", bulletListMarker: "-", codeBlockStyle: "fenced", emDelimiter: "*" });
       try { if (window.turndownPluginGfm) _td.use(window.turndownPluginGfm.gfm); } catch (e) {}
       _td.addRule("wikilink", { filter: (n) => n.nodeName === "A" && n.getAttribute("data-vault-path") != null,
-        replacement: (c, n) => "[[" + n.getAttribute("data-vault-path") + "]]" });
+        replacement: (c, n) => {
+          const p = n.getAttribute("data-vault-path");
+          const cls = n.getAttribute("class") || "";
+          if (n.querySelector && n.querySelector("img")) return c;   // ảnh vault bọc link: giữ ![[..]] từ luật ảnh
+          if (cls.indexOf("jv-fcode") >= 0) return c;                // đường dẫn trong inline code: giữ nguyên `..`
+          if (cls.indexOf("jv-wikilink") >= 0) {                     // wikilink thật: giữ [[path]] / [[path|alias]]
+            const alias = n.getAttribute("data-wiki-alias");
+            return "[[" + p + (alias ? "|" + alias : "") + "]]";
+          }
+          return "[" + (c || p) + "](" + p + ")";                    // link markdown vault: giữ dạng [chữ](đường-dẫn)
+        } });
       _td.addRule("wikiimg", { filter: (n) => n.nodeName === "IMG" && n.getAttribute("data-vault-path") != null,
         replacement: (c, n) => "![[" + n.getAttribute("data-vault-path") + "]]" });
     }
@@ -3688,6 +3698,9 @@
       mdFromHtml: _mdFromHtml,
       buildToolbar: _neBuildToolbar,
     };
+    // Cho wikilink (chat-render.js) điều hướng NGAY TRONG editor cây khi đang đọc note (như Wikipedia).
+    // Giống bấm file khác trên cây: KHÔNG tự lưu, chỉnh sửa chưa lưu sẽ mất (quy ước sẵn của editor).
+    window.JavisOpenNote = openNote;
   }
 
   async function openNote(rel, it) {

@@ -24,7 +24,11 @@ jobs:
         run: python -m compileall -q server system/plugins
 
       - name: Chay test JS dashboard
-        run: node dashboard/test_chat_ask.js
+        run: |
+          node dashboard/test_chat_ask.js
+          node dashboard/test_chat_render.js
+          node dashboard/test_chat_slash.js
+          node dashboard/test_wikilink.js
 
       - name: Chạy test (auth/secret/MCP-perm/traversal/CSRF + plugin)
         env:
