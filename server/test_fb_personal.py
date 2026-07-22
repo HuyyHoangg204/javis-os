@@ -440,6 +440,20 @@ async def fetch_tests():
     check("fb_feed_read: trang splash đăng nhập → ERROR (không trả splash thành feed)",
           r_feed_splash.startswith("ERROR") and "cookie" in r_feed_splash.lower())
 
+    # mbasic bị Facebook khai tử: bị 302 sang m.facebook.com → báo mbasic NGỪNG PHỤC VỤ, KHÔNG đổ lỗi cookie
+    check("_off_mbasic: bắt redirect ra khỏi mbasic",
+          plug._off_mbasic("https://m.facebook.com/") and plug._off_mbasic("https://www.facebook.com/x")
+          and not plug._off_mbasic("https://mbasic.facebook.com/home.php") and not plug._off_mbasic(""))
+    async def _get_offmbasic(client, url):
+        return LOGINPAGE, "https://m.facebook.com/"      # nội dung login nhưng đã rời mbasic
+    plug._get = _get_offmbasic
+    _po, _uo, _uao, erro = await plug._fetch("c=1", "/")
+    check("_fetch: bị đá khỏi mbasic → báo mbasic NGỪNG PHỤC VỤ (không đổ lỗi cookie)",
+          bool(erro) and "NGỪNG PHỤC VỤ" in erro and "m.facebook.com" in erro)
+    r_feed_off = await plug._feed({}, None)
+    check("fb_feed_read: mbasic ngừng phục vụ → ERROR đúng bệnh (không nói cookie hỏng)",
+          r_feed_off.startswith("ERROR") and "mbasic" in r_feed_off.lower())
+
 asyncio.run(fetch_tests())
 
 if _fails:

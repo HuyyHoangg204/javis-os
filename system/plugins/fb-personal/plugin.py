@@ -18,6 +18,7 @@ from __future__ import annotations
 import html as _html
 import json
 import re
+from urllib.parse import urlsplit
 
 BASE = "https://mbasic.facebook.com"
 CONNECTOR_ID = "facebook-personal"
@@ -107,6 +108,14 @@ def _blocked(url):
     return "login" in u or "checkpoint" in u
 
 
+def _off_mbasic(url):
+    """True nếu request bị chuyển hướng RA KHỎI mbasic (sang m./www.facebook.com). Đây là dấu
+    hiệu Facebook đã NGỪNG phục vụ mbasic cho phiên/khu vực này (mbasic đang bị khai tử dần),
+    khác hẳn lỗi cookie - cookie có thể vẫn tốt mà mbasic vẫn chết."""
+    host = urlsplit(url or "").netloc.lower()
+    return bool(host) and "facebook.com" in host and not host.endswith("mbasic.facebook.com")
+
+
 def _unsupported(page):
     """Trang 'Trình duyệt không hỗ trợ, tải Facebook Lite' mà mbasic trả khi chê UA."""
     return bool(re.search(r"không hỗ trợ|browser is not supported|isn'?t compatible|"
@@ -144,6 +153,15 @@ _COOKIE_HELP = ("ERROR: Facebook trả trang ĐĂNG NHẬP - cookie đang bị t
                 "mở trình duyệt xác minh xong rồi lấy lại cookie. Kiểm tra cookie có đủ cả c_user và xs.")
 
 
+_MBASIC_GONE = ("ERROR: Facebook CHUYỂN HƯỚNG khỏi mbasic sang m.facebook.com - nhiều khả năng "
+                "mbasic.facebook.com (bản HTML nhẹ mà công cụ này dựa vào) đã bị Facebook NGỪNG PHỤC VỤ "
+                "cho tài khoản/khu vực của bạn. Cookie của bạn nhiều khả năng VẪN TỐT (vẫn đăng nhập được "
+                "trên m.facebook.com), nên đây KHÔNG phải lỗi cookie và đổi cookie cũng không cứu được. Muốn "
+                "đọc feed / thao tác tài khoản cá nhân lúc này cần trình duyệt thật (Playwright/Chromium) chạy "
+                "m.facebook.com, hoặc chuyển sang nguồn được hỗ trợ: Trang qua Graph API, theo dõi công khai "
+                "qua Apify.")
+
+
 _UA_HELP = ("mbasic chê trình duyệt ('không hỗ trợ, tải Facebook Lite') với mọi User-Agent thử. "
             "Cách sửa: mở kết nối Facebook cá nhân, dán vào ô 'User-Agent' đúng UA của trình duyệt "
             "nơi bạn lấy cookie (tra 'my user agent' trên trình duyệt đó). Tốt nhất lấy cookie từ "
@@ -153,18 +171,25 @@ _UA_HELP = ("mbasic chê trình duyệt ('không hỗ trợ, tải Facebook Lite
 async def _fetch(cookie, url):
     """GET url, tự đổi UA nếu mbasic chê. Trả (page, final_url, ua_dùng, err_str)."""
     last_url = ""
+    off_mbasic_seen = False
     for ua in _uas():
         try:
             async with _client(cookie, ua) as c:
                 page, furl = await _get(c, url)
         except Exception as e:
             return None, "", ua, f"ERROR: không tải được ({type(e).__name__}: {e})."
+        if _off_mbasic(furl):
+            off_mbasic_seen = True        # bị đá sang m./www.facebook.com; thử UA khác xem có UA nào còn ở lại mbasic
+            last_url = furl
+            continue
         if _blocked(furl) or _is_login(page):
             return None, furl, ua, _COOKIE_HELP     # cookie bị từ chối - đổi UA không cứu được
         if _unsupported(page):
             last_url = furl
             continue                      # thử UA kế tiếp
         return page, furl, ua, None
+    if off_mbasic_seen:                    # không UA nào ở lại được mbasic → mbasic đã ngừng phục vụ
+        return None, last_url, None, _MBASIC_GONE
     return None, last_url, None, "ERROR: " + _UA_HELP
 
 
