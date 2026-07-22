@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.154] - 2026-07-22
+Sửa lỗi phát hiện cookie hỏng trong plugin Facebook cá nhân.
+### Sửa lỗi
+- **Trang đăng nhập không còn bị đọc nhầm thành feed**: khi cookie bị Facebook đá ra, mbasic (hoặc m.facebook.com khi bị chuyển hướng) trả trang splash "Đăng nhập hoặc đăng ký" ở URL không chứa `login` và không có sẵn ô email/mật khẩu (chỉ tiêu đề + nút). Trước đây `fb_feed_read` để lọt trang này và trả về như feed thật (post_links rỗng). Nay `_is_login` bắt rộng theo nội dung (ô mật khẩu, form/nút dẫn tới `/login` hoặc `/checkpoint`, tiêu đề trang đăng nhập) nên tool báo rõ "cookie bị từ chối" thay vì trả rác.
+
 ## [0.9.153] - 2026-07-22
 Mở rộng plugin Facebook cá nhân (cookie/mbasic) thêm loạt thao tác cơ bản của người dùng: xoá bài, thả cảm xúc, chia sẻ, đọc và gửi tin nhắn Messenger, lướt feed nhiều trang. Vẫn theo cách mbasic nhẹ (chỉ cần cookie, chạy VPS headless) nên không đăng được reel/video và không sửa bài đã đăng. Mọi thao tác ghi bằng tài khoản cá nhân có rủi ro khoá tài khoản; connector mặc định Chỉ đọc, các tool ghi chỉ chạy khi bật Toàn quyền.
 ### Thêm mới

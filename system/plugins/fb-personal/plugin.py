@@ -114,11 +114,26 @@ def _unsupported(page):
                           page or "", re.I))
 
 
+_LOGIN_TITLE_RE = re.compile(
+    r"Đăng nhập hoặc đăng ký|Log in or sign up|Log Into Facebook|Đăng nhập vào Facebook|"
+    r"You must log in|Bạn (?:cần|phải) đăng nhập", re.I)
+_LOGIN_ACTION_RE = re.compile(r'<(?:form|a)\b[^>]*(?:action|href)="[^"]*/(?:login|checkpoint)', re.I)
+
+
 def _is_login(page):
-    """mbasic trả trang ĐĂNG NHẬP (cookie bị từ chối) - có cả ô email lẫn ô mật khẩu."""
+    """Trang ĐĂNG NHẬP / WELCOME (cookie bị từ chối). Bắt RỘNG theo NỘI DUNG: khi cookie bị đá
+    ra, mbasic (hoặc m.facebook.com khi bị chuyển hướng) hay trả trang splash 'Đăng nhập hoặc
+    đăng ký' ở URL KHÔNG chứa 'login' và KHÔNG có sẵn ô email/mật khẩu trong HTML (chỉ nút +
+    tiêu đề). Phải bắt được, nếu không trang đăng nhập bị trả nhầm thành feed."""
     p = page or ""
-    return (bool(re.search(r'<input[^>]*name="email"', p, re.I))
-            and bool(re.search(r'<input[^>]*name="(pass|encpass)"', p, re.I)))
+    if (re.search(r'<input[^>]*type="password"', p, re.I)
+            or re.search(r'<input[^>]*name="(?:pass|encpass)"', p, re.I)):
+        return True                          # có ô mật khẩu = chắc chắn form đăng nhập
+    if _LOGIN_ACTION_RE.search(p):           # form/nút dẫn tới /login hoặc /checkpoint
+        return True
+    if _LOGIN_TITLE_RE.search(p):            # tiêu đề trang đăng nhập / splash
+        return True
+    return False
 
 
 _COOKIE_HELP = ("ERROR: Facebook trả trang ĐĂNG NHẬP - cookie đang bị từ chối, không đọc được feed. "

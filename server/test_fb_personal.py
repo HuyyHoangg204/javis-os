@@ -373,6 +373,14 @@ LOGINPAGE = ('<html><body><form method="post" action="/login/device-based/regula
              '<input name="email" type="text"><input name="pass" type="password">'
              '<input name="login" value="Đăng nhập"></form></body></html>')
 check("_is_login: bắt trang đăng nhập (email+pass)", plug._is_login(LOGINPAGE) and not plug._is_login(HOME))
+# Trang splash 'Đăng nhập hoặc đăng ký' khi cookie bị đá ra: KHÔNG có ô email/mật khẩu, chỉ
+# tiêu đề + nút, URL không chứa 'login'. Trước đây lọt thành feed - phải bắt được theo nội dung.
+SPLASH = ('<html><head><title>Facebook - Đăng nhập hoặc đăng ký Facebook</title></head>'
+          '<body><h2>Đăng nhập hoặc đăng ký</h2>'
+          '<a href="/login/?next=%2F">Đăng nhập</a>'
+          '<a href="/reg/">Tạo tài khoản mới</a></body></html>')
+check("_is_login: bắt trang splash (không ô email/mật khẩu, chỉ tiêu đề + nút login)",
+      plug._is_login(SPLASH) and not plug._is_login(HOME) and not plug._is_login(POSTPAGE))
 
 
 async def fetch_tests():
@@ -423,6 +431,14 @@ async def fetch_tests():
     r_feed_login = await plug._feed({}, None)
     check("fb_feed_read: cookie bị từ chối → ERROR rõ (không đọc login thành feed)",
           r_feed_login.startswith("ERROR") and "ĐĂNG NHẬP" in r_feed_login)
+
+    # trang splash (URL sạch, không ô email/mật khẩu) → vẫn phải báo cookie bị từ chối, KHÔNG trả thành feed
+    async def _get_splash(client, url):
+        return SPLASH, BASE_HOME
+    plug._get = _get_splash
+    r_feed_splash = await plug._feed({}, None)
+    check("fb_feed_read: trang splash đăng nhập → ERROR (không trả splash thành feed)",
+          r_feed_splash.startswith("ERROR") and "cookie" in r_feed_splash.lower())
 
 asyncio.run(fetch_tests())
 
