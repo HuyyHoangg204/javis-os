@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.155] - 2026-07-22
+Sửa lỗi bấm node trên brain 3D không mở được note (dính từ 0.9.152).
+### Sửa lỗi
+- **Bấm chấm màu trên brain 3D ra "Loại file này không xem trực tiếp - hãy tải về"**: bản 0.9.152 lỡ gán đè hàm `JavisOpenNote` (cầu nối click-node-đồ-thị mở editor) bằng hàm mở note thô, làm mất bước suy tên/đuôi file nên note .md rơi nhầm vào nhánh tải về. Nay bỏ chỗ gán đè, wikilink trong editor cũng gọi đúng cầu nối sẵn có này, và thêm chú thích cảnh báo ngay tại hàm để không tái phạm.
+
 ## [0.9.154] - 2026-07-22
 Sửa lỗi phát hiện cookie hỏng trong plugin Facebook cá nhân.
 ### Sửa lỗi

@@ -563,10 +563,11 @@
         setTimeout(function () { wl.classList.remove("jv-wl-miss"); }, 1500);
         return;
       }
-      // Dang doc trong editor cay (trang Bo nao/Tep tin) -> dieu huong NGAY TRONG editor do (nhu Wikipedia);
-      // con lai (chat, khung sua giua man hinh) -> mo/thay noi dung khung sua giua man hinh.
+      // Dang doc trong editor cay (trang Bo nao/Tep tin) -> dieu huong NGAY TRONG editor do (nhu Wikipedia).
+      // JavisOpenNote la wrapper SAN CO cua console.js (cung cai click node do thi dung): nhan MOT chuoi
+      // path tuong doi GOC BRAIN, tu ghep tien to tran + suy ten/duoi. KHONG duoc ghi de/goi khac chu ky.
       if (wl.closest("#noteEditor") && typeof window.JavisOpenNote === "function")
-        window.JavisOpenNote(hit.ceil, { name: hit.name, ext: hit.ext, type: "file" });
+        window.JavisOpenNote(hit.rel);
       else if (typeof window.JavisEditFile === "function") window.JavisEditFile(hit.rel);
       else if (typeof window.JavisOpenFiles === "function") window.JavisOpenFiles(hit.rel);
     });

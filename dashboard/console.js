@@ -196,7 +196,10 @@
     else navigateTo("files");
   }
   if (typeof window !== "undefined") window.JavisOpenFiles = openFilesAt;
-  // Mở note trong editor cây (dùng cho click node đồ thị) từ đường dẫn TƯƠNG ĐỐI GỐC BRAIN (như openNodePopup).
+  // Mở note trong editor cây từ đường dẫn TƯƠNG ĐỐI GỐC BRAIN (như openNodePopup). Người gọi: click node
+  // đồ thị (app.js onGraphNodeClick) VÀ wikilink [[..]] trong chat-render.js - đều truyền MỘT chuỗi path.
+  // ĐỪNG gán đè hàm này bằng openNote thô: mất bước suy tên/đuôi file → note .md rơi nhánh "hãy tải về"
+  // (đã dính ở 0.9.152).
   if (typeof window !== "undefined") window.JavisOpenNote = function (brainRel) {
     if (!brainRel) return;
     const ceilingRel = _vtHome ? _vtHome + "/" + brainRel : brainRel;   // ghép tiền tố trần như cây
@@ -3698,9 +3701,6 @@
       mdFromHtml: _mdFromHtml,
       buildToolbar: _neBuildToolbar,
     };
-    // Cho wikilink (chat-render.js) điều hướng NGAY TRONG editor cây khi đang đọc note (như Wikipedia).
-    // Giống bấm file khác trên cây: KHÔNG tự lưu, chỉnh sửa chưa lưu sẽ mất (quy ước sẵn của editor).
-    window.JavisOpenNote = openNote;
   }
 
   async function openNote(rel, it) {
