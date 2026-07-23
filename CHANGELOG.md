@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.158] - 2026-07-23
+Kho kết nối có thêm Google Tasks, kèm vá phân quyền các tool gộp manage_* của Google Workspace.
+### Thêm mới
+- **Connector Google Tasks**: đọc và quản việc cần làm trong Google Tasks (xem danh sách, thêm việc, đặt hạn, đánh dấu xong). Chạy chung server `workspace-mcp` với connector Google Workspace nhưng chỉ nạp service tasks ở tier complete - vì `list_task_lists` (tra ID danh sách việc, thứ mọi tool tasks khác cần) chỉ có ở tier complete, connector Google Workspace tier core dùng Tasks sẽ cụt đường. Chỉ xin đúng quyền Google Tasks, không đụng Gmail/Drive/Lịch; đã có OAuth client của Google Workspace thì dùng lại được, chỉ cần bật thêm Google Tasks API. Cân nhắc và KHÔNG chọn gtasks-mcp (zcaceres): server đó vỡ đường dẫn credential trên Windows (`new URL(...).pathname` ra `\D:\...`), token không tự refresh (chết sau ~1 giờ phải auth lại bằng tay), không có trên npm phải tự clone build, và bắt chạy lệnh auth thủ công - trái nguyên tắc đấu nối trên UI.
+### Bảo mật
+- **Vá lỗ phân loại tool `manage_*` của Google Workspace**: `manage_task`, `manage_event`, `manage_gmail_label`... không khớp mẫu write/danger nào và chữ "manage" cũng không nằm trong heuristic, nên bị xếp nhầm là "đọc" - kết nối đặt mức Chỉ đọc (hay loop suggest) vẫn cho Javis sửa/xoá lịch và việc thật. Thêm mẫu `*manage*` vào nhóm ghi và nói rõ trong cảnh báo rủi ro.
+
 ## [0.9.157] - 2026-07-23
 ChatGPT (Codex) dùng được kho MCP gốc của chính nó, ngang hàng cách engine Claude dùng MCP gốc của Claude Code.
 ### Thêm mới

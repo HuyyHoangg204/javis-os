@@ -265,11 +265,56 @@
         "guide_url": "https://github.com/taylorwilsdon/google_workspace_mcp"
       },
       "tool_meta": {
-        "write": ["*create*", "*update*", "*upload*", "*draft*", "*modify*", "*move*", "*add*", "*set*"],
+        "write": ["*create*", "*update*", "*upload*", "*draft*", "*modify*", "*move*", "*add*", "*set*", "*manage*"],
         "danger": ["*send*", "*delete*"]
       },
       "default_perm": "safe",
-      "risk": "Mức Ghi nháp (mặc định) cho phép Javis soạn nháp thư, tạo lịch, tạo tài liệu, và cả SỬA tài liệu có sẵn lẫn DI CHUYỂN file trong Drive.\n\nMức Toàn quyền thêm quyền GỬI EMAIL THẬT và XOÁ file, thư, lịch bằng tài khoản Google của bạn.\n\nChỉ cần đọc thì hạ xuống Chỉ đọc."
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis soạn nháp thư, tạo lịch, tạo tài liệu, và cả SỬA tài liệu có sẵn lẫn DI CHUYỂN file trong Drive.\nCác tool gộp (manage_event, manage_task...) cũng thuộc mức này, nên Javis sửa và xoá được từng sự kiện lịch hay việc cần làm lẻ.\n\nMức Toàn quyền thêm quyền GỬI EMAIL THẬT và XOÁ file, thư bằng tài khoản Google của bạn.\n\nChỉ cần đọc thì hạ xuống Chỉ đọc."
+    },
+    {
+      "id": "google-tasks",
+      "name": "Google Tasks",
+      "icon": "✅",
+      "category": "Văn phòng",
+      "description": "Việc cần làm trong Google Tasks: xem danh sách, thêm việc, đặt hạn, đánh dấu xong. Chỉ xin quyền Tasks, không đụng Gmail hay Drive. Đăng nhập Google bằng OAuth client tự tạo (~10 phút, có hướng dẫn).",
+      "status": "beta",
+      "transport": "stdio",
+      "command": "uvx",
+      "_args_doc": "Chạy chung server workspace-mcp với connector google-workspace nhưng chỉ nạp service tasks. Tier complete vì list_task_lists nằm ở tier complete - thiếu nó thì không biết ID danh sách để đọc việc.",
+      "args": ["workspace-mcp", "--tools", "tasks", "--tool-tier", "complete"],
+      "auth": {
+        "type": "apikey",
+        "fields": [
+          {
+            "key": "client_id",
+            "label": "OAuth Client ID",
+            "placeholder": "xxxx.apps.googleusercontent.com",
+            "env": "GOOGLE_OAUTH_CLIENT_ID"
+          },
+          {
+            "key": "client_secret",
+            "label": "OAuth Client Secret",
+            "placeholder": "GOCSPX-...",
+            "env": "GOOGLE_OAUTH_CLIENT_SECRET"
+          },
+          {
+            "key": "user_email",
+            "label": "Email Google của bạn (tuỳ chọn)",
+            "placeholder": "vd ten@gmail.com",
+            "env": "USER_GOOGLE_EMAIL",
+            "optional": true
+          }
+        ],
+        "guide": "Làm 1 lần, khoảng 10 phút. Đã đấu Google Workspace rồi thì dùng lại đúng Client ID + Secret cũ, chỉ cần làm thêm bước 2:\n1. Vào console.cloud.google.com, tạo project.\n2. Bật Google Tasks API cho project.\n3. OAuth consent screen: chọn External, thêm email mình vào Test users.\n4. Credentials > Create OAuth client ID, loại Desktop app.\n5. Copy Client ID + Secret vào đây.\n\nLẦN ĐẦU Javis gọi tool Google Tasks, trình duyệt trên máy chạy Javis sẽ mở để bạn bấm đồng ý quyền. Nhớ làm trên máy có màn hình.",
+        "guide_url": "https://github.com/taylorwilsdon/google_workspace_mcp"
+      },
+      "tool_meta": {
+        "read": ["list_*", "get_*"],
+        "write": ["manage_task"],
+        "danger": ["manage_task_list"]
+      },
+      "default_perm": "safe",
+      "risk": "Mức Ghi nháp (mặc định) cho phép Javis TẠO và SỬA việc thật trong Google Tasks: thêm việc, đổi hạn, đánh dấu xong, kể cả xoá một việc lẻ (tool gộp manage_task có hành động delete).\n\nMức Toàn quyền thêm quyền TẠO, ĐỔI TÊN và XOÁ cả DANH SÁCH việc. Xoá danh sách là mất toàn bộ việc bên trong, không hoàn tác được.\n\nKết nối này chỉ xin quyền Google Tasks, không đọc được Gmail, Drive hay Lịch."
     },
     {
       "id": "meta-ads",
