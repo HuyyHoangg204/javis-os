@@ -15,7 +15,7 @@ Bên dưới, mỗi kết nối là một "đường ống" MCP (Model Context P
 
 1. Vào dashboard (cổng mặc định `7777`).
 2. Thanh bên trái, bấm mục **Kết nối** (biểu tượng phích cắm, phụ đề "Nguồn dữ liệu & công cụ").
-3. Trang có 3 khu: **Đã kết nối** (các tài khoản đang đấu), **Kho kết nối** (dịch vụ cài sẵn để đấu thêm), và **MCP từ Claude Code** (những MCP bạn kết nối trong app Claude - chỉ để xem).
+3. Trang có 4 khu: **Đã kết nối** (các tài khoản đang đấu), **Kho kết nối** (dịch vụ cài sẵn để đấu thêm), **MCP từ Claude Code** (những MCP bạn kết nối trong app Claude - chỉ để xem), và **MCP từ Codex (ChatGPT)** (kho MCP gốc bạn tự đăng ký trong Codex CLI bằng `codex mcp add` - chỉ để xem).
 
 ## Cách dùng (từng bước)
 
@@ -58,6 +58,8 @@ Zalo mặc định được cả đọc lẫn gửi tin (Toàn quyền) theo l�
 - **Google Workspace** (Gmail + Lịch + Drive + Docs trong 1 kết nối, chạy local): cần tạo OAuth client trong Google Cloud một lần (~10 phút, hướng dẫn từng bước trong cửa sổ kết nối); lần đầu dùng, trình duyệt mở để bạn bấm đồng ý. Mặc định ở mức Ghi nháp: Javis soạn nháp mail, tạo lịch, tạo tài liệu được nhưng KHÔNG tự gửi mail hay xoá gì - bật Toàn quyền phải xác nhận rủi ro. Chọn cái này nếu muốn CẢ Drive/Docs/Sheets trong một mối; nếu chỉ cần Lịch + Gmail thì 2 kết nối riêng ở trên gọn hơn (ít công cụ, chạy remote).
 
 Mẹo: nếu chỉ cần Gmail/Lịch/Drive và bạn dùng engine Claude Code, cách nhanh hơn là bấm Connect ngay trong app Claude (claude.ai > Settings > Connectors) - Javis tự thấy chúng ở khu "MCP từ Claude Code".
+
+Tương tự với engine ChatGPT (Codex): MCP bạn đã đăng ký thẳng trong Codex CLI (`codex mcp add <tên> --url https://...` cho server HTTP, hoặc `codex mcp add <tên> -- <lệnh>` cho server stdio) được engine ChatGPT tự nạp khi chạy, và hiện ở khu "MCP từ Codex (ChatGPT)". Server đăng nhập kiểu OAuth thì chạy `codex mcp login <tên>` một lần trong terminal. Server OAuth thêm ở form "Tự thêm (nâng cao)" của Javis cũng được đăng ký vào cả hai CLI (Claude Code lẫn Codex) để đổi engine không mất công cụ.
 
 ### 5. Kết nối quảng cáo (Meta Ads, Google Ads, TikTok Ads)
 
@@ -117,7 +119,7 @@ Dịch vụ chưa có trong Kho? Bấm thẻ **Tự thêm (nâng cao)** - form k
 
 ### 9. Chế độ "Chỉ dùng kết nối của Javis" (strict)
 
-Tick ô này ở khu Đã kết nối nếu muốn Javis CHỈ dùng các kết nối khai ở đây, bỏ qua MCP cài sẵn trong Claude Code trên máy - kiểm soát chặt, tránh gọi nhầm công cụ của tài khoản Claude.
+Tick ô này ở khu Đã kết nối nếu muốn Javis CHỈ dùng các kết nối khai ở đây, bỏ qua MCP cài sẵn trong Claude Code trên máy - kiểm soát chặt, tránh gọi nhầm công cụ của tài khoản Claude. Lưu ý: ô này áp cho engine Claude Code (cờ strict của Claude CLI); kho MCP gốc của Codex do lệnh codex quản riêng - muốn engine ChatGPT bỏ một server gốc thì gỡ bằng `codex mcp remove <tên>`.
 
 ## Đọc số liệu
 

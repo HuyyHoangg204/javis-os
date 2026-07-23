@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.157] - 2026-07-23
+ChatGPT (Codex) dùng được kho MCP gốc của chính nó, ngang hàng cách engine Claude dùng MCP gốc của Claude Code.
+### Thêm mới
+- **Trang Kết nối có thêm khu "MCP từ Codex (ChatGPT)"**: liệt kê các server trong kho MCP gốc của Codex CLI (những gì bạn tự đăng ký bằng `codex mcp add`, nằm trong config gốc của Codex), song song khu "MCP từ Claude Code" sẵn có. Engine ChatGPT vốn tự nạp kho này khi chạy (profile javis chỉ phủ THÊM MCP của Javis lên config gốc, không đè), nhưng trước đây Javis không nhìn thấy và không quản được nó nên người dùng khó biết ChatGPT đang có công cụ gì. Endpoint `/mcp/ambient` trả thêm `codex_servers`; hỗ trợ cả bản codex cũ chưa có `mcp list --json` (đọc bảng text).
+- **Server MCP kiểu OAuth giờ đăng ký cho CẢ HAI CLI**: server OAuth không đi qua hub được (CLI phải tự giữ token), nên trước đây thêm ở form "Tự thêm (nâng cao)" chỉ đăng ký vào Claude Code (`claude mcp add`) - engine ChatGPT hoàn toàn không thấy nhóm này. Nay Javis đăng ký thêm vào kho gốc của Codex (best-effort, máy chưa cài codex thì bỏ qua, không chặn flow), xoá server thì gỡ ở cả hai. Xác thực một lần bằng `codex mcp login <tên>`; endpoint `/mcp/oauth-auth` nhận `{"engine":"codex","name":...}` để mở terminal chạy sẵn lệnh đó (máy local có màn hình), `/mcp/native-status` nhận `engine=codex` để kiểm tra trạng thái đăng nhập.
+### Kiểm thử
+- Thêm `test_codex_native_mcp.py`: parse output `codex mcp list --json` (3 hình dạng JSON khác nhau giữa các bản codex + trạng thái tắt/cần-đăng-nhập), fallback bảng text, và dựng argv `codex mcp add` (HTTP, bearer env, stdio). Toàn bộ hàm parse là hàm thuần nên test không cần cài Codex.
+
 ## [0.9.156] - 2026-07-22
 Báo đúng bệnh khi Facebook khai tử mbasic (thay vì đổ oan cho cookie).
 ### Sửa lỗi
