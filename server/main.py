@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list
+from claude_cli import CodexCLI, claude_engine, find_claude_cli, find_codex_cli, cancel_all, _empty_mcp_file, auth_status as claude_auth_status, auth_login as claude_auth_login, auth_logout as claude_auth_logout, auth_login_ui_start, auth_login_ui_code, mcp_native_add, mcp_native_remove, mcp_native_status, mcp_open_auth_terminal, mcp_native_list, codex_mcp_native_list, codex_mcp_native_add, codex_mcp_native_remove, codex_mcp_native_status, codex_mcp_open_login_terminal
 from graph_builder import build_graph, _color_for, _top_folder, WIKILINK_RE
 import config as cfgmod
 import update_state
@@ -830,16 +830,24 @@ async def mcp_add(request: Request):
     data = await request.json()
     if not (data.get("name") or "").strip():
         return JSONResponse({"ok": False, "error": "Thiếu tên server"}, status_code=400)
+    codex_ok = False
     if (data.get("auth") or "header") == "oauth":
         # Đăng ký native để Claude Code tự lo OAuth (cần xác thực 1 lần trong terminal: claude → /mcp)
         res = mcp_native_add(data["name"].strip(), (data.get("url") or "").strip(),
                              data.get("transport", "http"), None, data.get("client_id") or None)
         if not res.get("ok"):
             return JSONResponse({"ok": False, "error": res.get("error") or res.get("out") or "native add lỗi"}, status_code=400)
+        # Đối xứng cho engine ChatGPT: server OAuth không đi qua hub được (CLI tự lo OAuth) nên
+        # đăng ký thêm vào kho MCP gốc của Codex (best-effort - chưa cài codex thì bỏ qua).
+        # User xác thực 1 lần bằng `codex mcp login <tên>`.
+        if find_codex_cli():
+            codex_ok = bool(codex_mcp_native_add(data["name"].strip(),
+                                                 url=(data.get("url") or "").strip()).get("ok"))
     sid = mcp_store.add_server(data)
     mcp_hub.invalidate_cache()
     _write_codex_profile()
-    return {"ok": True, "id": sid, "oauth": (data.get("auth") or "header") == "oauth"}
+    return {"ok": True, "id": sid, "oauth": (data.get("auth") or "header") == "oauth",
+            "codex": codex_ok}
 
 
 @app.post("/mcp/update")
@@ -856,6 +864,8 @@ async def mcp_delete(request: Request):
     s = next((x for x in mcp_store.list_servers() if x["id"] == data.get("id")), None)
     if s and s.get("auth") == "oauth" and s.get("name"):
         mcp_native_remove(s["name"])
+        if find_codex_cli():
+            codex_mcp_native_remove(s["name"])   # gỡ cả bản đã đăng ký vào kho gốc Codex
     ok = mcp_store.delete_server(data.get("id"))
     mcp_hub.invalidate_cache()
     _write_codex_profile()
@@ -882,18 +892,27 @@ async def mcp_strict(request: Request):
 
 @app.get("/mcp/ambient")
 def mcp_ambient():
-    """MCP sẵn trong Claude Code (đồng bộ claude.ai) - chỉ hiển thị."""
-    return {"servers": mcp_native_list()}
+    """MCP sẵn của từng CLI - chỉ hiển thị. servers = Claude Code (đồng bộ claude.ai);
+    codex_servers = kho MCP gốc của Codex (~/.codex/config.toml, user tự `codex mcp add`).
+    Engine ChatGPT nạp kho gốc đó vì profile javis chỉ phủ THÊM lên config gốc."""
+    return {"servers": mcp_native_list(), "codex_servers": codex_mcp_native_list()}
 
 
 @app.get("/mcp/native-status")
-def mcp_native_status_ep(name: str = Query(...)):
-    return mcp_native_status(name)
+def mcp_native_status_ep(name: str = Query(...), engine: str = Query("claude")):
+    return codex_mcp_native_status(name) if engine == "codex" else mcp_native_status(name)
 
 
 @app.post("/mcp/oauth-auth")
-def mcp_oauth_auth():
-    """Mở terminal chạy claude để user gõ /mcp xác thực OAuth MCP (chỉ máy local) - fallback cũ."""
+async def mcp_oauth_auth(request: Request):
+    """Mở terminal xác thực OAuth MCP (chỉ máy local). Mặc định: chạy claude rồi user gõ /mcp.
+    Body {"engine":"codex","name":...}: chạy `codex mcp login <tên>` cho kho gốc Codex."""
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    if (data or {}).get("engine") == "codex":
+        return codex_mcp_open_login_terminal((data or {}).get("name") or "")
     return mcp_open_auth_terminal()
 
 

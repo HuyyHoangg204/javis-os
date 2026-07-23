@@ -2805,14 +2805,15 @@
       + (e.ok ? "" : '<div class="aud-err">' + esc(e.err || "") + '</div>') + '</div>').join("");
     m.querySelector("#audBody").innerHTML = rows || '<div class="mp-note">Chưa có lượt gọi nào.</div>';
   }
-  function ambientCard(s) {   // MCP sẵn trong Claude Code - chỉ hiển thị
+  function ambientCard(s, kind) {   // MCP sẵn trong CLI (Claude Code / Codex) - chỉ hiển thị
     const ok = s.connected;
+    const detail = s.url || s.command || "";
     return `<div class="prov-card" style="opacity:.92">
       <div class="prov-head">
         <span class="prov-shield ${ok ? "on" : ""}">${_shield(ok)}</span>
         <div class="prov-info">
-          <div class="prov-name">${esc(s.name)} <span class="prov-kind">claude code</span></div>
-          <div class="prov-status ${ok ? "on" : ""}">${ok ? "● " : "⚠ "}${esc(s.status)}${s.url ? " · " + esc(s.url) : ""}</div>
+          <div class="prov-name">${esc(s.name)} <span class="prov-kind">${esc(kind || "claude code")}</span></div>
+          <div class="prov-status ${ok ? "on" : ""}">${ok ? "● " : "⚠ "}${esc(s.status)}${detail ? " · " + esc(detail) : ""}</div>
         </div>
       </div>
     </div>`;
@@ -2856,7 +2857,10 @@
       + '<div class="cat-grid" id="catGrid">' + cat.map(catalogCard).join("") + catalogCard(byId.custom) + '</div></div>'
       + '<div class="cview-section"><h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>'
       + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
-      + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>';
+      + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>'
+      + '<div class="cview-section"><h3>◆ MCP từ Codex (ChatGPT) <span style="opacity:.5">kho gốc - chỉ hiển thị</span></h3>'
+      + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã đăng ký sẵn trong Codex CLI (kho gốc của Codex, thêm bằng lệnh <code>codex mcp add</code>). Engine ChatGPT/Codex tự nạp các server này khi chạy - server OAuth cần chạy <code>codex mcp login &lt;tên&gt;</code> một lần trong terminal. Quản lý bằng lệnh codex, không sửa ở đây.</div>'
+      + '<div class="prov-list" id="mcpAmbientCodex" style="margin-top:12px"><div class="mp-empty">Đang tải…</div></div></div>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
     wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
     const isFirst = conns.length === 0;
@@ -2883,10 +2887,17 @@
       applyFilter();
     });
     fetch("/mcp/ambient").then(r => r.json()).then(a => {
-      const box = document.getElementById("mcpAmbient"); if (!box) return;
-      const list = a.servers || [];
-      box.innerHTML = list.length ? list.map(ambientCard).join("") : '<div class="mp-empty">Không có (hoặc Claude CLI chưa cài).</div>';
-    }).catch(() => { const box = document.getElementById("mcpAmbient"); if (box) box.innerHTML = '<div class="mp-empty">Không tải được.</div>'; });
+      const box = document.getElementById("mcpAmbient");
+      if (box) {
+        const list = a.servers || [];
+        box.innerHTML = list.length ? list.map(s => ambientCard(s, "claude code")).join("") : '<div class="mp-empty">Không có (hoặc Claude CLI chưa cài).</div>';
+      }
+      const cbox = document.getElementById("mcpAmbientCodex");
+      if (cbox) {
+        const clist = a.codex_servers || [];
+        cbox.innerHTML = clist.length ? clist.map(s => ambientCard(s, "codex")).join("") : '<div class="mp-empty">Không có (hoặc Codex CLI chưa cài).</div>';
+      }
+    }).catch(() => { ["mcpAmbient", "mcpAmbientCodex"].forEach(id => { const b = document.getElementById(id); if (b) b.innerHTML = '<div class="mp-empty">Không tải được.</div>'; }); });
   }
   function openMcpForm(el, server) {
     const edit = !!server;

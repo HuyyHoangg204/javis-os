@@ -425,6 +425,194 @@ def find_codex_cli() -> Optional[str]:
     return None
 
 
+# ---- MCP NATIVE của Codex (kho gốc ~/.codex/config.toml, quản bằng `codex mcp ...`) ----
+# Đối xứng với bộ mcp_native_* của Claude ở trên: Codex cũng có kho MCP gốc riêng (user tự
+# `codex mcp add`, hoặc app khác ghi vào config.toml). Javis chạy `codex exec -p javis` mà
+# profile chỉ PHỦ THÊM lên config gốc nên kho này vẫn được engine ChatGPT nạp - các hàm dưới
+# cho Javis liệt kê/thêm/gỡ/kiểm tra nó, và mở `codex mcp login <tên>` cho server OAuth.
+def _codex_run(sub_args, timeout=30):
+    """Chạy `codex <sub_args...>` trả CompletedProcess; None nếu chưa cài Codex CLI."""
+    cli = find_codex_cli()
+    if not cli:
+        return None
+    return subprocess.run([cli] + list(sub_args), capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=timeout,
+                          creationflags=_no_window())
+
+
+def codex_mcp_parse_list(out):
+    """Parse output `codex mcp list --json` → list chuẩn hoá [{name, url, command, transport,
+    status, connected}]. PURE (test được không cần codex). Format --json từng đổi giữa các bản
+    Codex nên chấp nhận nhiều hình dạng: list phẳng, bọc {"servers": [...]}, hay map tên→cấu
+    hình; parse hụt trả [] chứ không nổ."""
+    out = (out or "").strip()
+    if not out:
+        return []
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(data, dict):
+        inner = data.get("servers") or data.get("mcp_servers") or data
+        if isinstance(inner, list):
+            data = inner
+        elif isinstance(inner, dict):
+            data = [dict(v, name=v.get("name") or k) if isinstance(v, dict) else {"name": str(k)}
+                    for k, v in inner.items()]
+        else:
+            return []
+    if not isinstance(data, list):
+        return []
+    servers = []
+    for it in data:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or "").strip()
+        if not name:
+            continue
+        tr = it.get("transport") if isinstance(it.get("transport"), dict) else {}
+        url = str(it.get("url") or tr.get("url") or "")
+        cmd = it.get("command") or tr.get("command") or ""
+        if not isinstance(cmd, str):
+            cmd = " ".join(str(x) for x in cmd)
+        args = it.get("args") or tr.get("args") or []
+        if cmd and args:
+            cmd = (cmd + " " + " ".join(str(a) for a in args)).strip()
+        ttype = str((it.get("transport") if isinstance(it.get("transport"), str) else tr.get("type"))
+                    or ("http" if url else ("stdio" if cmd else "")))
+        enabled = it.get("enabled")
+        auth = str(it.get("auth_status") or it.get("auth") or "").lower()
+        needs_login = auth in ("unauthenticated", "needs_login", "not_logged_in", "logged_out")
+        status = ("tắt" if enabled is False
+                  else "cần đăng nhập (codex mcp login)" if needs_login else "đã khai báo")
+        servers.append({"name": name, "url": url, "command": cmd, "transport": ttype,
+                        "status": status, "connected": enabled is not False and not needs_login})
+    return servers
+
+
+def codex_mcp_parse_list_text(out):
+    """Fallback cho bản codex cũ không có `mcp list --json`: parse bảng text, lấy cột tên.
+    PURE. Bỏ dòng header/kẻ bảng/'No MCP servers configured'."""
+    servers = []
+    for line in (out or "").splitlines():
+        line = line.strip().strip("│|").strip()
+        if not line or "no mcp servers" in line.lower():
+            continue
+        if not set(line) - set("-─┼┤├┌┐└┘│| "):   # dòng kẻ bảng
+            continue
+        first = line.split()[0]
+        if first.lower() in ("name", "server"):    # dòng header bảng
+            continue
+        servers.append({"name": first, "url": "", "command": "", "transport": "",
+                        "status": "đã khai báo", "connected": True})
+    return servers
+
+
+def codex_mcp_native_list():
+    """Liệt kê MCP gốc của Codex (~/.codex/config.toml) - chỉ hiển thị, như mcp_native_list
+    bên Claude. Ưu tiên `codex mcp list --json`; bản cũ fallback parse bảng text."""
+    try:
+        r = _codex_run(["mcp", "list", "--json"], timeout=30)
+    except Exception:
+        return []
+    if r is None:
+        return []
+    if r.returncode == 0:
+        servers = codex_mcp_parse_list(r.stdout)
+        if servers:
+            return servers
+    try:
+        r2 = _codex_run(["mcp", "list"], timeout=30)
+    except Exception:
+        return []
+    if r2 is None or r2.returncode != 0:
+        return []
+    return codex_mcp_parse_list_text(r2.stdout)
+
+
+def _codex_mcp_add_args(name, url=None, command=None, bearer_env=None):
+    """Dựng argv sau `codex` cho `mcp add` (PURE để test). url → server HTTP (bearer_env =
+    TÊN biến env chứa token, không phải token); command (str hoặc list) → server stdio sau '--'."""
+    args = ["mcp", "add", name]
+    if url:
+        args += ["--url", url]
+        if bearer_env:
+            args += ["--bearer-token-env-var", bearer_env]
+    elif command:
+        cmd = command if isinstance(command, list) else str(command).split()
+        args += ["--"] + [str(c) for c in cmd]
+    return args
+
+
+def codex_mcp_native_add(name, url=None, command=None, bearer_env=None):
+    """Đăng ký 1 server vào kho MCP gốc của Codex (`codex mcp add`). Server OAuth: thêm bằng
+    url rồi user chạy `codex mcp login <tên>` MỘT lần (như claude → /mcp bên Claude)."""
+    if not find_codex_cli():
+        return {"ok": False, "error": "Codex CLI chưa cài"}
+    if not (url or command):
+        return {"ok": False, "error": "Thiếu url hoặc command"}
+    try:
+        r = _codex_run(_codex_mcp_add_args(name, url, command, bearer_env), timeout=30)
+        ok = r is not None and r.returncode == 0
+        return {"ok": ok, "out": ((r.stdout or "") + (r.stderr or "")).strip()[:300] if r else ""}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+def codex_mcp_native_remove(name):
+    if not find_codex_cli():
+        return {"ok": False, "error": "Codex CLI chưa cài"}
+    try:
+        _codex_run(["mcp", "remove", name], timeout=30)
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
+def codex_mcp_native_status(name):
+    """Trạng thái 1 server trong kho gốc Codex qua `codex mcp get` (parse chuỗi cần đăng nhập) -
+    đối xứng mcp_native_status bên Claude."""
+    if not find_codex_cli():
+        return {"authenticated": False, "status": "no_cli"}
+    try:
+        r = _codex_run(["mcp", "get", name], timeout=30)
+        out = (((r.stdout or "") + (r.stderr or "")) if r else "").lower()
+        if r is None or r.returncode != 0 or "not found" in out or "no mcp server" in out:
+            return {"authenticated": False, "status": "not_found"}
+        if ("not logged in" in out or "needs login" in out or "unauthenticated" in out
+                or "login required" in out):
+            return {"authenticated": False, "status": "needs_auth"}
+        return {"authenticated": True, "status": "ok"}
+    except Exception as e:
+        return {"authenticated": False, "status": "error", "error": f"{type(e).__name__}: {e}"}
+
+
+def codex_mcp_open_login_terminal(name):
+    """Mở 1 cửa sổ terminal chạy `codex mcp login <tên>` để user xác thực OAuth cho MCP gốc
+    của Codex (chỉ máy local có màn hình - như mcp_open_auth_terminal bên Claude)."""
+    cli = find_codex_cli()
+    if not cli:
+        return {"ok": False, "error": "Codex CLI chưa cài"}
+    # Tên đi vào chuỗi shell trên Windows → chỉ nhận chữ/số/_/- để khỏi tiêm lệnh.
+    safe = "".join(ch for ch in str(name or "") if ch.isalnum() or ch in "_-")
+    if not safe or safe != str(name):
+        return {"ok": False, "error": "Tên server không hợp lệ"}
+    try:
+        if os.name == "nt":
+            subprocess.Popen(f'start "Javis - Dang nhap MCP Codex" cmd /k codex mcp login {safe}',
+                             shell=True)
+        else:
+            for term in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm"):
+                if shutil.which(term):
+                    subprocess.Popen([term, "-e", cli, "mcp", "login", safe])
+                    break
+            else:
+                return {"ok": False, "error": "Không tìm thấy terminal"}
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": f"{type(e).__name__}: {e}"}
+
+
 class CodexCLI:
     def __init__(self, cwd: Optional[str] = None, tag: str = "chat", model: Optional[str] = None,
                  instructions: Optional[str] = None):
