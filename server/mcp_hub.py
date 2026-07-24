@@ -867,8 +867,12 @@ async def validate_connection(conn_id):
         spec["headers"].update(await mcp_client._oauth_headers(conn))
         tools = await mcp_client.pool.list_tools(spec)
     except Exception as e:
+        # Kèm nội dung lỗi thật: chỉ tên loại (vd "ValueError") thì không lần ra manh mối.
+        chi_tiet = str(e)[:160]
         return {"ok": False, "label": "", "tools": 0,
-                "error": f"Không kết nối được ({type(e).__name__}). Kiểm tra lại key/URL hoặc thử lại."}
+                "error": "Không kết nối được (" + type(e).__name__
+                         + (": " + chi_tiet if chi_tiet else "")
+                         + "). Kiểm tra lại key/URL hoặc thử lại."}
     label = ""
     val = (conn.get("connector") or {}).get("validate")
     if val and val.get("tool"):

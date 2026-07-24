@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.160] - 2026-07-24
+Sửa "Không kết nối được (ValueError)" khi đấu Google Workspace: response tools/list lớn hơn 64KB làm nổ trần dòng mặc định của asyncio.
+### Sửa lỗi
+- **Đấu connector Google Workspace báo "Không kết nối được (ValueError)"**: tools/list của server workspace-mcp là MỘT dòng NDJSON vài trăm KB (hàng chục tool, mô tả dài), vượt trần StreamReader 64KB/dòng mặc định của asyncio.create_subprocess_exec nên readline() nổ LimitOverrunError đội lốt ValueError. Nới trần lên 16MB cho mọi session MCP stdio. Các connector stdio khác chưa dính chỉ vì response của chúng còn dưới 64KB.
+- **Thông báo lỗi kết nối kèm nội dung lỗi thật**: trước chỉ hiện tên loại lỗi (vd "ValueError") nên không lần ra manh mối; giờ kèm cả message rút gọn.
+### Kiểm thử
+- Thêm `test_stdio_big_line.py`: server MCP giả trả tools/list một dòng ~200KB, phải đọc trọn không nổ, kèm canary chứng minh kịch bản thật sự vượt trần 64KB.
+
 ## [0.9.159] - 2026-07-24
 Kết nối Lịch Google/Gmail hết cảnh "đã kết nối mà không có quyền": guide bổ sung 2 điều kiện bắt buộc của Google, nút Test báo đúng bệnh.
 ### Sửa lỗi

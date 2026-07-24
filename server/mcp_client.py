@@ -188,6 +188,10 @@ class McpStdioSession:
     def alive(self):
         return self.proc is not None and self.proc.returncode is None
 
+    # asyncio mặc định trần StreamReader 64KB MỖI DÒNG - tools/list của workspace-mcp là MỘT
+    # dòng NDJSON vài trăm KB nên readline() nổ LimitOverrun (đội lốt ValueError). Nới hẳn 16MB.
+    _STREAM_LIMIT = 16 * 1024 * 1024
+
     async def start(self):
         kwargs = {}
         if os.name == "nt":
@@ -196,7 +200,7 @@ class McpStdioSession:
         env.update(self.env)
         self.proc = await asyncio.create_subprocess_exec(
             *self._argv(), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE, env=env, **kwargs)
+            stderr=asyncio.subprocess.PIPE, env=env, limit=self._STREAM_LIMIT, **kwargs)
         asyncio.ensure_future(self._drain_stderr())
 
     def _err_tail(self):
