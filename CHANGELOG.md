@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.163] - 2026-07-24
+Trang Kết nối: ghim card "Tự thêm (nâng cao)" lên ĐẦU kho với icon ⭐, ngay sau là Composio.
+### Cải thiện
+- **Card "Tự thêm (nâng cao)" lên đầu Kho kết nối, icon đổi 🧩 thành ⭐**: trước nằm cuối grid, người muốn tự khai URL/lệnh phải kéo qua toàn bộ kho mới thấy; icon cũ cũng trùng với Composio mới thêm.
+- **Composio đứng đầu danh sách connector trong kho**: chuyển entry lên đầu system/mcp-catalog.json (grid vẽ theo thứ tự file), một kết nối mở 500+ app nên đáng thấy đầu tiên.
+
 ## [0.9.162] - 2026-07-24
 Thêm connector Composio: MỘT kết nối mở ra hơn 500 app đã có sẵn MCP (Gmail, Notion, Sheets, GitHub, Linear...), Javis khỏi viết connector riêng cho từng app.
 ### Thêm mới

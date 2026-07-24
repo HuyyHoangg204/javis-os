@@ -2826,7 +2826,7 @@
     const conns = d.connections || [];
     const byId = {};
     cat.forEach(c => byId[c.id] = c);
-    byId.custom = { id: "custom", name: "Tự thêm (nâng cao)", icon: "🧩", category: "Khác",
+    byId.custom = { id: "custom", name: "Tự thêm (nâng cao)", icon: "⭐", category: "Khác",
                     description: "Server MCP tự khai URL/lệnh/header - dành cho người rành kỹ thuật.", auth_type: "apikey" };
     const st = await freshSettings();
     const main = (st.model && st.model.main) || {};
@@ -2854,7 +2854,7 @@
       + '<div class="cview-section"><h3>◆ Kho kết nối</h3>'
       + '<div class="cat-tools"><input class="js-input" id="catQ" placeholder="Tìm dịch vụ…" style="max-width:220px">'
       + '<span class="cat-filter"><button class="cat-chip on" data-catf="">Tất cả</button>' + cats.map(x => '<button class="cat-chip" data-catf="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</span></div>'
-      + '<div class="cat-grid" id="catGrid">' + cat.map(catalogCard).join("") + catalogCard(byId.custom) + '</div></div>'
+      + '<div class="cat-grid" id="catGrid">' + catalogCard(byId.custom) + cat.map(catalogCard).join("") + '</div></div>'
       + '<div class="cview-section"><h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>'
       + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
       + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>'
