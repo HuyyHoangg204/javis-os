@@ -821,6 +821,35 @@ def _extract_label(text, paths):
     return m.group(1) if m else ""
 
 
+def _friendly_tool_error(err):
+    """Dịch lỗi validate tool thành lời khuyên ĐÚNG BỆNH cho các lỗi Google/OAuth hay gặp.
+    Nhận chuỗi lỗi (đã bỏ tiền tố 'ERROR:'), trả thông báo cho UI. Lỗi lạ giữ hành vi cũ.
+
+    Vì sao: server MCP hosted của Google (calendarmcp/gmailmcp.googleapis.com) là API RIÊNG
+    phải bật thêm + phải ghi danh Workspace Developer Preview. Người dùng thiếu bước đó bị 403
+    nhưng Javis từng chỉ báo "Key chưa đúng hoặc chưa đủ quyền" - đổ oan sang key/não."""
+    e = (err or "").strip()
+    low = e.lower()
+    if "has not been used in project" in low or "service_disabled" in low:
+        m = re.search(r"https://console\.developers\.google\.com/apis/[^\s\"'\\]+", e)
+        link = ("\nBật tại: " + m.group(0)) if m else ""
+        extra = ""
+        m2 = re.search(r"\b([a-z0-9-]*mcp)\.googleapis\.com", low)
+        if m2:
+            extra = ("\nLưu ý: server MCP của Google là API riêng (" + m2.group(0)
+                     + "), phải bật THÊM bên cạnh API thường, và tài khoản Google phải ghi danh"
+                       " Workspace Developer Preview Program (miễn phí):"
+                       " https://developers.google.com/workspace/preview")
+        return "API này chưa được bật trong project Google Cloud của bạn." + link + extra
+    if "insufficient authentication scopes" in low or "access_token_scope_insufficient" in low:
+        return ("Tài khoản đã kết nối nhưng chưa cấp đủ quyền cho Javis (có thể lúc đồng ý đã"
+                " bỏ bớt ô tick). Bấm Đăng nhập lại và tick chọn đầy đủ các quyền.")
+    if ("missing required authentication credential" in low or "unauthenticated" in low
+            or "invalid_grant" in low or "invalid_token" in low):
+        return "Phiên đăng nhập hỏng hoặc hết hạn. Bấm Đăng nhập lại để lấy token mới."
+    return "Key chưa đúng hoặc chưa đủ quyền: " + e[:200]
+
+
 async def validate_connection(conn_id):
     """Gọi thử connection: đếm tool + (nếu catalog khai validate) lấy label tên shop.
     Trả {ok, label, tools, error}."""
@@ -846,6 +875,6 @@ async def validate_connection(conn_id):
         res = await mcp_client.pool.call_tool(spec, val["tool"], val.get("args") or {})
         if str(res).startswith("ERROR:"):
             return {"ok": False, "label": "", "tools": len(tools),
-                    "error": "Key chưa đúng hoặc chưa đủ quyền: " + str(res)[7:200]}
+                    "error": _friendly_tool_error(str(res)[7:])}
         label = _extract_label(str(res), val.get("label_paths"))
     return {"ok": True, "label": label, "tools": len(tools), "error": ""}

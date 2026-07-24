@@ -591,7 +591,7 @@
       "name": "Google Calendar",
       "icon": "/static/logos/google-calendar.png",
       "category": "Văn phòng",
-      "description": "Lịch Google qua MCP chính chủ của Google: xem lịch, tìm chỗ trống, tạo/sửa sự kiện, nhắc hẹn. Đăng nhập Google trong dashboard, chạy được cả trên VPS. Cần tạo OAuth client 1 lần (~10 phút).",
+      "description": "Lịch Google qua MCP chính chủ của Google: xem lịch, tìm chỗ trống, tạo/sửa sự kiện, nhắc hẹn. Đăng nhập Google trong dashboard, chạy được cả trên VPS. Cần tạo OAuth client + ghi danh Developer Preview của Google 1 lần (~10 phút).",
       "status": "beta",
       "transport": "http",
       "url": "https://calendarmcp.googleapis.com/mcp/v1",
@@ -606,8 +606,14 @@
           { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
           { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
         ],
-        "guide": "Làm 1 lần, khoảng 10 phút:\n1. Vào console.cloud.google.com, tạo project, bật Google Calendar API.\n2. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n3. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n4. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n5. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.",
-        "guide_url": "https://console.cloud.google.com/apis/credentials"
+        "guide": "Server MCP Lịch của Google đang ở giai đoạn Developer Preview: phải ghi danh chương trình (miễn phí) và bật thêm API MCP riêng, thiếu là bị chặn 403 dù đăng nhập thành công.\nLàm 1 lần, khoảng 10 phút:\n1. Ghi danh Google Workspace Developer Preview Program bằng đúng tài khoản Google sẽ đăng nhập (nút bên dưới).\n2. Vào console.cloud.google.com, tạo project, bật CẢ HAI API: Google Calendar API và Google Calendar MCP API (tìm 'Calendar MCP' trong thư viện API, có nút bên dưới).\n3. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n4. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n5. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n6. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nĐăng nhập xong mà Test vẫn báo thiếu quyền thì soát lại bước 1 và bước 2, hai bước hay bị bỏ sót nhất.",
+        "guide_url": "https://console.cloud.google.com/apis/credentials",
+        "setup": {
+          "links": [
+            { "label": "Ghi danh Developer Preview", "url": "https://developers.google.com/workspace/preview" },
+            { "label": "Bật Google Calendar MCP API", "url": "https://console.cloud.google.com/apis/library/calendarmcp.googleapis.com" }
+          ]
+        }
       },
       "validate": {
         "tool": "list_calendars",
@@ -627,7 +633,7 @@
       "name": "Gmail",
       "icon": "/static/logos/gmail.webp",
       "category": "Văn phòng",
-      "description": "Gmail qua MCP chính chủ của Google: đọc và tìm thư, soạn NHÁP, gắn nhãn sắp xếp hộp thư. Server chính chủ KHÔNG có tool gửi thẳng - luôn dừng ở bản nháp để bạn tự bấm gửi. Cần tạo OAuth client 1 lần.",
+      "description": "Gmail qua MCP chính chủ của Google: đọc và tìm thư, soạn NHÁP, gắn nhãn sắp xếp hộp thư. Server chính chủ KHÔNG có tool gửi thẳng - luôn dừng ở bản nháp để bạn tự bấm gửi. Cần tạo OAuth client + ghi danh Developer Preview của Google 1 lần.",
       "status": "beta",
       "transport": "http",
       "url": "https://gmailmcp.googleapis.com/mcp/v1",
@@ -642,8 +648,14 @@
           { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
           { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
         ],
-        "guide": "Làm 1 lần, khoảng 10 phút:\n1. Vào console.cloud.google.com, tạo project, bật Gmail API.\n2. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n3. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n4. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n5. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nCó thể dùng CHUNG một OAuth client với Google Calendar, chỉ cần bật thêm Gmail API.",
-        "guide_url": "https://console.cloud.google.com/apis/credentials"
+        "guide": "Server MCP Gmail của Google đang ở giai đoạn Developer Preview: phải ghi danh chương trình (miễn phí) và bật thêm API MCP riêng, thiếu là bị chặn 403 dù đăng nhập thành công.\nLàm 1 lần, khoảng 10 phút:\n1. Ghi danh Google Workspace Developer Preview Program bằng đúng tài khoản Google sẽ đăng nhập (nút bên dưới).\n2. Vào console.cloud.google.com, tạo project, bật CẢ HAI API: Gmail API và Gmail MCP API (tìm 'Gmail MCP' trong thư viện API, có nút bên dưới).\n3. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n4. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n5. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n6. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nCó thể dùng CHUNG một OAuth client với Google Calendar, chỉ cần bật thêm Gmail API + Gmail MCP API.\nĐăng nhập xong mà Test vẫn báo thiếu quyền thì soát lại bước 1 và bước 2, hai bước hay bị bỏ sót nhất.",
+        "guide_url": "https://console.cloud.google.com/apis/credentials",
+        "setup": {
+          "links": [
+            { "label": "Ghi danh Developer Preview", "url": "https://developers.google.com/workspace/preview" },
+            { "label": "Bật Gmail MCP API", "url": "https://console.cloud.google.com/apis/library/gmailmcp.googleapis.com" }
+          ]
+        }
       },
       "validate": {
         "tool": "list_labels",

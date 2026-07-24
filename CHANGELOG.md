@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.159] - 2026-07-24
+Kết nối Lịch Google/Gmail hết cảnh "đã kết nối mà không có quyền": guide bổ sung 2 điều kiện bắt buộc của Google, nút Test báo đúng bệnh.
+### Sửa lỗi
+- **Lịch Google/Gmail OAuth xong vẫn "không có quyền" (báo từ người dùng thật)**: server MCP hosted của Google (calendarmcp/gmailmcp.googleapis.com) đòi 2 thứ mà guide cũ không nói: ghi danh Google Workspace Developer Preview Program (miễn phí) và bật API MCP RIÊNG (Google Calendar MCP API / Gmail MCP API) bên cạnh API thường. Thiếu là Google chặn 403 dù đăng nhập thành công, càng dễ hiểu nhầm vì trạng thái "đã kết nối" vẫn xanh (tools/list của Google không cần token, chỉ tools/call mới cần). Guide 2 connector viết lại đủ 6 bước, thêm nút mở thẳng trang ghi danh + trang bật API. Không phải lỗi não/model: nút Test chạy hoàn toàn phía server, không đi qua engine.
+- **Nút Test dịch lỗi Google thành lời khuyên đúng bệnh**: thay câu chung "Key chưa đúng hoặc chưa đủ quyền" bằng nhận diện 3 họ lỗi: API chưa bật trong project (kèm đúng link bật lấy từ thông báo của Google, nhắc ghi danh preview nếu là server *mcp.googleapis.com), token thiếu scope do bỏ tick lúc đồng ý (khuyên đăng nhập lại tick đủ), token hỏng/hết hạn (khuyên đăng nhập lại). Lỗi lạ giữ nguyên hành vi cũ.
+### Kiểm thử
+- Thêm `test_loi_ket_noi_google.py`: 15 phép thử cho bộ dịch lỗi (API chưa bật có/không phải server MCP, thiếu scope, token hỏng, fallback + canary, chuỗi UI có dấu tiếng Việt, và soát validate_connection thật sự đi qua bộ dịch).
+
 ## [0.9.158] - 2026-07-23
 Kho kết nối có thêm Google Tasks, kèm vá phân quyền các tool gộp manage_* của Google Workspace.
 ### Thêm mới
