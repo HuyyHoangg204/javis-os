@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.161] - 2026-07-24
+Google Keep có đường lui oauth_token khi Google từ chối App Password (BadAuthentication).
+### Sửa lỗi
+- **Kết nối Google Keep báo 'Google từ chối đăng nhập' dù App Password đúng**: Google đang siết dần đường đổi App Password lấy master token (perform_master_login trả BadAuthentication tuỳ tài khoản, kể cả trên máy cá nhân). Thêm đường lui chuẩn của cộng đồng gkeepapi: ô oauth_token mới trong form - người dùng mở accounts.google.com/EmbeddedSetup trong tab ẩn danh (có nút mở thẳng), đăng nhập, lấy cookie oauth_token dán vào, Javis đổi qua gpsoauth.exchange_token thành master token. Cookie dùng một lần, bị drop không lưu, không map ra env. Thông báo BadAuthentication giờ chỉ đủ 3 khả năng kèm đường lui này, và guide có hướng dẫn lấy cookie từng bước.
+### Cải thiện
+- **cred_exchange.run cho phép input tuỳ chọn bỏ trống**: input khai optional trong auth.fields không còn bị chặn "Thiếu" từ ngoài - handler tự kiểm tổ hợp (Keep cần App Password HOẶC oauth_token, không bắt cả hai).
+### Kiểm thử
+- `test_cred_exchange.py` thêm 9 phép thử: đường oauth_token đổi qua exchange_token (gpsoauth giả, không chạm mạng), lỗi BadAuthentication phải chỉ sang đường lui, input tuỳ chọn tới được handler, ô oauth_token không map env + có trong drop, nút EmbeddedSetup. `test_google_keep.py` cập nhật đếm 5 ô nhập.
+
 ## [0.9.160] - 2026-07-24
 Sửa "Không kết nối được (ValueError)" khi đấu Google Workspace: response tools/list lớn hơn 64KB làm nổ trần dòng mặc định của asyncio.
 ### Sửa lỗi

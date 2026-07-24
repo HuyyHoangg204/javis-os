@@ -890,6 +890,12 @@
             "optional": true
           },
           {
+            "key": "oauth_token",
+            "label": "Hoặc dán oauth_token lấy từ trình duyệt (đường lui khi Google từ chối App Password - xem cuối hướng dẫn)",
+            "placeholder": "oauth2_4/...",
+            "optional": true
+          },
+          {
             "key": "master_token",
             "label": "Hoặc dán sẵn master token nếu bạn đã tự lấy (bỏ trống nếu dùng App Password ở trên)",
             "placeholder": "aas_et/...",
@@ -904,9 +910,9 @@
             "env": "UNSAFE_MODE"
           }
         ],
-        "guide": "Google Keep không có API chính chủ cho gmail thường, nên Javis phải đăng nhập bằng App Password rồi tự đổi thành token.\n\nCẢNH BÁO: token đổi ra có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu.\n\nLàm 1 lần:\n1. Bật xác minh 2 bước cho tài khoản Google.\n2. Bấm nút bên dưới, tạo App Password rồi copy chuỗi 16 ký tự.\n3. Dán email + chuỗi đó vào ô dưới, bấm Kết nối.\n\nJavis đổi lấy token, lưu token, và KHÔNG lưu lại App Password. Copy cả dấu cách cũng được.\n\nNếu Google từ chối (hay gặp khi Javis chạy trên VPS), hãy tự lấy master token ở máy cá nhân rồi dán vào ô Master token.\n\nÔ cuối để trống thì Javis chỉ sửa được note do chính nó tạo. Gõ true thì Javis sửa được mọi note, kể cả note bạn viết tay.",
-        "exchange": { "handler": "google_master_token", "inputs": ["google_email", "app_password"], "output": "master_token", "drop": ["app_password"] },
-        "setup": { "links": [{ "label": "Tạo App Password", "url": "https://myaccount.google.com/apppasswords" }] },
+        "guide": "Google Keep không có API chính chủ cho gmail thường, nên Javis phải đăng nhập bằng App Password rồi tự đổi thành token.\n\nCẢNH BÁO: token đổi ra có TOÀN QUYỀN tài khoản Google của bạn (Gmail, Drive, Photos...), tương đương mật khẩu.\n\nLàm 1 lần:\n1. Bật xác minh 2 bước cho tài khoản Google.\n2. Bấm nút bên dưới, tạo App Password rồi copy chuỗi 16 ký tự.\n3. Dán email + chuỗi đó vào ô dưới, bấm Kết nối.\n\nJavis đổi lấy token, lưu token, và KHÔNG lưu lại App Password. Copy cả dấu cách cũng được.\n\nNếu Google từ chối (hay gặp khi Javis chạy trên VPS), hãy tự lấy master token ở máy cá nhân rồi dán vào ô Master token.\n\nÔ unsafe_mode để trống thì Javis chỉ sửa được note do chính nó tạo. Gõ true thì Javis sửa được mọi note, kể cả note bạn viết tay.\n\nNếu báo 'Google từ chối đăng nhập' dù chuỗi đúng: Google đang siết dần đường App Password. Đường lui oauth_token:\n1. Bấm nút 'Mở trang lấy oauth_token' bên dưới trong TAB ẨN DANH, đăng nhập đúng tài khoản, bấm Tôi đồng ý.\n2. Ngay tab đó bấm F12 > Application > Cookies > accounts.google.com, tìm cookie tên oauth_token (giá trị bắt đầu oauth2_4/).\n3. Copy giá trị đó dán vào ô oauth_token rồi bấm Kết nối NGAY (cookie dùng một lần, hết hạn nhanh). Javis đổi lấy master token và không lưu cookie.",
+        "exchange": { "handler": "google_master_token", "inputs": ["google_email", "app_password", "oauth_token"], "output": "master_token", "drop": ["app_password", "oauth_token"] },
+        "setup": { "links": [{ "label": "Tạo App Password", "url": "https://myaccount.google.com/apppasswords" }, { "label": "Mở trang lấy oauth_token", "url": "https://accounts.google.com/EmbeddedSetup" }] },
         "guide_url": "https://github.com/feuerdev/keep-mcp"
       },
       "validate": {

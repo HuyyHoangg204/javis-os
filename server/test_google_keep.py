@@ -134,8 +134,8 @@ check("mode auto: full + delete_note vẫn BỊ CHẶN",
 # ---- bản cho UI không lộ secret ----
 pub = next((c for c in mcp_catalog.public_catalog() if c["id"] == "google-keep"), None)
 check("public_catalog có google-keep", pub is not None)
-check("public_catalog trả đủ 4 ô nhập (email, app password, master token, unsafe)",
-      len((pub or {}).get("fields") or []) == 4)
+check("public_catalog trả đủ 5 ô nhập (email, app password, oauth_token, master token, unsafe)",
+      len((pub or {}).get("fields") or []) == 5)
 check("public_catalog trả nút setup để UI vẽ 'Tạo App Password'",
       bool(((pub or {}).get("setup") or {}).get("links")))
 check("public_catalog KHÔNG lộ tool_meta/validate nội bộ",

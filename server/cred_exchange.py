@@ -28,7 +28,12 @@ _ANDROID_ID = "0123456789abcdef"
 
 
 def _google_master_token(fields):
-    """App Password -> master token. Trả (token, lỗi)."""
+    """App Password HOẶC oauth_token (cookie trang EmbeddedSetup) -> master token. Trả (token, lỗi).
+
+    Google siết dần đường App Password (perform_master_login trả BadAuthentication dù chuỗi đúng,
+    tuỳ tài khoản). Đường lui chuẩn của cộng đồng gkeepapi: người dùng đăng nhập
+    accounts.google.com/EmbeddedSetup trên trình duyệt, lấy cookie oauth_token (oauth2_4/...),
+    đổi qua gpsoauth.exchange_token. Cookie đó dùng MỘT lần, không lưu."""
     try:
         import gpsoauth
     except ImportError:
@@ -38,8 +43,27 @@ def _google_master_token(fields):
     email = str(fields.get("google_email") or "").strip()
     # Google hiển thị App Password thành 4 nhóm 4 ký tự có dấu cách; người dùng hay copy cả cách.
     pw = str(fields.get("app_password") or "").replace(" ", "").strip()
-    if not email or not pw:
-        return None, "Cần điền cả Email Google và App Password."
+    otk = str(fields.get("oauth_token") or "").strip()
+    if not email:
+        return None, "Cần điền Email Google."
+    if not pw and not otk:
+        return None, ("Cần App Password, hoặc oauth_token lấy từ trình duyệt theo hướng dẫn "
+                      "trong form (một trong hai).")
+
+    if otk:
+        try:
+            res = gpsoauth.exchange_token(email, otk, _ANDROID_ID)
+        except Exception as e:
+            return None, (f"Không gọi được máy chủ Google ({type(e).__name__}). Kiểm tra mạng của "
+                          "máy chạy Javis rồi thử lại.")
+        token = res.get("Token")
+        if token:
+            return token, ""
+        ma = str(res.get("Error") or res.get("error") or "").strip()
+        return None, (f"Google từ chối oauth_token (mã: {ma or 'không rõ'}). Cookie này dùng MỘT "
+                      "lần và hết hạn nhanh: mở lại accounts.google.com/EmbeddedSetup trong tab "
+                      "ẩn danh, lấy cookie oauth_token MỚI rồi dán và bấm Kết nối ngay.")
+
     if len(pw) != 16:
         return None, (f"App Password phải đúng 16 ký tự (đang nhận {len(pw)}). Đây KHÔNG phải mật "
                       "khẩu Gmail thường, mà là chuỗi Google sinh ra ở myaccount.google.com/apppasswords.")
@@ -56,10 +80,12 @@ def _google_master_token(fields):
 
     ma = str(res.get("Error") or res.get("error") or "").strip()
     if ma == "BadAuthentication":
-        return None, ("Google từ chối đăng nhập. Hai khả năng: (1) sai email hoặc App Password, "
-                      "hãy tạo lại chuỗi mới ở myaccount.google.com/apppasswords; (2) Javis đang "
-                      "chạy trên VPS và Google chặn đăng nhập từ trung tâm dữ liệu. Nếu là (2), "
-                      "hãy lấy master token trên máy cá nhân rồi dán thẳng vào ô Master token.")
+        return None, ("Google từ chối đăng nhập. Ba khả năng: (1) sai email hoặc App Password, "
+                      "tạo lại chuỗi mới ở myaccount.google.com/apppasswords; (2) Google đã siết "
+                      "đường App Password với tài khoản này, dùng đường lui oauth_token theo hướng "
+                      "dẫn trong form (mở accounts.google.com/EmbeddedSetup); (3) Javis chạy trên "
+                      "VPS bị Google chặn IP trung tâm dữ liệu, lấy token ở máy cá nhân rồi dán "
+                      "vào ô Master token hoặc oauth_token.")
     if ma in ("NeedsBrowser", "DeviceManagementRequiredOrSyncDisabled"):
         return None, ("Google đòi xác minh thêm bằng trình duyệt. Đăng nhập tài khoản này trên "
                       "trình duyệt một lần, xác nhận cảnh báo bảo mật, rồi thử lại.")
@@ -99,7 +125,10 @@ def run(connector, fields):
 
     inputs = list(ex.get("inputs") or [])
     nhan = {f.get("key"): f for f in ((connector or {}).get("auth") or {}).get("fields") or []}
-    thieu = [k for k in inputs if not str(fields.get(k) or "").strip()]
+    # Input khai optional trong auth.fields được phép bỏ trống - handler tự kiểm tổ hợp
+    # (vd Google Keep: cần App Password HOẶC oauth_token, không bắt cả hai).
+    thieu = [k for k in inputs
+             if not str(fields.get(k) or "").strip() and not (nhan.get(k) or {}).get("optional")]
     if thieu:
         ten = ", ".join((nhan.get(k) or {}).get("label") or k for k in thieu)
         return _bo_rac(fields), f"Thiếu: {ten}."

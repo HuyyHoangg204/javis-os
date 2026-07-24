@@ -48,6 +48,9 @@ _goi = []
 
 def _handler_gia(fields):
     _goi.append(dict(fields))
+    # Input optional được run() thả qua -> handler PHẢI tự kiểm, giống handler Google thật.
+    if not str(fields.get("app_password") or "").strip():
+        return None, "Cần điền App Password."
     if fields.get("app_password") == "sai":
         return None, "Mật khẩu ứng dụng không đúng."
     return "TOKEN-MOI-" + fields.get("email", ""), ""
@@ -81,9 +84,55 @@ check("BẢO MẬT: đã dán sẵn token thì app_password vẫn bị xoá", "a
 check("đã dán sẵn token -> không lỗi", err3 == "")
 
 # ---- thiếu đầu vào ----
+_goi.clear()
+out4a, err4a = cred_exchange.run(CON, {"email": "", "app_password": "x", "token": ""})
+check("thiếu input BẮT BUỘC (email) -> báo Thiếu, KHÔNG gọi handler",
+      "Thiếu" in (err4a or "") and len(_goi) == 0)
+_goi.clear()
 out4, err4 = cred_exchange.run(CON, {"email": "a@gmail.com", "app_password": "", "token": ""})
-check("thiếu app_password và token -> báo lỗi rõ", bool(err4))
-check("thiếu đầu vào -> KHÔNG gọi handler", len(_goi) == 0)
+check("input TUỲ CHỌN bỏ trống -> VẪN tới handler (nó tự kiểm tổ hợp, vd pw HOẶC oauth_token)",
+      len(_goi) == 1)
+check("handler tự báo thiếu -> lỗi rõ vẫn tới người dùng", bool(err4))
+check("BẢO MẬT: nhánh này app_password vẫn bị xoá", "app_password" not in (out4 or {}))
+
+# ---- handler google_master_token THẬT: đường lui oauth_token (EmbeddedSetup) ----
+# gpsoauth được import TRONG handler -> nhét module giả vào sys.modules là chặn được mạng.
+import types  # noqa: E402
+
+_calls = {}
+_fake_gps = types.ModuleType("gpsoauth")
+
+
+def _fake_master(email, pw, aid):
+    _calls["master"] = (email, pw)
+    return {"Error": "BadAuthentication"}
+
+
+def _fake_exchange(email, tok, aid, **kw):
+    _calls["exchange"] = (email, tok)
+    return {"Token": "aas_et/tu-oauth-token"}
+
+
+_fake_gps.perform_master_login = _fake_master
+_fake_gps.exchange_token = _fake_exchange
+_gps_that = sys.modules.get("gpsoauth")
+sys.modules["gpsoauth"] = _fake_gps
+
+_g = cred_exchange._google_master_token
+_t1, _e1 = _g({"google_email": "a@x.vn", "app_password": "", "oauth_token": "oauth2_4/abc"})
+check("oauth_token -> đổi qua exchange_token, ra master token",
+      _t1 == "aas_et/tu-oauth-token" and _calls.get("exchange") == ("a@x.vn", "oauth2_4/abc"))
+check("oauth_token -> KHÔNG đi đường App Password", "master" not in _calls)
+_t2, _e2 = _g({"google_email": "a@x.vn", "app_password": "abcd efgh ijkl mnop", "oauth_token": ""})
+check("App Password bị BadAuthentication -> lỗi chỉ sang đường lui oauth_token",
+      _t2 is None and "oauth_token" in (_e2 or "") and "EmbeddedSetup" in (_e2 or ""))
+_t3, _e3 = _g({"google_email": "a@x.vn", "app_password": "", "oauth_token": ""})
+check("thiếu cả App Password lẫn oauth_token -> lỗi nói rõ cần một trong hai",
+      _t3 is None and "App Password" in (_e3 or "") and "oauth_token" in (_e3 or ""))
+if _gps_that is not None:
+    sys.modules["gpsoauth"] = _gps_that
+else:
+    sys.modules.pop("gpsoauth", None)
 
 # ---- connector không khai exchange thì đi qua không đổi gì ----
 out5, err5 = cred_exchange.run({"id": "khac", "auth": {"fields": []}},
@@ -118,10 +167,20 @@ env = mcp_catalog.build_env(keep, {"google_email": "a@gmail.com", "app_password"
 check("BẢO MẬT: app_password KHÔNG xuất hiện trong env dù có bị truyền nhầm vào",
       "SIEU-BI-MAT" not in str(env))
 
-# ---- nút mở trang App Password của Google ----
+# ---- ô oauth_token (đường lui khi Google từ chối App Password) ----
+check("google-keep có ô oauth_token", "oauth_token" in fields)
+check("ô oauth_token là tuỳ chọn", bool(fields.get("oauth_token", {}).get("optional")))
+check("BẢO MẬT: ô oauth_token KHÔNG map ra env (dùng một lần rồi vứt)",
+      not fields.get("oauth_token", {}).get("env"))
+check("exchange nhận oauth_token làm input", "oauth_token" in (ex.get("inputs") or []))
+check("BẢO MẬT: google-keep khai drop oauth_token", "oauth_token" in (ex.get("drop") or []))
+
+# ---- nút mở trang App Password + trang lấy oauth_token của Google ----
 links = (((keep or {}).get("auth") or {}).get("setup") or {}).get("links") or []
 check("google-keep có nút mở trang tạo App Password",
       any("apppasswords" in (l.get("url") or "") for l in links))
+check("google-keep có nút mở trang EmbeddedSetup lấy oauth_token",
+      any("EmbeddedSetup" in (l.get("url") or "") for l in links))
 
 # ---- ĐẦU-CUỐI: app_password có bao giờ chạm tới ĐĨA không? ----
 # Đi đúng đường của endpoint /connect/add: cred_exchange.run -> mcp_store.add_connection,
