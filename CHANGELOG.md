@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.162] - 2026-07-24
+Thêm connector Composio: MỘT kết nối mở ra hơn 500 app đã có sẵn MCP (Gmail, Notion, Sheets, GitHub, Linear...), Javis khỏi viết connector riêng cho từng app.
+### Thêm mới
+- **Connector Composio (nhóm mới "Kho ứng dụng")**: đấu connect.composio.dev/mcp bằng API key (header x-consumer-api-key), đi qua hub và chịu phân quyền như mọi connector khác. 7 tool phân loại tường minh: tìm và xem mô tả tool là Chỉ đọc; nối app mới (COMPOSIO_MANAGE_CONNECTIONS - Composio đưa link, người dùng tự đăng nhập) là Ghi nháp; COMPOSIO_MULTI_EXECUTE_TOOL cùng 2 tool remote bash/workbench xếp NGUY HIỂM vì mọi hành động app thật (kể cả lệnh đọc) chạy qua MỘT tool chung nên Javis không tách được đọc với ghi bên trong - muốn Javis thao tác thật phải chủ động nâng kết nối lên Toàn quyền, guide và cảnh báo rủi ro nói rõ điều này. Loop nền vẫn bị mode ép trần như thường lệ (suggest ép Chỉ đọc, auto ép Ghi nháp).
+
 ## [0.9.161] - 2026-07-24
 Google Keep có đường lui oauth_token khi Google từ chối App Password (BadAuthentication).
 ### Sửa lỗi
