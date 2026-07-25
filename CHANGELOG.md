@@ -4,6 +4,23 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.173] - 2026-07-25
+Kanban trở thành hàng đợi vận hành dành cho AI, thay vì một bảng Trello cần người bấm chạy từng thẻ.
+### Thêm mới
+- **Task kernel bền vững bằng SQLite**: thêm board, task, dependency, run và event log; claim task dùng compare-and-set trong transaction, có worker lease, heartbeat, timeout, retry, idempotency key và lịch sử từng lần chạy (`server/task_store.py`).
+- **AI specifier trước khi thực thi**: goal mới đi qua tầng triage để model nền chuẩn hoá intent, chọn lane `files`, `research`, `mcp-read`, `code` hoặc `external-write`, rồi mới vào hàng đợi chạy. Hành động ra ngoài thiếu quyền `full` bị block theo loại `capability`, không chạy liều (`server/tasks.py`).
+- **Operations console mới**: trang Việc tập trung vào worker đang chạy, hàng đợi, ngoại lệ cần xử lý, throughput 24 giờ và drawer xem run/event; tự cập nhật 3 giây một lần. Sáu cột ngang và nút Chạy trên từng card không còn là luồng chính (`dashboard/console.js`).
+### Sửa lỗi
+- **Dispatcher quét mọi brain**: không còn hardcode `tick(["brain"])` khiến board khác hiển thị auto nhưng không bao giờ chạy.
+- **Chạy đúng task được chọn**: endpoint chạy/retry claim chính xác task id bằng transaction, không đưa về ready rồi vô tình chọn task cũ có ưu tiên cao hơn.
+- **Task nền không chặn cron và lịch thuốc**: dispatcher có vòng lặp riêng, mỗi worker là một asyncio task độc lập; scheduler 30 giây chỉ đánh thức dispatcher và trả ngay.
+- **Task Learn không dừng review thủ công hàng loạt**: task nội bộ mặc định tự hoàn thành; chỉ thiếu input, thiếu capability, hành động bên ngoài hoặc cờ duyệt tường minh mới cần người xử lý.
+### Tương thích
+- `Javis/kanban.json` cũ được import đúng một lần, task `running` từ tiến trình cũ được thu hồi về `ready`. SQLite là nguồn lifecycle chính nhưng Javis vẫn xuất snapshot JSON để brain backup và phiên bản cũ đọc được.
+- Worker tiếp tục đi qua `aux_engine`, nên Claude Code, Codex/ChatGPT và OpenAI/OpenRouter API dùng cùng queue, brain context và policy MCP hiện có.
+### Kiểm thử
+- Thêm `server/test_tasks_autonomous.py`: phủ migration JSON, atomic claim, dependency promotion, dispatcher đa brain và chạy đúng task được chọn.
+
 ## [0.9.172] - 2026-07-25
 ChatGPT nhớ đúng mạch hội thoại, và mọi model đọc cron/lịch thuốc từ dữ liệu thật thay vì đoán theo memory.
 ### Sửa lỗi
