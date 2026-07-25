@@ -182,7 +182,6 @@ def _c2_atomic_write(path, text):
 
 _c2_deps = self_improve.LoopDeps(
     build_system_prompt=lambda brain: "SYS",
-    metrics=lambda *a, **k: {"cards": []},
     brain_root=lambda brain: brain,   # test dùng thẳng path vault làm "brain" - identity map
     aux_model=lambda: None,
     atomic_write_text=_c2_atomic_write,

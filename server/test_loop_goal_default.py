@@ -41,15 +41,8 @@ def _atomic_write(path, text):
     p.write_text(text, encoding="utf-8")
 
 
-# metrics: nếu (sai) rơi vào nhánh business, hàm này bị gọi và trả cards có số → prompt sẽ
-# chứa marker kinh doanh. Nhánh custom KHÔNG đụng metrics.
-async def _metrics(*_a, **_k):
-    return {"cards": [{"label": "Doanh thu", "value": "1.36tr"}], "source": "POS"}
-
-
 deps = self_improve.LoopDeps(
     build_system_prompt=lambda brain: "SYS",
-    metrics=_metrics,
     brain_root=lambda brain: _BRAIN_ROOT,
     aux_model=lambda: None,
     atomic_write_text=_atomic_write,

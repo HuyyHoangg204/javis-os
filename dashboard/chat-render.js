@@ -263,7 +263,7 @@
   // ---------------------------------------------------------------- entry: markdown -> html
   function mdToHtml(raw) {
     raw = String(raw == null ? "" : raw);
-    // Bo HTML comment (block JAVIS_METRICS luon vo hinh), ke ca comment chua dong luc stream
+    // Bo HTML comment (khoi dieu khien JAVIS_* luon vo hinh), ke ca comment chua dong luc stream
     raw = raw.replace(/<!--[\s\S]*?-->/g, "").replace(/<!--[\s\S]*$/, "");
 
     var ph = [];

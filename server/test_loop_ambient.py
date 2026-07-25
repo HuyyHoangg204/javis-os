@@ -51,7 +51,6 @@ def _apply_mcp(cli, mode="full", brain=None):
 
 deps = self_improve.LoopDeps(
     build_system_prompt=lambda brain: "SYS",
-    metrics=lambda *a, **k: {"cards": []},
     brain_root=lambda brain: _BRAIN_ROOT,
     aux_model=lambda: None,
     atomic_write_text=_atomic_write,

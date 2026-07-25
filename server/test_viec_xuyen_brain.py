@@ -51,7 +51,6 @@ def _atomic_write(path, text):
 # ══════════════════════ A. Di chuyển loop giữa brain ══════════════════════
 _loop_deps = self_improve.LoopDeps(
     build_system_prompt=lambda brain: "SYS",
-    metrics=lambda *a, **k: {"cards": []},
     brain_root=lambda brain: brain,   # identity: path vault = "brain"
     aux_model=lambda: None,
     atomic_write_text=_atomic_write,

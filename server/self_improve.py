@@ -133,7 +133,6 @@ def _in_quiet_hours(spec: str, hour: int) -> bool:
 class LoopDeps:
     """Các helper của main.py được tiêm vào (tránh import vòng)."""
     build_system_prompt: Callable[[str], str]
-    metrics: Callable[..., Any]              # async: metrics(fresh:int) -> {"cards":[...], ...}
     brain_root: Callable[[str], str]
     aux_model: Callable[[], Optional[str]]
     atomic_write_text: Callable[[Any, str], None]
@@ -603,23 +602,20 @@ class LoopFeature:
         else:
             safety = _MCP_FULL if mode == "full" else _MCP_SAFETY
         if goal == "business":
-            try:
-                mdata = await self.deps.metrics(0)
-            except Exception:
-                mdata = {"cards": []}
-            cards = mdata.get("cards", []) or []
-            if not cards:
-                return "", ("Chưa có số liệu kinh doanh (chưa đấu MCP hoặc chưa có cache) → bỏ qua vòng này. "
-                            "Hãy bấm ⟳ tải số liệu hoặc đấu MCP (POS/kênh/ads).")
-            cards_json = json.dumps(cards, ensure_ascii=False)
-            src = mdata.get("source", "")
+            # Trước đây vòng này mồi sẵn số liệu từ job thẻ dashboard (/metrics). Job đó đã gỡ
+            # vì tự spawn agent kèm MCP mỗi lần mở dashboard, tốn hạn mức cho một bảng không ai
+            # xem. Giờ loop tự lấy số qua MCP ngay trong vòng - đúng nguồn, đúng lúc cần.
             base = (
                 "VÒNG TỰ CẢI THIỆN - MỤC TIÊU: CẢI THIỆN CHỈ SỐ KINH DOANH.\n"
-                f"Chỉ số hiện tại (nguồn {src or 'MCP'}): {cards_json}\n"
+                "BƯỚC 1 - lấy số thật: xem các MCP đang kết nối rồi lấy 3-6 chỉ số kinh doanh quan trọng nhất "
+                "của kỳ hiện tại, có so kỳ trước nếu lấy được. Ưu tiên nguồn theo thứ tự: Pancake POS (tool pos_*) "
+                "→ kênh bán / mạng xã hội → quảng cáo → bất kỳ nguồn kinh doanh nào khác. Dùng số THẬT, KHÔNG bịa. "
+                "Nếu KHÔNG có nguồn kinh doanh nào đang đấu thì dừng vòng và báo đúng một câu là chưa có nguồn dữ liệu.\n"
+                "BƯỚC 2 - phân tích: "
                 "Đọc thêm context trong vault (Wiki marketing/sales/funnel/content, data cache, projects) để hiểu bối cảnh. "
                 "Xác định CHỈ SỐ YẾU NHẤT hoặc đòn bẩy lớn nhất, rồi đề ra 1 hành động khả thi TUẦN NÀY để cải thiện nó "
                 "(vd: ý tưởng + caption content nháp, khung email, kịch bản khuyến mãi, điểm tối ưu funnel, danh sách lead cần gọi lại).\n"
-                "Có thể đọc thêm số liệu chi tiết qua MCP nếu cần.\n"
+                "Báo cáo phải NÊU RÕ các con số đã lấy được ở bước 1, kèm nguồn.\n"
                 + safety
             )
             if is_write:

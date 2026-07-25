@@ -105,31 +105,6 @@ body {
 }
 .mini-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* Metric cards */
-.metric-cards { display: flex; flex-direction: column; gap: 10px; }
-.metric-card {
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
-  position: relative; overflow: hidden;
-}
-.metric-card::before {
-  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: var(--card-accent, var(--accent)); opacity: 0.7;
-}
-.metric-empty {
-  background: var(--bg3); border: 1px dashed var(--border); border-radius: 10px;
-  padding: 16px 14px; font-size: 14px; color: var(--text2); line-height: 1.6;
-}
-.metric-empty .me-hint { color: var(--text3); font-size: 13px; }
-.m-label { font-size: 13px; color: var(--text2); margin-bottom: 6px; }
-.m-value { font-size: 22px; font-weight: 700; color: var(--text); font-family: var(--font); }
-.m-sub { font-size: 13px; color: var(--text3); margin-top: 4px; }
-.m-sub.up { color: var(--green); }
-.m-sub.down { color: var(--red); }
-.metric-card.loading .m-value { color: var(--text3); animation: blink 1s infinite; }
-@keyframes blink { 50% { opacity: 0.4; } }
-.metric-status { font-size: 12px; color: var(--text3); font-family: var(--font); margin-top: 10px; }
-
 /* CENTER orb */
 .hud-center {
   position: relative; overflow: hidden;

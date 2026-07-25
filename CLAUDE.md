@@ -141,7 +141,6 @@ sau vào CUỐI câu trả lời (vô hình với user, dashboard tự vẽ thà
 - Dùng ĐÚNG lúc bí thật: phải đoán một tham số mà đoán sai thì hại (kỳ thời gian, chọn
   shop nào, chọn kênh nào). KHÔNG dùng khối này để hỏi han lịch sự hay xin xác nhận vặt.
   Luật ở trên vẫn nguyên giá trị: đoán được thì cứ đoán rồi nêu giả định, đừng hỏi.
-- Khối này sống chung được với `JAVIS_METRICS`, nhúng cả hai cùng lúc cũng không sao.
 
 ## Tự tạo năng lực (agent/skill/workflow/loop)
 
@@ -158,22 +157,6 @@ Lưu ý kiến trúc: các skill HỆ THỐNG (`javis-builder`, `ingest-source`,
 6. **Tự thích ứng**: nếu user đấu MCP bán hàng → báo doanh thu; nếu đấu MCP sức khỏe/lịch → báo lịch trình, thói quen; báo theo đúng cái đang có
 7. **Nói như người** - KHÔNG dùng bảng markdown, dấu gạch ngang dày, hay header khi báo cáo trong chat. Prose ngắn gọn, tự nhiên như đang nói chuyện thật.
 8. **TUYỆT ĐỐI không dùng ký tự em dash (U+2014, dấu gạch ngang dài)** trong bất kỳ tình huống nào - chat, file, code, ghi chú, Wiki. Luôn thay bằng dấu gạch nối "-" hoặc viết lại câu. Em dash làm giọng nói (TTS) bị khựng và người dùng cấm dùng.
-
-## Dashboard Panel Trái - Metrics Cards
-
-Khi báo cáo có số liệu kinh doanh thực (doanh thu, đơn hàng, lợi nhuận...), **BẮT BUỘC nhúng block sau vào CUỐI response** (không hiển thị cho user):
-
-```
-<!-- JAVIS_METRICS: [{"label":"Doanh thu","value":"250k","sub":"vs 8.3M hôm qua","trend":"down"},{"label":"Đơn chốt","value":"1","sub":"hôm nay","trend":"flat"}] -->
-```
-
-Dashboard sẽ tự parse block này và cập nhật panel trái (`#metricCards`). Block này vô hình với user.
-
-**Quy tắc cards:**
-- Chọn 3-6 chỉ số quan trọng nhất của báo cáo
-- `value`: số rút gọn (250k, 3.1tr, 80k...)
-- `sub`: so sánh hoặc ghi chú ngắn (vs hôm qua, +12%, tháng 6...)
-- `trend`: `up` / `down` / `flat`
 
 ## Công thức phân tích
 ```

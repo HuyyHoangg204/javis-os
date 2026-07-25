@@ -580,16 +580,6 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
-  <!-- Bảng SỐ LIỆU KINH DOANH đã gỡ khỏi giao diện (thay bằng Vault explorer ở cột trái).
-       Vẫn giữ 3 id ở stub ẩn này vì app.js đọc #metricCards/#metricStatus/#refreshMetrics ngay
-       lúc nạp (getElementById + addEventListener vô điều kiện) - xoá trần sẽ ném null, hỏng dashboard.
-       Ẩn hoàn toàn: block JAVIS_METRICS nếu có vẫn parse vào đây nhưng không hiển thị. -->
-  <div id="metricsStub" hidden aria-hidden="true">
-    <button id="refreshMetrics" tabindex="-1"></button>
-    <div id="metricCards"></div>
-    <div id="metricStatus"></div>
-  </div>
-
   <script src="/static/voice.js?v=14"></script>
   <!-- three.js + 3d-force-graph KHÔNG nạp tĩnh nữa: app.js tự lazy-load qua CDN CHỈ khi chọn đồ thị 3D. -->
   <script src="/static/graph.js?v=14"></script>

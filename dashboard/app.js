@@ -19,7 +19,6 @@ function setSessionRunning(sid, on) {
 const SESSION_KEY = "javis.session.v1";
 let convo = [];            // [{role:"user"|"javis", text, atts}]
 let savedSessionId = null; // session_id của Claude để resume sau khi F5
-let savedMetrics = null;   // {cards, status}
 const stopBtn = document.getElementById("stopBtn");
 let stopTag = null;        // tag phiên chat server phát qua message hello → Stop chỉ ngắt phiên MÌNH
 
@@ -157,14 +156,12 @@ function handleMessage(data) {
       }
     }
   } else if (data.type === "response") {
-    const { clean, cards } = extractMetrics(data.content);
-    const { clean: askClean, ask } = window.JavisAsk.extract(clean);
+    const { clean: askClean, ask } = window.JavisAsk.extract(data.content || "");
     const finalText = askClean || (t && t.text) || "";
     const shownText = finalText || "_(không có nội dung trả về - thử lại hoặc đổi model)_";
     if (t) t.text = shownText;
     if (isActive) {
       hideActivity();
-      if (cards) pushMetricsToPanel(cards);
       let msgEl = t && t.bubble;
       if (!msgEl) msgEl = appendJavisMessage(shownText);
       else msgEl.querySelector(".bubble").innerHTML = markdownToHtml(shownText);
@@ -254,7 +251,6 @@ function persistSession() {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       convo: convo.slice(-200),
       sessionId: savedSessionId,
-      metrics: savedMetrics,
       savedAt: Date.now(),
     }));
   } catch (e) {}
@@ -270,7 +266,6 @@ function restoreSession() {
   if (!s) return;
   convo = Array.isArray(s.convo) ? s.convo : [];
   savedSessionId = s.sessionId || null;
-  savedMetrics = s.metrics || null;
   // Dựng lại bong bóng hội thoại
   convo.forEach((t, i) => {
     if (t.role === "user") { appendUserMessage(t.text, t.atts || []); return; }
@@ -279,10 +274,6 @@ function restoreSession() {
     if (t.ask) window.JavisAsk.render(el, t.ask, i === convo.length - 1);
   });
   if (convo.length) scrollBottom(true);
-  // Dựng lại số liệu kinh doanh (đánh dấu là của phiên trước)
-  if (savedMetrics && (savedMetrics.cards || []).length) {
-    renderMetrics(savedMetrics.cards, (savedMetrics.status || "") + " · phiên trước");
-  }
 }
 
 // ============================================
@@ -730,12 +721,6 @@ graphSource.addEventListener("change", () => {
   connectGraphWatch();   // theo dõi realtime trên nguồn mới
   loadMemStats();   // bộ nhớ theo vault → đổi vault thì đổi số ký ức
   loadBrainStats(); // agent/skill/workflow theo vault
-  // Nếu panel số liệu đang ở fallback Agentic → cập nhật số theo vault mới (không gọi lại MCP)
-  if (savedMetrics && savedMetrics.agentic) {
-    agenticFallbackCards().then(fb => {
-      if (fb.length) { renderMetrics(fb, "Lớp Agentic"); savedMetrics = { cards: fb, status: "Lớp Agentic", agentic: true }; persistSession(); }
-    });
-  }
   checkVault();     // kiểm tra cấu trúc vault mới chọn
 });
 
@@ -1058,108 +1043,6 @@ function initStarfield() {
     ctx.globalCompositeOperation = "source-over";
   }
   draw();
-}
-
-// ============================================
-// Metrics (auto-load số liệu)
-// ============================================
-const metricCards = document.getElementById("metricCards");
-const ACCENTS = ["var(--accent)", "var(--accent2)", "var(--yellow)", "var(--green)", "#06b6d4", "var(--red)"];
-
-async function loadMetrics(opts = {}) {
-  const status = document.getElementById("metricStatus");
-  const hasCards = !!metricCards.querySelector(".metric-card");
-  // silent + đã có card → refresh ngầm, không nháy placeholder
-  if (opts.silent && hasCards) {
-    status.textContent = "Đang cập nhật...";
-  } else {
-    status.textContent = "Đang phát hiện MCP & lấy số liệu...";
-    metricCards.innerHTML = `<div class="metric-empty">Đang quét các nguồn dữ liệu...</div>`;
-  }
-  try {
-    const res = await fetch("/metrics");
-    const data = await res.json();
-    const cards = data.cards || [];
-    if (cards.length === 0) {
-      // Không có MCP/dữ liệu kinh doanh → fallback: số agent/skill/workflow (lớp Agentic)
-      const fb = await agenticFallbackCards();
-      if (fb.length) {
-        renderMetrics(fb, "Chưa có nguồn dữ liệu kinh doanh - hiện lớp Agentic");
-        savedMetrics = { cards: fb, status: "Lớp Agentic", agentic: true };
-        persistSession();
-      } else if (!opts.silent || !hasCards) {
-        const note = data.note || data.error || "Chưa có MCP dữ liệu nào kết nối.";
-        metricCards.innerHTML = `<div class="metric-empty">${escapeHtml(note)}<br><span class="me-hint">Đấu thêm MCP (POS, kênh, quảng cáo...) để Javis báo cáo.</span></div>`;
-        status.textContent = "";
-      }
-      return;
-    }
-    const src = data.source ? ` · ${data.source}` : "";
-    const statusText = "Cập nhật: " + new Date().toLocaleTimeString("vi-VN") + src;
-    renderMetrics(cards, statusText);
-    savedMetrics = { cards, status: statusText };   // lưu để F5 còn
-    persistSession();
-  } catch (e) {
-    if (!opts.silent || !hasCards) {
-      metricCards.innerHTML = `<div class="metric-empty">⚠ Không lấy được số liệu</div>`;
-    }
-    status.textContent = "";
-  }
-}
-
-// Fallback khi không có dữ liệu kinh doanh: hiện số agent / skill / workflow của vault
-async function agenticFallbackCards() {
-  const b = encodeURIComponent(currentBrainPath());
-  try {
-    const [a, s, w] = await Promise.all([
-      fetch(`/agents?brain=${b}`).then(r => r.json()).catch(() => ({})),
-      fetch(`/skills?brain=${b}`).then(r => r.json()).catch(() => ({})),
-      fetch(`/workflows?brain=${b}`).then(r => r.json()).catch(() => ({})),
-    ]);
-    return [
-      { label: "Agents", value: String((a.agents || []).length), sub: "trong Javis", trend: "flat" },
-      { label: "Skills", value: String((s.skills || []).length), sub: "khả dụng", trend: "flat" },
-      { label: "Workflows", value: String((w.workflows || []).length), sub: "đã tạo", trend: "flat" },
-    ];
-  } catch (e) { return []; }
-}
-
-// Dựng các card số liệu từ dữ liệu (dùng cho cả load mới lẫn khôi phục phiên)
-function renderMetrics(cards, statusText) {
-  metricCards.innerHTML = "";
-  (cards || []).forEach((c, i) => {
-    const accent = ACCENTS[i % ACCENTS.length];
-    const trendClass = c.trend === "up" ? "up" : c.trend === "down" ? "down" : "";
-    const div = document.createElement("div");
-    div.className = "metric-card";
-    div.style.setProperty("--card-accent", accent);
-    div.innerHTML = `
-      <div class="m-label">${escapeHtml(c.label || "")}</div>
-      <div class="m-value">${escapeHtml(c.value || "-")}</div>
-      <div class="m-sub ${trendClass}">${escapeHtml(c.sub || "")}</div>`;
-    metricCards.appendChild(div);
-  });
-  const status = document.getElementById("metricStatus");
-  if (status) status.textContent = statusText || "";
-}
-document.getElementById("refreshMetrics").addEventListener("click", loadMetrics);
-
-// Trích block metrics Javis nhúng trong response → cập nhật panel trái
-const METRICS_BLOCK_RE = /<!--\s*JAVIS_METRICS:\s*([\s\S]*?)\s*-->/;
-function extractMetrics(text) {
-  if (typeof text !== "string") return { clean: "", cards: null };
-  const m = text.match(METRICS_BLOCK_RE);
-  if (!m) return { clean: text, cards: null };
-  let cards = null;
-  try { cards = JSON.parse(m[1]); } catch(e) {}
-  return { clean: text.replace(METRICS_BLOCK_RE, "").trim(), cards };
-}
-function pushMetricsToPanel(cards) {
-  if (!Array.isArray(cards) || !cards.length) return;
-  const ts = "Cập nhật: " + new Date().toLocaleTimeString("vi-VN");
-  renderMetrics(cards, ts);
-  savedMetrics = { cards, status: ts };
-  persistSession();
 }
 
 // ============================================
@@ -1826,6 +1709,3 @@ checkVault();
 // Hội thoại cũ KHÔNG mất - vẫn nằm trong panel Lịch sử (lưu ở server), bấm để mở lại.
 try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
 savedSessionId = null;
-// Mặc định: TỰ tải số liệu kinh doanh khi vào.
-// Có số liệu phiên trước → hiện ngay rồi refresh ngầm (silent) cho đỡ nháy.
-loadMetrics({ silent: !!(savedMetrics && (savedMetrics.cards || []).length) });

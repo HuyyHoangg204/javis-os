@@ -246,9 +246,12 @@ def collect_turn_files(reply_text: str, written_paths: list, t0: float,
 # Hạ khối điều khiển xuống chữ cho kênh không phải web
 # ============================================================
 # Javis nhúng khối điều khiển dạng HTML comment ở cuối câu trả lời cho dashboard
-# đọc (JAVIS_METRICS bơm panel trái, JAVIS_ASK vẽ nút lựa chọn). Kênh chữ thuần
-# như Telegram không hiểu mấy khối này, mà md_to_mdv2 chỉ escape chứ không bóc,
-# nên không lọc là người dùng nhìn thấy nguyên cụm "<\!\-\- JAVIS\_METRICS: ...".
+# đọc (hiện chỉ còn JAVIS_ASK - vẽ nút lựa chọn). Kênh chữ thuần như Telegram không
+# hiểu mấy khối này, mà md_to_mdv2 chỉ escape chứ không bóc, nên không lọc là người
+# dùng nhìn thấy nguyên cụm "<\!\-\- JAVIS\_ASK: ...".
+# Regex để CHUNG cho mọi JAVIS_*, không liệt kê từng tên: khối lạ (vd JAVIS_METRICS
+# thời còn bảng số liệu, hoặc ký ức cũ trong brain còn nhắc) thì lặng lẽ rơi mất
+# thay vì lọt nguyên xi ra chat.
 _CTRL_RE = re.compile(r"<!--\s*JAVIS_([A-Z_]+):\s*([\s\S]*?)\s*-->")
 _MAX_ASK_OPTS = 4
 

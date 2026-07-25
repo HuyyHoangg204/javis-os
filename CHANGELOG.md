@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.166] - 2026-07-25
+Gỡ hẳn bảng thẻ SỐ LIỆU KINH DOANH. Muốn xem số thì hỏi thẳng, Javis gọi MCP lấy về.
+### Gỡ bỏ
+- **Bảng thẻ số liệu ở cột trái**: bảng này đã bỏ khỏi giao diện từ trước (thay bằng Vault explorer), nhưng toàn bộ máy móc phía sau vẫn chạy để nuôi một stub ẩn không ai nhìn thấy - mỗi lần mở dashboard là một phiên Claude đầy đủ kèm MCP. Nay gỡ sạch: endpoint `/metrics` cùng lớp cache vừa thêm ở 0.9.165 (`server/main.py`), toàn bộ phần dựng thẻ trong `dashboard/app.js` (`loadMetrics`, `renderMetrics`, `agenticFallbackCards`, `extractMetrics`, `pushMetricsToPanel`, biến `savedMetrics` và phần lưu/khôi phục nó theo phiên), stub ẩn trong `index.html`, và các lớp `.metric-*` trong `style.css`.
+- **Chỉ thị nhúng khối `JAVIS_METRICS`**: gỡ khỏi system prompt (`CLAUDE.md`), nên Javis không còn tự đính khối ẩn vào cuối câu trả lời có số liệu nữa. Bộ bóc khối điều khiển cho kênh chữ thuần thì GIỮ nguyên và vẫn bóc chung mọi `JAVIS_*` - ký ức cũ trong brain còn nhắc tên khối này, để đó cho chắc kẻo lọt nguyên xi ra Telegram.
+### Cải thiện
+- **Loop `goal: business` tự lấy số qua MCP**: trước đây vòng này mồi sẵn chỉ số từ chính job thẻ dashboard, không có số là bỏ qua cả vòng kèm lời nhắc "bấm ⟳ tải số liệu" - nút giờ không còn. Nay bước đầu mỗi vòng là loop tự gọi MCP lấy 3-6 chỉ số theo thứ tự ưu tiên POS → kênh → quảng cáo → nguồn khác, và báo cáo phải nêu rõ số kèm nguồn. Bỏ luôn tham số `metrics` khỏi `LoopDeps` (`server/self_improve.py`).
+### Kiểm thử
+- Thay `test_metrics_cache.py` (hết đối tượng) bằng `server/test_session_brain.py`: giữ phần nhãn dự án theo brain, thêm chốt chặn hồi quy khẳng định `/metrics`, phần dựng thẻ trong app.js, stub HTML, CSS và chỉ thị trong system prompt đều đã sạch - và khối `JAVIS_*` lạ vẫn bị bóc khỏi kênh chữ thuần.
+
 ## [0.9.165] - 2026-07-25
 Chặn khoản hao token âm thầm: mở dashboard không còn spawn agent mới mỗi vài phút.
 ### Sửa lỗi

@@ -132,15 +132,11 @@ Vài tiện ích trong khung chat (cả khi phóng to lẫn thu nhỏ):
 - Khi bạn đang cuộn lên đọc lại mà Javis trả lời tiếp, khung chat KHÔNG giật xuống; một nút **↓ Tin mới** hiện ở đáy để bấm nhảy xuống khi sẵn sàng.
 - Gõ nhiều dòng bằng **Shift+Enter** (Enter để gửi); dán ảnh từ clipboard hoặc kéo thả file vào bất cứ đâu trong khung chat để đính kèm.
 
-## Panel số liệu bên trái cập nhật thế nào
+## Hỏi số liệu kinh doanh
 
-Cột trái (SỐ LIỆU KINH DOANH) hiện các thẻ số liệu. Có 3 nguồn làm nó cập nhật:
+Bảng thẻ số liệu cố định ở cột trái đã được gỡ (từ bản 0.9.165). Trước đây mỗi lần mở dashboard là Javis lại tự chạy một lượt quét các nguồn đã kết nối để đắp bảng đó, tốn hạn mức mà phần lớn thời gian không ai nhìn tới.
 
-1. **Tự tải khi mở trang.** Javis quét các nguồn dữ liệu (POS, kênh, quảng cáo...) đã kết nối và điền số. Nếu chưa đấu nguồn kinh doanh nào, panel hiện thay bằng số Agents / Skills / Workflows của vault.
-2. **Bấm nút ⟳** cạnh chữ SỐ LIỆU KINH DOANH để lấy lại số mới nhất.
-3. **Trong lúc trò chuyện.** Khi bạn hỏi về tình hình kinh doanh, Javis có thể gắn kèm một khối số liệu ẩn trong câu trả lời (đánh dấu `JAVIS_METRICS`). Javis tự gỡ khối này ra khỏi phần chữ đọc và đẩy con số lên các thẻ ở panel trái. Bạn chỉ thấy thẻ số liệu đổi, không thấy đoạn kỹ thuật đó.
-
-Số liệu của phiên gần nhất được nhớ lại: mở trang lần sau vẫn thấy ngay, kèm ghi chú "phiên trước", rồi Javis làm mới ngầm. Chi tiết về nguồn số liệu xem [MCP & số liệu kinh doanh](09-mcp-va-so-lieu.md).
+Giờ muốn xem số thì cứ hỏi thẳng trong chat ("doanh thu hôm nay thế nào", "so với tuần trước"). Javis gọi đúng nguồn đang đấu (POS, kênh, quảng cáo...) và trả lời bằng lời, nên chỉ chạy khi bạn thật sự cần. Chi tiết về nguồn số liệu xem [MCP & số liệu kinh doanh](09-mcp-va-so-lieu.md).
 
 ## Ý nghĩa dòng chữ trạng thái giữa màn hình
 
