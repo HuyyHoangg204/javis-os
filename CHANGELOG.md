@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.171] - 2026-07-25
+Gọt phần đầu cố định của mỗi lượt chat, KHÔNG động tới bộ nhớ.
+### Cải thiện
+- **Mô tả skill trong bản mirror bị ép về đúng trần 150 ký tự**: Claude Code nạp native đọc frontmatter ở `.claude/skills`, và danh sách skill đó nằm trong phần đầu CỐ ĐỊNH của mọi lượt chat. Đo trên brain thật: 14/30 skill vượt trần 150 của chính dự án (dài nhất 1.018 ký tự), tổng mô tả 10.095 ký tự; sau khi ép còn 3.844, giảm 62%. Bản canonical trong `skills/` **giữ nguyên chữ của người dùng** - mirror vốn là bản phái sinh. Không mất năng lực: mô tả chỉ để định tuyến, router xưa nay đã cắt đúng ở 150 nên phần dư vốn đang mất im lặng; thân skill vẫn nạp đủ khi được gọi. Xử được cả YAML nhiều dòng (`>`, `>-`, `|`) - hai mô tả dài nhất của brain thật đều viết kiểu đó (`server/system_sync.py`).
+- **Chỉ mục bộ nhớ có TRẦN, hạ dần theo bậc**: `JAVIS_MEMORY_INDEX_MAX` mặc định 20.000 ký tự. Vượt trần thì rút mô tả còn 100 ký tự, rồi 60, rồi chỉ còn tiêu đề kèm link - **bỏ hẳn dòng là bậc CUỐI**, và khi buộc phải bỏ thì nói rõ còn bao nhiêu ký ức cùng đường đọc tiếp. Rút mô tả không làm mất trí nhớ: tiêu đề và đường dẫn file vẫn còn, chi tiết đầy đủ vẫn nằm trong `Memory/facts/`. Hôm nay chưa cắt gì (18.363 < 20.000) - đây là chặn đường dốc trước khi nó thành vấn đề, đúng bệnh curator vừa mắc (`server/main.py`).
+- **CLAUDE.md thôi ôm mẫu file dài**: các bản mẫu frontmatter của loop, agent, workflow, skill và cả `plugin.yaml`/`plugin.py` đã có sẵn trong skill `javis-builder`, nạp theo nhu cầu khi thật sự đi tạo. Gỡ bản trùng khỏi system prompt, **giữ nguyên toàn bộ luật an toàn và luật hành vi** (mặc định `mode: suggest` + `enabled: false`, env gate plugin, trần 150 ký tự, bắt buộc có `group`, `owner_chat`, `notify: false`). Bổ sung `tools_profile` và `notify` vào `javis-builder` cho khỏi hụt thông tin.
+### Đo được
+- Phần đầu mỗi lượt chat giảm khoảng **9.328 ký tự (~2,9k token)**: system prompt Javis từ 46.056 xuống 42.979, mô tả skill từ 10.095 xuống 3.844.
+- **Không cắt bộ nhớ**, và đó là quyết định có đo: MEMORY.md chỉ chiếm 5,7k trong prefix 85k (7%); thử rút mô tả xuống 60 ký tự chỉ tiết kiệm 1,4k token, đổi khả năng nhớ lấy chừng đó là lỗ.
+### Kiểm thử
+- `server/test_prefix_slim.py`: cắt được cả 4 kiểu viết description (trần, nháy kép, gấp `>-`, khối `|`) mà thân skill và `group` nguyên vẹn; canonical không bị đụng; chỉ mục bộ nhớ giữ đủ ký ức qua nhiều mức trần và chỉ bỏ dòng ở bậc cuối kèm lời chỉ đường; CLAUDE.md đã gỡ mẫu nhưng còn đủ 8 luật, và `javis-builder` phủ đủ 10 trường đã dời sang.
+
 ## [0.9.170] - 2026-07-25
 Curator chỉ soi phần wiki thật sự đổi, thôi quét lại cả kho mỗi ngày.
 ### Cải thiện

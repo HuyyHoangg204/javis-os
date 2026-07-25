@@ -181,6 +181,68 @@ def _brain_memory_dir(brain: str) -> Path:
         print(f"[memory dir error] {e}", file=__import__('sys').stderr)
     return mem
 
+# Trần cho chỉ mục bộ nhớ nạp vào MỌI lượt chat. Đo trên brain thật: 87 ký ức = 18.363 ký tự
+# (~5,7k token) và tăng tuyến tính theo số ký ức - đúng cái bệnh curator vừa mắc, không có gì
+# chặn. Trần này chưa cắt gì hôm nay (18.363 < 20.000), nó biến đường dốc thành đường phẳng.
+MEMORY_INDEX_MAX = int(os.getenv("JAVIS_MEMORY_INDEX_MAX", "20000"))
+_MEM_ITEM_RE = re.compile(r'^(\s*-\s*\[[^\]]*\]\([^)]*\))\s*[-–—]?\s*(.*)$')
+
+
+def _fit_memory_index(mem: str, cap: int = None) -> str:
+    """Ép chỉ mục bộ nhớ xuống dưới trần mà KHÔNG làm mất ký ức nào cho tới phút chót.
+
+    Hạ dần theo bậc: giữ nguyên -> rút mô tả còn 100 ký tự -> còn 60 -> chỉ còn tiêu đề+link
+    -> (cùng lắm) cắt bớt dòng kèm lời chỉ đường. Rút mô tả KHÔNG mất năng lực nhớ: tiêu đề và
+    đường dẫn file vẫn còn nguyên, chi tiết đầy đủ vẫn nằm trong Memory/facts/*.md và đọc được
+    bất cứ lúc nào. Mất hẳn dòng mới là mất trí nhớ, nên đó là bậc CUỐI.
+    """
+    cap = cap or MEMORY_INDEX_MAX
+    if len(mem) <= cap:
+        return mem
+    lines = mem.split("\n")
+
+    def rebuild(desc_cap):
+        out = []
+        for l in lines:
+            m = _MEM_ITEM_RE.match(l)
+            if not m:
+                out.append(l)
+                continue
+            head, desc = m.group(1), m.group(2).strip()
+            if not desc:
+                out.append(head)
+            elif desc_cap is None:
+                out.append(head)
+            elif len(desc) <= desc_cap:
+                out.append(f"{head} - {desc}")
+            else:
+                out.append(f"{head} - {desc[:desc_cap].rstrip()}…")
+        return "\n".join(out)
+
+    for desc_cap in (100, 60, None):
+        got = rebuild(desc_cap)
+        if len(got) <= cap:
+            note = ("\n\n> (Mô tả trong chỉ mục đã rút gọn cho vừa ngữ cảnh. Chi tiết đầy đủ của "
+                    "từng ký ức nằm trong file tương ứng ở Memory/facts/ - cứ đọc khi cần.)")
+            return got + note
+
+    # Bậc cuối: buộc phải bỏ bớt dòng. Giữ các dòng ĐẦU (ký ức nền tảng ghi sớm nhất) và nói rõ
+    # còn bao nhiêu, kèm đường đọc tiếp - đừng để mất im lặng.
+    kept, total = [], 0
+    items = 0
+    for l in rebuild(None).split("\n"):
+        if total + len(l) + 1 > cap - 300:
+            break
+        kept.append(l)
+        total += len(l) + 1
+        if _MEM_ITEM_RE.match(l):
+            items += 1
+    con_lai = sum(1 for l in lines if _MEM_ITEM_RE.match(l)) - items
+    return "\n".join(kept) + (
+        f"\n\n> (Chỉ mục quá dài nên còn {con_lai} ký ức chưa liệt kê ở đây. "
+        "Đọc Memory/MEMORY.md để xem đủ danh sách, và Memory/facts/ để xem chi tiết.)")
+
+
 def build_system_prompt(brain: str = "brain") -> str:
     """CLAUDE.md + nạp MEMORY.md của vault đang chọn → Javis luôn nhớ ngữ cảnh."""
     base = CLAUDE_MD_PATH.read_text(encoding="utf-8") if CLAUDE_MD_PATH.exists() else ""
@@ -192,7 +254,7 @@ def build_system_prompt(brain: str = "brain") -> str:
     except Exception:
         mem = ""
     if mem.strip():
-        base += "\n\n# === BỘ NHỚ DÀI HẠN (nạp sẵn) ===\n" + mem
+        base += "\n\n# === BỘ NHỚ DÀI HẠN (nạp sẵn) ===\n" + _fit_memory_index(mem)
     # Đường dẫn lớp Agentic của vault đang làm việc (để Javis tạo agent/workflow/loop qua chat)
     root = _brain_root(brain)
     system_sync.ensure_synced(root)   # brain nào cũng có đủ năng lực hệ thống (1 lần/process, rẻ)

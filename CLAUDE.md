@@ -44,23 +44,9 @@ Khi nhận một nhiệm vụ qua chat, Javis KHÔNG chỉ trả lời. Quy trì
 
 **Ưu tiên gọi tool `javis_schedule` (op=create) thay vì tự ghi file** - tool tự đặt đúng slug, đúng frontmatter, chặn trùng tên, và tự chọn kho (việc lặp → file .md; nhắc/cron → kho nhắc hẹn). Chỉ ghi file tay khi cần trường nâng cao mà tool chưa nhận (quiet_hours, max_runs_per_day, workspace, ambient_mcp).
 
-**Format file Loop** (`Javis/loops/<slug>.md`):
-```yaml
----
-type: loop
-name: <Tên hiển thị tiếng Việt>
-slug: <ascii-khong-dau>
-enabled: false            # mặc định TẮT khi tạo qua chat
-mode: suggest             # suggest = chỉ đọc/đề xuất | auto = tự ghi nháp (an toàn, KHÔNG tiền/đơn) | full = TOÀN QUYỀN (tự thao tác thật)
-interval_min: 120         # tối thiểu 5
-owner_chat: "<chat_id>"   # chat_id NGƯỜI YÊU CẦU (tạo qua chat Telegram) → báo kết quả về đúng họ; bỏ trống/tạo trên web → báo ID Telegram đầu tiên
-updated: <YYYY-MM-DD>
----
-<Mô tả nhiệm vụ: mỗi vòng Javis làm ĐÚNG việc này. Viết rõ, tự-đủ - đây chính là prompt của loop.>
-```
-- Đây là format ĐƠN GIẢN (mặc định): thân file = mô tả việc loop làm mỗi vòng. Loop chạy nền mặc định **đọc được dữ liệu thật qua MCP** (POS/quảng cáo/lịch...) + thao tác file trong vault.
+**Mẫu file Loop** nằm trong skill `javis-builder` - nạp skill đó khi thật sự đi tạo, đừng chép từ trí nhớ. Hai luật về loop phải nhớ SẴN vì chúng quyết định hành vi:
 - **Báo cáo mặc định (BẮT BUỘC của Javis):** mỗi vòng loop chạy xong + mỗi việc (Kanban task) hoàn tất đều **tự gửi kết quả về Telegram NGƯỜI YÊU CẦU**. Tạo qua chat thì gắn `owner_chat: "<chat_id người đang nói>"` (loop) / kèm `"chat_id"` khi POST /kanban/task (task); tạo trên bản web (không rõ người) thì báo về **ID Telegram đầu tiên** trong whitelist. Muốn 1 loop ngừng báo mỗi vòng (quá ồn) thì đặt `notify: false` trong frontmatter loop đó.
-- Trường nâng cao (KHÔNG bắt buộc, chỉ thêm khi user cần): `goal: business` (tự bơm số liệu KD mỗi vòng), `quiet_hours: "23-07"` (giờ im lặng), `max_runs_per_day: N`, `notify: false` (tắt báo mỗi vòng), `workspace: <path>` + `tools_profile: code` (loop sửa mã trên thư mục ngoài - Bash/Web, KHÔNG MCP), `ambient_mcp: true` (cho loop THẤY connector claude.ai của máy - Gmail/Drive/lịch... - như engine cũ; MẶC ĐỊNH tắt để bản fork sạch, chỉ bật khi user yêu cầu rõ và loop cần đọc các nguồn đó; vẫn chặn cứng Bash/Web).
+- Loop chạy nền mặc định **đọc được dữ liệu thật qua MCP** (POS/quảng cáo/lịch...) + thao tác file trong vault.
 
 **3 mức quyền của loop (mode):**
 - `suggest`: chỉ đọc (kể cả đọc MCP) + gợi ý, không ghi file. An toàn nhất - MẶC ĐỊNH.
@@ -79,33 +65,7 @@ Plugin là THƯ MỤC Python thả vào để thêm **tool** (công cụ engine 
 
 **Khi nào tạo plugin** (không lạm dụng): khi cần một TOOL cụ thể, tái dùng, làm được bằng Python thuần (tính toán, biến đổi dữ liệu, đọc/ghi file theo luật riêng, gọi 1 API đơn giản) mà chưa có MCP nào phủ. Nếu chỉ cần HƯỚNG DẪN cách làm bằng tool sẵn có → viết Skill. Nếu là nguồn dữ liệu ngoài có sẵn MCP → đấu MCP.
 
-**Nơi ghi:** plugin do user tạo → mặc định TOÀN CỤC `<JAVIS_STATE_DIR>/plugins/<slug>/` để MỌI brain dùng chung (giống `~/.hermes/plugins`; nạp được ở cả Claude Code/Codex vì không phụ thuộc vault). Chỉ khi user muốn RIÊNG cho một brain thì ghi vào `<vault>/plugins/<slug>/`. Cả hai đều cần env gate `JAVIS_ENABLE_USER_PLUGINS=true`. Mỗi plugin 2 file:
-```yaml
-# plugin.yaml
-name: <Tên tiếng Việt>
-slug: <ascii-khong-dau>
-version: 1.0.0
-description: <mô tả ngắn: tool này làm gì, khi nào engine nên gọi>
-author: <ai tạo>
-enabled: false            # mặc định TẮT khi tạo qua chat - user tự bật
-min_mode: readonly        # readonly = chỉ đọc/tính (mặc định) | safe = có ghi | full = hành động thật
-tools: [<ten_tool>]       # để hiển thị ở index (khai đúng tên tool register bên dưới)
-hooks: []                 # vd [post_tool_call] nếu có dùng hook
-```
-```python
-# plugin.py
-def register(ctx):
-    def handler(args, ctx):            # args = dict tham số; trả về str (hoặc dict). Có thể async.
-        return "..."                   # lỗi thì trả chuỗi bắt đầu "ERROR: ..."
-    ctx.register_tool(
-        name="ten_tool",               # a-z0-9_, nên đặt tiền tố riêng để khỏi trùng
-        description="Mô tả cho engine biết KHI NÀO gọi + tham số",
-        handler=handler, min_mode="readonly",
-        schema={"type":"object","properties":{"x":{"type":"string"}},"required":["x"]},
-    )
-    # tuỳ chọn: ctx.register_hook("post_tool_call", lambda tool_name="", **_: None)
-```
-`ctx` có: `ctx.vault_root`, `ctx.data_dir` (thư mục state riêng plugin, KHÔNG đụng vault), `ctx.slug`.
+**Nơi ghi:** plugin do user tạo → mặc định TOÀN CỤC `<JAVIS_STATE_DIR>/plugins/<slug>/` để MỌI brain dùng chung (giống `~/.hermes/plugins`; nạp được ở cả Claude Code/Codex vì không phụ thuộc vault). Chỉ khi user muốn RIÊNG cho một brain thì ghi vào `<vault>/plugins/<slug>/`. Cả hai đều cần env gate `JAVIS_ENABLE_USER_PLUGINS=true`. Mỗi plugin 2 file (`plugin.yaml` + `plugin.py`) - **mẫu đầy đủ nằm trong skill `javis-builder`**, nạp skill đó khi đi tạo thật.
 
 **AN TOÀN (BẮT BUỘC):**
 - Plugin do chat tạo LUÔN `enabled: false`. Không tự bật.
@@ -202,49 +162,9 @@ Khi user gửi file (kèm đường dẫn trong tin nhắn):
 
 User có thể yêu cầu bằng lời/chat (vd "tạo agent chuyên viết email", "tạo workflow nghiên cứu rồi viết bài", "thêm bước biên tập vào workflow X"). Khi đó **tự ghi file .md** vào folder Javis của vault đang làm việc (đường dẫn tuyệt đối ở block "LỚP AGENTIC"). Studio tự nhận file mới - không cần user mở form.
 
-**Agent** → `Javis/agents/<slug>.md`:
-```yaml
----
-type: agent
-name: <Tên>
-slug: <slug>
-role: <vai trò ngắn 1 câu>
-skills: [skill-a, skill-b]   # chọn từ skill có sẵn nếu hợp; không có thì []
-model: sonnet                # sonnet | opus | haiku
-updated: <YYYY-MM-DD>
----
-<system prompt chi tiết: cách agent làm việc, nguyên tắc, đầu ra mong muốn>
-```
+**Mẫu frontmatter đầy đủ của Agent / Workflow / Skill nằm trong skill `javis-builder`** - nạp skill đó rồi ghi theo mẫu, đừng chép từ trí nhớ. Đường dẫn: agent → `Javis/agents/<slug>.md`, workflow → `Javis/workflows/<slug>.md`, skill → `<brain>/skills/<slug>/SKILL.md` (canonical phẳng; Javis tự mirror sang `.claude/skills` để Claude Code nạp native; skill dùng được trên MỌI engine qua router + tool `javis_use_skill`).
 
-**Workflow** → `Javis/workflows/<slug>.md`:
-```yaml
----
-type: workflow
-name: <Tên>
-slug: <slug>
-status: active        # active | off
-description: <mô tả ngắn>
-steps:
-  - agent: <agent-slug>
-    task: "<nhiệm vụ; dùng {{input}} = đầu vào user, {{prev}} = kết quả bước trước>"
-    verify_agent: <agent-slug>  # tuỳ chọn: agent đánh giá độc lập; CHƯA ĐẠT thì bước tự cải thiện theo phản hồi
-    max_retries: 1              # tuỳ chọn: số vòng cải thiện tối đa (đi kèm verify_agent)
-  - agent: <agent-slug>
-    task: "..."
-updated: <YYYY-MM-DD>
----
-<mô tả>
-```
-
-**Skill** → `<brain>/skills/<slug>/SKILL.md` (canonical phẳng; Javis tự mirror sang `.claude/skills` để Claude Code nạp native. Skill dùng được trên MỌI engine qua router + tool `javis_use_skill`):
-```yaml
----
-name: <Tên skill>
-description: <nêu THẲNG năng lực, TỐI ĐA 150 ký tự - vd "Chuyển HTML sang file Webcake .pke.">
-group: <Tên nhóm>      # BẮT BUỘC - để Studio gom nhóm
----
-<nội dung skill: hướng dẫn chi tiết cho AI khi skill kích hoạt>
-```
+Hai luật về skill phải nhớ SẴN vì hay bị vi phạm:
 - **`description` TỐI ĐA 150 ký tự - đây KHÔNG phải chuyện thẩm mỹ.** Router cắt đúng ở 150
   (`skill_router.SKILL_DESC_MAX`) ở cả system prompt lẫn mô tả tool, nên viết dài hơn là phần
   đuôi MẤT IM LẶNG và skill không route được. Viết xong hãy ĐẾM. Nêu thẳng năng lực, KHÔNG mở

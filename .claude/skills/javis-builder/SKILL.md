@@ -125,8 +125,11 @@ schedule="120m" hoặc "mỗi 2 tiếng") thay vì tự ghi file. Tool tự đ�
 (kể cả `goal: custom` bên dưới - thiếu field này là lỗi thật đã xảy ra: self_improve.py mặc định
 `goal: business`, loop chỉ đọc số liệu MCP và BỎ QUA HOÀN TOÀN nhiệm vụ ở thân file), và chặn
 trùng tên. **CHỈ tự ghi file tay** (mẫu dưới) khi: (a) SỬA loop ĐÃ CÓ, hoặc (b) cần trường nâng
-cao mà tool chưa nhận - `quiet_hours`, `max_runs_per_day`, `workspace`, `ambient_mcp`, hoặc
-`goal` khác `custom` (`business`/`brain`/`product`).
+cao mà tool chưa nhận - `quiet_hours` (giờ im lặng, vd "23-07"), `max_runs_per_day`, `workspace`
+(+ `tools_profile: code` khi loop sửa mã trên thư mục ngoài - có Bash/Web, KHÔNG MCP),
+`ambient_mcp` (cho loop THẤY connector claude.ai của máy - Gmail/Drive/lịch; MẶC ĐỊNH tắt để bản
+fork sạch, chỉ bật khi user yêu cầu rõ; vẫn chặn cứng Bash/Web), `notify: false` (loop quá ồn thì
+ngừng báo mỗi vòng), hoặc `goal` khác `custom` (`business`/`brain`/`product`).
 ```
 ---
 type: loop

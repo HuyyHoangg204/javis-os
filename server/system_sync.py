@@ -233,6 +233,79 @@ def migrate_brain(root) -> None:
             print(f"[skill migrate] {src_base}: {type(e).__name__}: {e}", file=sys.stderr)
 
 
+_DESC_RE = re.compile(r"^(description\s*:\s*)(.*)$", re.MULTILINE)
+
+
+def _cap_desc(text: str, cap: int) -> Optional[str]:
+    """Rút `description` trong frontmatter xuống <= cap ký tự. None = không cần/không sửa được.
+
+    Vì sao chỉ sửa BẢN MIRROR: Claude Code nạp native đọc frontmatter ở `.claude/skills`, và
+    danh sách skill đó đi vào phần đầu CỐ ĐỊNH của MỌI lượt chat. Đo trên brain thật: 14/30
+    skill vượt trần 150 ký tự của chính dự án (dài nhất 1.018), tổng mô tả 10.095 ký tự nạp
+    mỗi phiên; ép đúng trần còn 3.892, giảm 61%. Bản canonical trong `skills/` GIỮ NGUYÊN chữ
+    của người dùng - mirror vốn là bản phái sinh. Không mất năng lực: mô tả chỉ để định tuyến,
+    thân skill vẫn nạp đủ khi được gọi, và router của Javis xưa nay đã cắt đúng ở 150 rồi.
+    """
+    m = _DESC_RE.search(text or "")
+    if not m:
+        return None
+    raw = m.group(2).strip()
+    end = m.end()          # hết dòng `description:` - scalar nhiều dòng sẽ đẩy mốc này xuống
+    if raw.startswith((">", "|")):
+        # Scalar gấp/khối (`>`, `>-`, `|`): giá trị nằm ở các dòng THỤT SÂU phía dưới. Nuốt trọn
+        # khối rồi thay bằng một dòng gọn. Đây KHÔNG phải ca hiếm - 2 mô tả dài nhất của brain
+        # thật (963 và 893 ký tự) đều viết kiểu này.
+        lines = text[end:].split("\n")
+        take = 0
+        for i, l in enumerate(lines):
+            if l.strip() == "":
+                take = i + 1
+                continue
+            if l[:1] in (" ", "\t"):
+                take = i + 1
+                continue
+            break
+        block = "\n".join(lines[:take])
+        end = end + len(block)
+        try:
+            val = yaml.safe_load(f"description: {raw}\n{block}\n").get("description")
+        except Exception:
+            return None
+        if not isinstance(val, str):
+            return None
+    elif len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
+        # Bóc nháy bao ngoài để đếm ĐÚNG phần chữ, rồi trả lại bằng scalar JSON an toàn cho YAML.
+        try:
+            val = yaml.safe_load(raw)
+        except Exception:
+            return None
+        val = val if isinstance(val, str) else raw
+    else:
+        val = raw
+    if len(val) <= cap:
+        return None
+    cut = val[:cap - 1].rstrip()     # chừa 1 chỗ cho "…" để tổng vẫn <= cap
+    sp = cut.rfind(" ")
+    if sp > cap * 0.6:
+        cut = cut[:sp].rstrip()      # cắt ở ranh giới từ cho đỡ cụt giữa chữ
+    return text[:m.start(2)] + json.dumps(cut + "…", ensure_ascii=False) + text[end:]
+
+
+def _copy_skill_md_capped(src: Path, dst: Path) -> None:
+    """copy2 nhưng rút description quá dài. Bất kỳ trục trặc nào -> chép nguyên như cũ."""
+    try:
+        import skill_router
+        cap = skill_router.SKILL_DESC_MAX
+        text = src.read_text(encoding="utf-8")
+        new = _cap_desc(text, cap)
+        if new is None:
+            shutil.copy2(str(src), str(dst))
+            return
+        dst.write_text(new, encoding="utf-8")
+    except Exception:
+        shutil.copy2(str(src), str(dst))
+
+
 def mirror_skills(root) -> None:
     """Mirror MỘT CHIỀU <root>/skills → <root>/.claude/skills (CHỈ skill đang BẬT), ĐỆ QUY
     cả references/ scripts/ templates/ - skill là PACKAGE, không phải một file.
@@ -309,7 +382,10 @@ def mirror_skills(root) -> None:
                     for rel in rels:
                         dst_f = dst_dir / rel
                         dst_f.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(str(d / rel), str(dst_f))
+                        if rel == "SKILL.md":
+                            _copy_skill_md_capped(d / rel, dst_f)
+                        else:
+                            shutil.copy2(str(d / rel), str(dst_f))
                 except Exception as e:
                     # 1 skill hỏng KHÔNG chặn các skill còn lại; nhớ TÊN nó để lượt sau thử lại
                     # RIÊNG nó (rglob của đúng 1 skill), thay vì phạt cả brain mỗi lượt.
