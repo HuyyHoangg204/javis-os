@@ -65,7 +65,9 @@ _DEFAULT = {
         "openrouter_model": "openai/gpt-4o-mini",
         # Catalog model theo provider (Telegram /model dùng key 'claude'+'openrouter'; picker dùng cả 3).
         "catalog": {
-            "claude": ["opus", "sonnet", "haiku", "fable"],                       # anthropic-cli (alias)
+            # anthropic-cli: chỉ là mồi lúc cài mới. /provider/models hỏi API Anthropic bằng token
+            # OAuth của Claude Code rồi ghi đè danh sách THẬT vào đây (xem claude_models.py).
+            "claude": ["opus", "sonnet", "haiku", "fable"],
             "anthropic-api": ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
             "openai": ["gpt-4o", "gpt-4o-mini", "o3-mini"],                        # OpenAI API
             "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],  # Google Gemini API (picker load động)

@@ -37,6 +37,7 @@ _update_outcome = update_state.update_outcome
 import git_brain
 import engine
 import openai_oauth
+import claude_models   # model Claude LIVE cho provider anthropic-cli (mượn token OAuth của Claude Code)
 import mcp_store
 import mcp_client
 import mcp_catalog
@@ -1431,7 +1432,32 @@ async def _fetch_provider_models(provider, m):
         return sorted(i for i in ids if i.startswith("gemini")) or None
     if provider == "openai-oauth":
         return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
-    return None   # anthropic-cli: alias CLI, không list được → fallback catalog
+    if provider == "anthropic-cli":
+        # Provider này chạy bằng đăng nhập OAuth của Claude Code → mượn chính token đó hỏi
+        # /v1/models, nên Anthropic ra bản mới là picker thấy ngay (trước kẹt ở 4 alias tĩnh).
+        return await claude_models.fetch_models(m.get("anthropic_api_key") or "")
+    return None
+
+
+def _remember_catalog(cfg, d, ids):
+    """Ghi danh sách live vừa lấy vào catalog settings.
+
+    Để lần sau mất mạng / token OAuth hết hạn thì fallback vẫn là danh sách MỚI NHẤT
+    từng thấy, chứ không rơi về mấy alias cũ hardcode trong config.py.
+    """
+    key = d.get("catalog_key")
+    if not key:
+        return
+    keep = list(ids[:50])                     # chặn phình settings.json (OpenRouter vài trăm model)
+    cat = cfg.setdefault("model", {}).setdefault("catalog", {})
+    if cat.get(key) == keep:
+        return
+    cat[key] = keep
+    try:
+        cfgmod.write_settings(cfg)
+    except Exception as e:
+        import sys
+        print(f"[models] không ghi được catalog {key}: {e}", file=sys.stderr)
 
 
 @app.get("/provider/models")
@@ -1455,6 +1481,7 @@ async def provider_models(provider: str = Query(...)):
         last_err = None
     if ids:
         _PROV_MODELS_CACHE[provider] = {"ids": ids, "ts": now}
+        _remember_catalog(cfg, d, ids)
         return {"models": ids, "live": True}
     return {"models": fallback, "live": False, "error": last_err}
 

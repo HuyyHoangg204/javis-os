@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.164] - 2026-07-25
+Đổi model Claude giờ lấy DANH SÁCH SỐNG từ Anthropic, ra bản mới là thấy ngay.
+### Cải thiện
+- **Provider "Anthropic OAuth (Claude Code)" list model động**: trước đây provider này không hỏi được API nên picker rơi về 4 alias tĩnh trong code (opus/sonnet/haiku/fable) và thiếu hẳn Opus 4.8, 4.7, 4.6, Sonnet 4.6... Giờ Javis mượn chính access token OAuth mà Claude Code đã lưu (`~/.claude/.credentials.json`, hoặc `CLAUDE_CONFIG_DIR`, hoặc biến `CLAUDE_CODE_OAUTH_TOKEN`) để gọi `GET /v1/models`, nên Anthropic ra model mới là danh sách tự có, khỏi sửa code (`server/claude_models.py`).
+- **Alias tự suy từ danh sách sống**: 4 tên "luôn bản mới nhất" đứng đầu picker được rút từ chính các dòng model API trả về, nên có dòng model mới thì alias cũng tự xuất hiện.
+- **Nhớ danh sách mới nhất vào catalog**: mỗi lần lấy live thành công, `/provider/models` ghi lại vào `settings.json` (tối đa 50 mục). Khi mất mạng hoặc token OAuth hết hạn thì fallback vẫn là danh sách MỚI từng thấy chứ không tụt về alias cũ hardcode.
+- Không tự refresh token OAuth (tránh xoay `refresh_token` làm Claude Code của người dùng bị đăng xuất): token hết hạn thì lặng lẽ dùng fallback, chạy Claude Code một lượt là tươi lại.
+
 ## [0.9.163] - 2026-07-24
 Trang Kết nối: ghim card "Tự thêm (nâng cao)" lên ĐẦU kho với icon ⭐, ngay sau là Composio.
 ### Cải thiện
