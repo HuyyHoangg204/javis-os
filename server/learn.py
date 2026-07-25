@@ -854,8 +854,9 @@ class LearnFeature:
             # Chạy TRÊN event-loop (không to_thread): tasks.enqueue là hàm sync → nguyên tử với
             # dispatcher/_io, tránh lost-update trên kanban.json. Gate như facts: chỉ enqueue thật
             # khi allow_write (mode auto + git + rate, hoặc force); dry-run chỉ liệt kê. Dedup theo
-            # tên chuẩn hoá nằm ở tasks.enqueue. Task vào backlog với needs_approval=True và
-            # orchestration mặc định off → enqueue tự nó KHÔNG chạy gì.
+            # tên chuẩn hoá nằm ở tasks.enqueue. Task vào tầng triage để AI specifier chuẩn
+            # hoá trước khi dispatcher thực thi. Chỉ capability external-write thiếu quyền
+            # mới cần con người can thiệp; task nội bộ không dừng review thủ công.
             report["tasks"] = []
             enqueued_n = 0
             if caps.get("task"):
@@ -878,7 +879,7 @@ class LearnFeature:
                         except Exception:
                             pr = 2
                         try:
-                            self.deps.enqueue_task(brain, title, intent, "auto", pr, None, True, "learn")
+                            self.deps.enqueue_task(brain, title, intent, "auto", pr, None, False, "learn")
                             report["tasks"].append(title)
                             enqueued_n += 1
                         except Exception as te:

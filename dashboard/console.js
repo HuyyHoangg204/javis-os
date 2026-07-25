@@ -110,7 +110,7 @@
     files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
     selfimprove: { icon: "♻", label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
     learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
-    kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "Backlog + dispatcher tự làm task nền" },
+    kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "AI tự đặc tả, điều phối và chạy task nền" },
     models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
     channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
     mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
@@ -516,7 +516,27 @@
     .si-chip.sel{border-color:#ff8a3c;background:rgba(255,138,60,.15);color:#ffd0a8}
     .si-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
     .si-status{margin-top:16px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);font-size:15px;color:#cdd8ee}
-    .si-log{margin-top:16px} .si-log .le{padding:10px 12px;border-left:2px solid rgba(120,180,255,.4);background:rgba(255,255,255,.02);margin-bottom:8px;border-radius:0 8px 8px 0;font-size:14px;white-space:pre-wrap;color:#bcc8e2}`;
+    .si-log{margin-top:16px} .si-log .le{padding:10px 12px;border-left:2px solid rgba(120,180,255,.4);background:rgba(255,255,255,.02);margin-bottom:8px;border-radius:0 8px 8px 0;font-size:14px;white-space:pre-wrap;color:#bcc8e2}
+    .kn-health{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin:16px 0}
+    .kn-kpi{padding:13px 14px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:rgba(255,255,255,.025)}
+    .kn-kpi b{display:block;font-size:22px;color:#edf3ff;margin-top:4px}.kn-kpi span{font-size:12px;color:#8290aa}
+    .kn-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:14px;align-items:start}
+    .kn-panel{border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.018);overflow:hidden}
+    .kn-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+    .kn-panel-head b{font-size:14px;color:#dfe8fa}.kn-panel-head span{font-size:12px;color:#77849d}
+    .kn-list{max-height:440px;overflow:auto}.kn-empty{padding:22px;text-align:center;color:#5f6b84;font-size:13px}
+    .kn-task{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.055);cursor:pointer;transition:.15s}
+    .kn-task:last-child{border-bottom:none}.kn-task:hover{background:rgba(127,176,255,.055)}
+    .kn-task-top{display:flex;gap:9px;align-items:flex-start}.kn-task-title{flex:1;color:#e6edfb;font-size:14px;font-weight:600;line-height:1.35}
+    .kn-pill{flex:none;border-radius:99px;padding:2px 7px;font-size:10px;border:1px solid rgba(255,255,255,.1);color:#96a6c2}
+    .kn-task-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#6f7d97;font-size:11px}
+    .kn-task-result{margin-top:6px;color:#91a1bb;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .kn-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.kn-actions button{padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.025);color:#aab8d0;font-size:11px;cursor:pointer}.kn-actions button:hover{border-color:#7fb0ff;color:#fff}
+    .kn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.kn-dot.live{background:#3fdc86;box-shadow:0 0 0 4px rgba(63,220,134,.12)}.kn-dot.off{background:#66728a}
+    .kn-drawer{position:fixed;z-index:9998;top:0;right:0;width:min(520px,94vw);height:100vh;background:#090e1a;border-left:1px solid rgba(127,176,255,.25);box-shadow:-20px 0 60px rgba(0,0,0,.45);transform:translateX(105%);transition:.2s;display:flex;flex-direction:column}
+    .kn-drawer.open{transform:translateX(0)}.kn-drawer-head{padding:15px 17px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;gap:10px}.kn-drawer-head b{flex:1;color:#edf3ff}.kn-drawer-head button{background:none;border:0;color:#9aa9c3;font-size:20px;cursor:pointer}
+    .kn-drawer-body{padding:16px 17px;overflow:auto;color:#aebbd2;font-size:13px;line-height:1.5}.kn-detail-block{margin-top:16px}.kn-detail-block h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#71809a;margin:0 0 7px}.kn-event{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    @media(max-width:850px){.kn-health{grid-template-columns:repeat(2,1fr)}.kn-layout{grid-template-columns:1fr}.kn-list{max-height:none}}`;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   }
 
@@ -1461,45 +1481,63 @@
   }
 
   // ============================================
-  // Trang Việc (Kanban) - backlog + dispatcher tự làm task nền
+  // Trang Việc - operations console cho hàng đợi AI tự vận hành
   // ============================================
-  const _KCOLS = [
-    ["todo", "Chờ (todo)", "#8a97b4"], ["ready", "Sẵn sàng", "#e0b34a"],
-    ["running", "Đang chạy", "#3fdc86"], ["review", "Chờ duyệt", "#7fb0ff"],
-    ["blocked", "Bị chặn", "#e0664a"], ["done", "Xong", "#6b7894"],
-  ];
   const _PRIO = { 1: "🔺", 2: "🔼", 3: "🔽" };
+  const _KSTATUS = {
+    triage: "AI đang đặc tả", todo: "Chờ phụ thuộc", ready: "Trong hàng đợi",
+    running: "Đang chạy", review: "Cần duyệt ngoại lệ", blocked: "Cần xử lý",
+    done: "Hoàn thành", cancelled: "Đã huỷ",
+  };
   async function renderKanban(el) {
     _injectExtraCss();
     el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
     let wfs = [];
     try { wfs = (await (await fetch(`/workflows?brain=${encodeURIComponent(fbrain())}`)).json()).workflows || []; } catch (e) {}
-    const routeOpts = `<option value="auto">Trực tiếp (Javis tự làm, chỉ file)</option>` +
+    const routeOpts = `<option value="auto">AI tự chọn worker</option>` +
       wfs.map(w => `<option value="wf:${esc(w.slug)}">Workflow: ${esc(w.name || w.slug)}</option>`).join("");
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 12px">Backlog + <b>dispatcher</b>: Javis giữ danh sách việc, tự chọn việc ưu tiên rồi điều phối xuống workflow/agent làm. <b>An toàn:</b> chạy nền chỉ thao tác FILE (không MCP tiền/đơn); việc xong dừng ở <b>Chờ duyệt</b> để bạn kiểm rồi mới tính là xong.</p>
-      <div class="si-grid" style="margin-bottom:14px">
-        <div class="si-field"><label>Điều phối tự động</label><div class="si-row" id="knOrch"></div>
-          <div class="dim" style="font-size:13px;margin-top:6px;color:#7d8aa6">off = chỉ dọn dẹp · manual = chỉ chạy khi bấm Nudge · auto = tự chạy theo lịch (30s/nhịp, 1 việc/lần).</div></div>
-        <div class="si-actions">
-          <button class="s-btn" id="knAdd">+ Thêm việc</button>
-          <button class="s-btn-ghost" id="knNudge">⚡ Nudge dispatcher</button>
-          <button class="s-btn-ghost" id="knRefresh">↻ Làm mới</button>
-          <button class="s-btn-ghost" id="knStop" style="color:#e0a04a">■ Dừng</button>
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div style="font-size:16px;color:#dfe8fa;font-weight:650"><span class="kn-dot off" id="knLiveDot"></span><span id="knLiveText">Dispatcher</span></div>
+          <p style="color:#8290aa;font-size:13px;max-width:680px;margin:6px 0 0">AI tự đặc tả goal, chọn capability, claim task và chạy worker nền. Màn hình này dùng để quan sát và xử lý ngoại lệ.</p>
+        </div>
+        <div class="si-actions" style="margin:0">
+          <button class="s-btn" id="knAdd">+ Giao goal</button>
+          <button class="s-btn-ghost" id="knNudge">Chạy nhịp ngay</button>
+          <button class="s-btn-ghost" id="knRefresh">↻</button>
+          <button class="s-btn-ghost" id="knStop" style="color:#e0a04a">Tạm dừng AI</button>
         </div>
       </div>
+      <div class="kn-health">
+        <div class="kn-kpi"><span>Worker đang chạy</span><b id="knKpiActive">0</b></div>
+        <div class="kn-kpi"><span>Đang chờ</span><b id="knKpiQueue">0</b></div>
+        <div class="kn-kpi"><span>Cần anh xử lý</span><b id="knKpiAttention">0</b></div>
+        <div class="kn-kpi"><span>Hoàn thành 24h</span><b id="knKpiDone">0</b></div>
+      </div>
+      <div class="si-field" style="margin-bottom:14px"><label>Chế độ dispatcher</label><div class="si-row" id="knOrch"></div></div>
       <div id="knForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
-        <div class="si-field"><label>Tiêu đề</label><input id="knTitle" placeholder="VD: Soạn 3 post từ sản phẩm bán chạy tuần này"></div>
-        <div class="si-field"><label>Mô tả việc (intent - Javis đọc để làm)</label><textarea id="knIntent" placeholder="Mô tả rõ việc cần làm + ghi kết quả nháp vào đâu (vd 05 - Projects)."></textarea></div>
+        <div class="si-field"><label>Goal</label><input id="knTitle" placeholder="VD: Phân tích sản phẩm bán chạy tuần này và soạn 3 bài đăng"></div>
+        <div class="si-field"><label>Ngữ cảnh và đầu ra mong muốn</label><textarea id="knIntent" placeholder="Có thể viết tự nhiên. AI specifier sẽ chuẩn hoá, chọn worker và điều kiện hoàn thành."></textarea></div>
         <div class="si-row" style="gap:14px;flex-wrap:wrap">
-          <div class="si-field" style="flex:1;min-width:220px"><label>Cách làm (route)</label><select id="knRoute" class="loop-sel">${routeOpts}</select></div>
+          <div class="si-field" style="flex:1;min-width:220px"><label>Route</label><select id="knRoute" class="loop-sel">${routeOpts}</select></div>
           <div class="si-field"><label>Ưu tiên</label><select id="knPrio" class="loop-sel"><option value="1">🔺 Cao</option><option value="2" selected>🔼 Vừa</option><option value="3">🔽 Thấp</option></select></div>
-          <div class="si-field"><label>Cần duyệt trước khi xong</label><label class="auto-learn" style="margin-top:8px"><input type="checkbox" id="knApprove" checked><span>Dừng ở Chờ duyệt</span></label></div>
+          <div class="si-field"><label>Ngoại lệ</label><label class="auto-learn" style="margin-top:8px"><input type="checkbox" id="knApprove"><span>Yêu cầu duyệt kết quả</span></label></div>
         </div>
-        <div class="si-actions"><button class="s-btn" id="knSave">Lưu việc</button><button class="s-btn-ghost" id="knCancel">Huỷ</button></div>
+        <div class="si-actions"><button class="s-btn" id="knSave">Giao cho AI</button><button class="s-btn-ghost" id="knCancel">Huỷ</button></div>
       </div>
-      <div id="knBoard" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:10px;align-items:flex-start"></div>
+      <div class="kn-layout" id="knOps">
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <section class="kn-panel"><div class="kn-panel-head"><b>Đang hoạt động</b><span id="knActiveCount">0 worker</span></div><div class="kn-list" id="knActive"></div></section>
+          <section class="kn-panel"><div class="kn-panel-head"><b>Hàng đợi AI</b><span id="knQueueCount">0 task</span></div><div class="kn-list" id="knQueue"></div></section>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <section class="kn-panel"><div class="kn-panel-head"><b style="color:#f0a080">Cần anh xử lý</b><span id="knAttentionCount">0 ngoại lệ</span></div><div class="kn-list" id="knAttention"></div></section>
+          <section class="kn-panel"><div class="kn-panel-head"><b>Lịch sử gần đây</b><span>24 giờ và mới nhất</span></div><div class="kn-list" id="knHistory"></div></section>
+        </div>
+      </div>
+      <aside class="kn-drawer" id="knDrawer"><div class="kn-drawer-head"><b id="knDrawerTitle">Chi tiết task</b><button id="knDrawerClose">×</button></div><div class="kn-drawer-body" id="knDrawerBody">Đang tải...</div></aside>
     </div>`;
 
     const bf = () => { const f = new FormData(); f.append("brain", fbrain()); return f; };
@@ -1508,8 +1546,9 @@
     el.querySelector("#knAdd").onclick = () => { const b = el.querySelector("#knForm"); b.style.display = b.style.display === "none" ? "block" : "none"; };
     el.querySelector("#knCancel").onclick = () => { el.querySelector("#knForm").style.display = "none"; };
     el.querySelector("#knRefresh").onclick = () => load();
-    el.querySelector("#knStop").onclick = async () => { await fetch("/kanban/stop", { method: "POST" }); load(); };
-    el.querySelector("#knNudge").onclick = async () => { const b = el.querySelector("#knNudge"); b.disabled = true; b.textContent = "Đang chạy..."; await post("/kanban/nudge"); setTimeout(() => { b.disabled = false; b.textContent = "⚡ Nudge dispatcher"; load(); }, 2500); };
+    el.querySelector("#knStop").onclick = async () => { await post("/kanban/stop"); load(); };
+    el.querySelector("#knNudge").onclick = async () => { const b = el.querySelector("#knNudge"); b.disabled = true; await post("/kanban/nudge"); b.disabled = false; load(); };
+    el.querySelector("#knDrawerClose").onclick = () => el.querySelector("#knDrawer").classList.remove("open");
     el.querySelector("#knSave").onclick = async () => {
       const title = el.querySelector("#knTitle").value.trim();
       if (!title) { alert("Nhập tiêu đề"); return; }
@@ -1522,47 +1561,94 @@
       el.querySelector("#knForm").style.display = "none"; load();
     };
 
-    function cardHtml(t) {
+    function ago(ts) {
+      const sec = Math.max(0, Date.now() / 1000 - Number(ts || 0));
+      if (sec < 60) return "vừa xong";
+      if (sec < 3600) return `${Math.floor(sec / 60)} phút`;
+      if (sec < 86400) return `${Math.floor(sec / 3600)} giờ`;
+      return `${Math.floor(sec / 86400)} ngày`;
+    }
+
+    function taskHtml(t, area) {
       const acts = [];
-      if (["todo", "ready", "blocked"].includes(t.status)) acts.push(`<button data-act="run" data-id="${t.id}">▶ Chạy</button>`);
-      if (t.status === "review") { acts.push(`<button data-act="done" data-id="${t.id}">✓ Duyệt</button>`); acts.push(`<button data-act="ready" data-id="${t.id}">↩ Làm lại</button>`); }
-      if (t.status === "blocked") acts.push(`<button data-act="ready" data-id="${t.id}">↻ Bỏ chặn</button>`);
-      acts.push(`<button data-act="archive" data-id="${t.id}">🗄</button>`);
-      const res = t.result ? `<div class="dim" style="font-size:12px;color:#8aa;margin-top:6px;max-height:54px;overflow:hidden">${esc(t.result.slice(0, 180))}</div>` : "";
-      const br = t.block_reason ? ` · <span style="color:#e0664a">${esc(t.block_reason)}</span>` : "";
-      const rt = t.route && t.route !== "auto" ? esc(t.route) : "trực tiếp";
-      return `<div class="le" style="margin-bottom:8px" title="${esc(t.intent || "")}">
-        <div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:13.5px">${_PRIO[t.priority] || ""} ${esc(t.title)}</b></div>
-        <div class="dim" style="font-size:11px;color:#6b7894;margin-top:2px">${rt} · ${esc(t.created_by || "")}${br}</div>
-        ${res}
-        <div class="kn-acts" style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">${acts.join("")}</div>
+      if (t.status === "review") acts.push(`<button data-act="done" data-id="${esc(t.id)}">✓ Duyệt ngoại lệ</button>`);
+      if (t.status === "blocked" || t.status === "review") acts.push(`<button data-act="retry" data-id="${esc(t.id)}">↻ Thử lại</button>`);
+      if (t.status === "running") acts.push(`<button data-act="cancel" data-id="${esc(t.id)}">Dừng task</button>`);
+      if (["done", "cancelled"].includes(t.status)) acts.push(`<button data-act="archive" data-id="${esc(t.id)}">Lưu trữ</button>`);
+      const reason = t.block_reason ? `<div class="kn-task-result" style="color:#dc927c">${esc(t.block_reason)}</div>` : "";
+      const result = !reason && t.result ? `<div class="kn-task-result">${esc(t.result.slice(0, 240))}</div>` : "";
+      return `<div class="kn-task" data-task="${esc(t.id)}">
+        <div class="kn-task-top"><div class="kn-task-title">${_PRIO[t.priority] || ""} ${esc(t.title)}</div><span class="kn-pill">${esc(_KSTATUS[t.status] || t.status)}</span></div>
+        <div class="kn-task-meta"><span>${esc(t.capability || "auto")}</span><span>attempt ${Number(t.attempts || 0)}/${Number(t.max_attempts || 3)}</span><span>${ago(t.updated_at)}</span></div>
+        ${reason}${result}
+        ${acts.length ? `<div class="kn-actions">${acts.join("")}</div>` : ""}
       </div>`;
     }
 
-    async function load() {
-      let d = { columns: {}, orchestration: "off", counts: {} };
-      try { d = await (await fetch(`/kanban?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
-      const orch = el.querySelector("#knOrch");
-      orch.innerHTML = [["off", "Tắt"], ["manual", "Thủ công"], ["auto", "Tự động"]]
-        .map(([v, l]) => `<button class="si-chip ${d.orchestration === v ? "sel" : ""}" data-orch="${v}">${l}</button>`).join("");
-      orch.querySelectorAll(".si-chip").forEach(c => c.onclick = async () => { await post("/kanban/orchestration", { mode: c.dataset.orch }); load(); });
-      const board = el.querySelector("#knBoard");
-      board.innerHTML = _KCOLS.map(([s, label, color]) => {
-        const arr = (d.columns && d.columns[s]) || [];
-        const cards = arr.length ? arr.map(cardHtml).join("") : `<div class="dim" style="font-size:12px;color:#556;text-align:center;padding:14px 0">- trống -</div>`;
-        return `<div style="min-width:210px;max-width:240px;flex:1;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px">
-          <div style="font-size:13px;font-weight:600;color:${color};margin-bottom:8px;display:flex;justify-content:space-between"><span>● ${label}</span><span>${arr.length}</span></div>
-          ${cards}</div>`;
-      }).join("");
-      board.querySelectorAll("button[data-act]").forEach(b => b.onclick = async () => {
+    function fillList(node, items, area) {
+      node.innerHTML = items.length ? items.map(t => taskHtml(t, area)).join("") : `<div class="kn-empty">${area === "attention" ? "Không có ngoại lệ. AI đang tự vận hành bình thường." : "Chưa có task."}</div>`;
+    }
+
+    function bindActions() {
+      el.querySelectorAll(".kn-task[data-task]").forEach(row => row.onclick = () => showTask(row.dataset.task));
+      el.querySelectorAll(".kn-actions button[data-act]").forEach(b => b.onclick = async ev => {
+        ev.stopPropagation();
+        b.disabled = true;
         const id = b.dataset.id, act = b.dataset.act;
-        if (act === "run") await post("/kanban/run", { id });
+        if (act === "retry") await post("/kanban/task/retry", { id });
+        else if (act === "cancel") await post("/kanban/task/cancel", { id });
         else if (act === "archive") await post("/kanban/task/delete", { id });
         else await post("/kanban/task/move", { id, status: act });
-        setTimeout(load, act === "run" ? 2000 : 200);
+        load();
       });
     }
+
+    async function showTask(id) {
+      const drawer = el.querySelector("#knDrawer"), body = el.querySelector("#knDrawerBody");
+      drawer.classList.add("open"); body.innerHTML = "Đang tải...";
+      let d = {}; try { d = await (await fetch(`/kanban/task/show?brain=${encodeURIComponent(fbrain())}&id=${encodeURIComponent(id)}`)).json(); } catch (e) {}
+      if (!d.ok) { body.innerHTML = `<span style="color:#e08070">${esc(d.error || "Không tải được task")}</span>`; return; }
+      const t = d.task || {}, events = d.events || [], runs = d.runs || [];
+      el.querySelector("#knDrawerTitle").textContent = t.title || "Chi tiết task";
+      body.innerHTML = `
+        <div style="color:#dfe8fa;white-space:pre-wrap">${esc(t.intent || "")}</div>
+        <div class="kn-task-meta" style="margin-top:10px"><span>${esc(_KSTATUS[t.status] || t.status)}</span><span>${esc(t.capability || "auto")}</span><span>mode ${esc(t.execution_mode || "auto")}</span><span>ưu tiên ${Number(t.priority || 2)}</span></div>
+        ${t.block_reason ? `<div class="kn-detail-block"><h4>Lý do bị chặn</h4><div style="color:#df927c">${esc(t.block_reason)}</div></div>` : ""}
+        ${t.result ? `<div class="kn-detail-block"><h4>Kết quả</h4><div style="white-space:pre-wrap">${esc(t.result)}</div></div>` : ""}
+        <div class="kn-detail-block"><h4>Lần chạy (${runs.length})</h4>${runs.length ? runs.map(r => `<div class="kn-event"><b>${esc(r.status)}</b> · ${new Date(Number(r.started_at || 0) * 1000).toLocaleString()}${r.error ? `<div style="color:#d98b77">${esc(r.error)}</div>` : ""}</div>`).join("") : `<div class="dim">Chưa chạy</div>`}</div>
+        <div class="kn-detail-block"><h4>Nhật ký lifecycle</h4>${events.length ? events.map(v => `<div class="kn-event"><b>${esc(v.event_type)}</b> · ${new Date(Number(v.created_at || 0) * 1000).toLocaleString()}<div>${esc(v.message || "")}</div></div>`).join("") : `<div class="dim">Chưa có sự kiện</div>`}</div>`;
+    }
+
+    async function load() {
+      if (!el.isConnected || !el.querySelector("#knOps")) return;
+      let d = { operations: {}, orchestration: "off", counts: {}, dispatcher: {} };
+      try { d = await (await fetch(`/kanban?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
+      const ops = d.operations || {}, active = ops.active || [], attention = ops.attention || [], queue = ops.queue || [], history = ops.history || [];
+      const live = !!(d.dispatcher && d.dispatcher.running), dot = el.querySelector("#knLiveDot");
+      dot.classList.toggle("live", live); dot.classList.toggle("off", !live);
+      el.querySelector("#knLiveText").textContent = live ? `Dispatcher đang chạy · tối đa ${Number(d.dispatcher.max_workers || 0)} worker` : "Dispatcher chưa chạy";
+      el.querySelector("#knKpiActive").textContent = Number(d.dispatcher.active_workers || active.length);
+      el.querySelector("#knKpiQueue").textContent = queue.length;
+      el.querySelector("#knKpiAttention").textContent = attention.length;
+      el.querySelector("#knKpiDone").textContent = Number(d.completed_24h || 0);
+      el.querySelector("#knActiveCount").textContent = `${active.length} worker`;
+      el.querySelector("#knQueueCount").textContent = `${queue.length} task`;
+      el.querySelector("#knAttentionCount").textContent = `${attention.length} ngoại lệ`;
+      const orch = el.querySelector("#knOrch");
+      orch.innerHTML = [["off", "Tắt"], ["manual", "Quan sát"], ["auto", "AI tự vận hành"]]
+        .map(([v, l]) => `<button class="si-chip ${d.orchestration === v ? "sel" : ""}" data-orch="${v}">${l}</button>`).join("");
+      orch.querySelectorAll(".si-chip").forEach(c => c.onclick = async () => { await post("/kanban/orchestration", { mode: c.dataset.orch }); load(); });
+      fillList(el.querySelector("#knActive"), active, "active");
+      fillList(el.querySelector("#knQueue"), queue, "queue");
+      fillList(el.querySelector("#knAttention"), attention, "attention");
+      fillList(el.querySelector("#knHistory"), history.slice(0, 20), "history");
+      bindActions();
+    }
     load();
+    const poll = setInterval(() => {
+      if (!el.isConnected || !el.querySelector("#knOps")) clearInterval(poll);
+      else load();
+    }, 3000);
   }
 
   async function freshSettings() {

@@ -3286,12 +3286,30 @@ learn_feature = learn_mod.register(app, learn_mod.LearnDeps(
 
 
 # ============================================================
-# KANBAN TASK BACKLOG + DISPATCHER (Loop Engineering) - tasks.py
-# Loop = bộ não (giữ backlog, điều phối) · workflow/agent = đôi tay (thực thi).
-# Dispatch nền = FILE-ONLY (an toàn), task cần hành động ra ngoài dừng ở 'review'.
-# Mặc định orchestration=off.
+# AUTONOMOUS TASK QUEUE + DISPATCHER - tasks.py
+# SQLite giữ lifecycle, dispatcher riêng quét mọi brain, worker chạy độc lập với scheduler
+# nhắc hẹn. Model nền Claude/Codex/API dùng chung aux_engine và cùng policy quyền.
+# Mặc định orchestration=off; người dùng bật auto theo từng brain.
 # ============================================================
 import tasks as tasks_mod
+
+
+def _kanban_brains():
+    """Mọi brain cần dispatcher quét, gồm cả folder ngoài đã đăng ký với scheduler."""
+    values = []
+    try:
+        values.extend(
+            str(p) for p in Path(BRAINS_DIR).iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        )
+    except Exception:
+        pass
+    try:
+        values.extend(loop_feature.scheduler_brains() or [])
+    except Exception:
+        pass
+    return list(dict.fromkeys(values))
+
 
 tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
     brain_root=_brain_root,
@@ -3302,6 +3320,10 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
     aux_model=_aux_model,
     aux_swap=_aux_swap,
     safe_tools=SAFE_FILE_TOOLS,
+    state_dir=cfgmod.STATE_DIR,
+    scheduler_brains=_kanban_brains,
+    apply_mcp=_apply_mcp,
+    mcp_allow_patterns=_loop_mcp_allow,
     report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU task khi chạy xong (web → ID đầu)
 ))
 
@@ -3759,6 +3781,11 @@ async def _start_scheduler():
     except Exception as e:
         print(f"[loops migrate] {e}", file=_sys.stderr)
     try:
+        # Dispatcher có vòng lặp riêng, không chặn cron/nhắc hẹn khi một worker chạy lâu.
+        tasks_feature.start()
+    except Exception as e:
+        print(f"[kanban start] {e}", file=_sys.stderr)
+    try:
         if cfgmod.provision_admin_from_env():
             print("[auth] Đã tạo tài khoản admin từ JAVIS_ADMIN_PASSWORD (env).", file=_sys.stderr)
         if cfgmod.setup_token_required():
@@ -3801,9 +3828,9 @@ async def _start_scheduler():
                     await learn_feature.curator_tick()
                 except Exception as le:
                     print(f"[learn tick] {type(le).__name__}: {le}", file=__import__('sys').stderr)
-                # 3) Kanban dispatcher: housekeeping + chạy 1 task nếu orchestration=auto
+                # 3) Kanban: chỉ đánh thức dispatcher riêng. Không await model run tại đây.
                 try:
-                    await tasks_feature.tick(["brain"])
+                    await tasks_feature.tick()
                 except Exception as te:
                     print(f"[kanban tick] {type(te).__name__}: {te}", file=__import__('sys').stderr)
                 # 3b) Nhắc hẹn từ chat: tới giờ → bắn Telegram (mode task: chạy engine rồi báo)
@@ -5525,6 +5552,10 @@ async def _warm_mcp_hub():
 @app.on_event("shutdown")
 async def _shutdown_mcp_pool():
     """Đóng các session MCP sống lâu (stdio subprocess, httpx client) khi server tắt."""
+    try:
+        await tasks_feature.shutdown()
+    except Exception as e:
+        print(f"[kanban shutdown] {e}", file=__import__('sys').stderr)
     # Listener Zalo TRƯỚC: nó cần được đóng tử tế để phía Zalo thả phiên ra. Bị giết đột
     # ngột thì phiên cũ còn treo và lần bật sau báo trùng phiên, chủ tưởng hỏng phải quét
     # QR lại. Đây chính là triệu chứng "cập nhật xong là báo đỏ".
