@@ -38,6 +38,7 @@ import git_brain
 import engine
 import openai_oauth
 import claude_models   # model Claude LIVE cho provider anthropic-cli (mượn token OAuth của Claude Code)
+import aux_engine   # engine việc nền: Claude / Codex / API rẻ
 import mcp_store
 import mcp_client
 import mcp_catalog
@@ -568,8 +569,18 @@ def _set_main_model(cfg, provider, model):
         m["engine"] = "cli"; m["claude_model"] = model
 
 def _aux_model():
-    """Alias Claude cho việc nền (loop/metrics/ingest). '' = không đổi (mặc định CLI)."""
-    return (cfgmod.read_settings().get("model", {}).get("auxiliary") or {}).get("model") or ""
+    """Model việc nền khi provider là Claude. '' = không đổi (mặc định CLI).
+
+    Provider khác Claude thì model KHÔNG phải alias Claude, trả '' để nhánh cũ đừng gán
+    nhầm vào engine Claude - việc chọn engine đúng do _aux_swap lo."""
+    spec = aux_engine.read_spec()
+    return spec["model"] if aux_engine.is_claude(spec) else ""
+
+
+def _aux_swap(cli, mode=None, tag=None):
+    """Engine Claude vừa dựng cho việc nền -> engine theo model phụ người dùng chọn.
+    Mặc định/hỏng cấu hình thì trả lại chính engine Claude đó (việc nền không được chết)."""
+    return aux_engine.swap(cli, mode=mode, tag=tag, codex_profile=_write_codex_profile)
 
 def _codex_safe_model(model: str) -> str:
     """Model hợp lệ cho Codex/ChatGPT-account. Model API thường (gpt-5-mini, gpt-4o, o3...)
@@ -1197,8 +1208,13 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
                 m[d["key_field"]] = ""
                 if _effective_main(cfg).get("provider") == patch["clear_key"]:
                     _set_main_model(cfg, "anthropic-cli", m.get("claude_model") or "opus")
-        if "auxiliary" in patch:   # model phụ cho việc nền
-            m.setdefault("auxiliary", {})["model"] = (patch["auxiliary"] or {}).get("model", "")
+        if "auxiliary" in patch:   # model phụ cho việc nền (provider + model)
+            aux_patch = patch["auxiliary"] or {}
+            aux = m.setdefault("auxiliary", {})
+            aux["model"] = aux_patch.get("model", "")
+            # Thiếu provider (client cũ) = Claude, đúng hành vi trước khi mở nhiều provider.
+            prov = aux_patch.get("provider") or aux_engine.CLAUDE
+            aux["provider"] = prov if _provider_def(prov) else aux_engine.CLAUDE
         if "reasoning" in patch:   # độ sâu suy nghĩ: off|low|medium|high
             r = patch["reasoning"]
             m["reasoning"] = r if r in ("off", "low", "medium", "high") else "off"
@@ -1767,9 +1783,9 @@ async def ingest_upload(
 ):
     """Dùng Claude CLI biến file staged thành .md nguồn: text→trích, ảnh→mô tả."""
     cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD)
-    cli.model = _aux_model() or None   # việc nền: dùng model phụ nếu có cấu hình
+    cli = _aux_swap(cli, mode="auto", tag="ingest")   # việc nền: theo model phụ đã chọn
     if not cli.is_available():
-        return {"ok": False, "error": "Claude CLI chưa cài"}
+        return {"ok": False, "error": "Engine việc nền chưa sẵn sàng (kiểm tra trang Model)"}
     slug = _sanitize_filename(os.path.splitext(name)[0]) or "source"
 
     if kind == "image":
@@ -3148,6 +3164,7 @@ loop_feature = self_improve.register(app, self_improve.LoopDeps(
     build_system_prompt=build_system_prompt,
     brain_root=_brain_root,
     aux_model=_aux_model,
+    aux_swap=_aux_swap,
     atomic_write_text=_atomic_write_text,
     project_root=PROJECT_ROOT,
     state_dir=cfgmod.STATE_DIR,
@@ -3188,6 +3205,7 @@ learn_feature = learn_mod.register(app, learn_mod.LearnDeps(
     brain_memory_dir=_brain_memory_dir,
     resolve_subfolder=_resolve_subfolder,
     aux_model=_aux_model,
+    aux_swap=_aux_swap,
     atomic_write_text=_atomic_write_text,
     sessions_store=get_store(),
     state_dir=cfgmod.STATE_DIR,
@@ -3210,6 +3228,7 @@ tasks_feature = tasks_mod.register(app, tasks_mod.TasksDeps(
     workflows_dir=_workflows_dir,
     build_system_prompt=build_system_prompt,
     aux_model=_aux_model,
+    aux_swap=_aux_swap,
     safe_tools=SAFE_FILE_TOOLS,
     report=_notify_owner,               # báo Telegram cho NGƯỜI YÊU CẦU task khi chạy xong (web → ID đầu)
 ))
@@ -3232,6 +3251,7 @@ reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
     send_telegram=_tg_send_to,
     build_system_prompt=build_system_prompt,
     aux_model=_aux_model,
+    aux_swap=_aux_swap,
     safe_tools=SAFE_FILE_TOOLS,
     readonly_tools=READONLY_TOOLS,
     scheduler_brains=loop_feature.scheduler_brains,

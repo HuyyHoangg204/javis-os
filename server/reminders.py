@@ -43,6 +43,7 @@ from fastapi import APIRouter, Body, Form, Query
 import cron_util
 import channel_context   # bóc khối JAVIS_* trước khi gửi Telegram - kênh chữ, không phải web
 from claude_cli import claude_engine, _empty_mcp_file
+import aux_engine   # engine viec nen theo model phu nguoi dung chon
 
 VN_TZ = timezone(timedelta(hours=7))
 VALID_MODE = {"notify", "task", "script"}
@@ -162,6 +163,9 @@ class RemindersDeps:
     scheduler_brains: Callable[[], List[str]]  # () -> danh sách brain scheduler quét
     apply_mcp: Optional[Callable] = None       # apply_mcp(cli, mode): gắn MCP Javis-quản-lý (đọc thật)
     mcp_allow_patterns: Optional[Callable] = None  # () -> ["mcp__<server>", ...] cho allowlist
+    # Đổi engine việc nền theo model phụ người dùng chọn (Claude / Codex / API rẻ).
+    # None = giữ nguyên Claude như trước (test dựng deps tối giản không cần tiêm).
+    aux_swap: Optional[Callable] = None
 
 
 class RemindersFeature:
@@ -470,7 +474,7 @@ class RemindersFeature:
             if mcpf:
                 cli.mcp_config = mcpf
                 cli.mcp_strict = True
-        cli.model = self.deps.aux_model() or None
+        cli = aux_engine.apply(self.deps, cli, mode="suggest", tag="reminder")
         cli.max_wall_s = 300
         if not cli.is_available():
             return "", "Claude CLI chưa cài"

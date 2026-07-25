@@ -40,6 +40,7 @@ from typing import Any, Callable, List, Optional
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
+import aux_engine   # engine viec nen theo model phu nguoi dung chon
 import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 VALID_STATUS = {"todo", "ready", "running", "review", "done", "blocked", "archived"}
@@ -72,6 +73,9 @@ class TasksDeps:
     aux_model: Callable[[], Optional[str]]
     safe_tools: List[str]
     report: Optional[Callable] = None   # async report(owner_chat, text) - báo NGƯỜI YÊU CẦU task khi chạy xong
+    # Đổi engine việc nền theo model phụ người dùng chọn (Claude / Codex / API rẻ).
+    # None = giữ nguyên Claude như trước (test dựng deps tối giản không cần tiêm).
+    aux_swap: Optional[Callable] = None
 
 
 class TasksFeature:
@@ -270,7 +274,7 @@ class TasksFeature:
         if mcpf:
             cli.mcp_config = mcpf; cli.mcp_strict = True
         cli.disallowed_tools = ["Bash", "WebFetch", "WebSearch", "Task"]
-        cli.model = self.deps.aux_model() or None
+        cli = aux_engine.apply(self.deps, cli, mode="auto", tag="dispatch")
         cli.max_wall_s = 300
         if not cli.is_available():
             return "", "Claude CLI chưa cài", False

@@ -623,6 +623,10 @@ class CodexCLI:
         self.instructions = instructions
         self.extra_config = []          # list '-c key=value' (override config, vd thêm mcp_servers)
         self.profile = None             # tên profile codex (-p) - Javis ghi javis.config.toml để thêm MCP
+        # Sandbox của Codex: None = toàn quyền (mặc định, giữ nguyên hành vi cũ của chat/workflow).
+        # Việc nền đặt 'read-only' / 'workspace-write' để khớp mode suggest/auto của loop -
+        # Codex KHÔNG có allowlist per-call như Claude nên đây là lớp chặn thật sự duy nhất.
+        self.sandbox = None
 
     def is_available(self) -> bool:
         return self.cli_path is not None
@@ -631,8 +635,11 @@ class CodexCLI:
         if not self.cli_path:
             yield {"type": "error", "content": "Không tìm thấy Codex CLI (cần ChatGPT login qua codex)."}
             return
-        args = [self.cli_path, "exec", "--json",
-                "--dangerously-bypass-approvals-and-sandbox", "--skip-git-repo-check"]
+        args = [self.cli_path, "exec", "--json", "--skip-git-repo-check"]
+        if self.sandbox:
+            args += ["--sandbox", self.sandbox, "--ask-for-approval", "never"]
+        else:
+            args += ["--dangerously-bypass-approvals-and-sandbox"]
         if self.model:
             args += ["-m", self.model]
         if self.profile:

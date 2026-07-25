@@ -22,16 +22,18 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
 import git_brain
+import aux_engine   # engine viec nen theo model phu nguoi dung chon
 import skill_router
 
 
@@ -176,6 +178,9 @@ class LearnDeps:
     # Nối learn → Kanban: enqueue_task(brain, title, intent, route, priority, deps, needs_approval, created_by)
     # → trả task id. Tiêm sau khi tasks_feature sẵn sàng (main gán). None = chưa nối (bỏ qua tasks).
     enqueue_task: Optional[Callable] = None
+    # Đổi engine việc nền theo model phụ người dùng chọn (Claude / Codex / API rẻ).
+    # None = giữ nguyên Claude như trước (test dựng deps tối giản không cần tiêm).
+    aux_swap: Optional[Callable] = None
 
 
 ALLOWED_WRITE_PREFIXES = ["memory", "Memory", "Wiki", "skills", ".claude/skills", "Javis"]
@@ -191,7 +196,11 @@ class LearnFeature:
             "capabilities": {"memory": True, "wiki": True, "skill": True, "task": True},  # bật hết
             "debounce": {"k": 3, "idle_min": 10, "dense_idle_min": 3},
             "rate": {"min_interval_s": 90, "fork_day": 40, "token_day": 300000},
-            "curator": {"enabled": False, "interval_hours": 24, "last_run": 0.0},
+            # stale_days: brain im lặng quá ngần này ngày thì curator BỎ QUA (0 = không lọc).
+            # Danh sách brains chỉ có thêm chứ không bớt (mỗi brain từng chat một lần là nằm đó
+            # mãi), nên không có mốc này thì curator cứ 24h lại chạy LINT Wiki - một phiên agent
+            # đầy đủ - trên cả những brain người dùng đã bỏ từ lâu.
+            "curator": {"enabled": False, "interval_hours": 24, "last_run": 0.0, "stale_days": 14},
             "aux_model": "",
             "brains": ["brain"],               # brain nào được học (mặc định brain đang dùng)
             "_state": {"day": "", "fork_count": 0, "token_est": 0, "last_fork_ts": 0.0},
@@ -455,6 +464,10 @@ class LearnFeature:
         gcli.mcp_strict = True
         gcli.disallowed_tools = ["Bash", "WebFetch", "WebSearch", "Task"]
         gcli.max_wall_s = 240
+        # Model việc nền toàn cục (có thể là Codex / API rẻ). Riêng khi trang Tự học đặt
+        # aux_model riêng thì tôn trọng lựa chọn hẹp đó, không đổi engine.
+        if not cfg.get("aux_model"):
+            gcli = aux_engine.apply(self.deps, gcli, mode="suggest", tag=tag)
         if not gcli.is_available():
             return ""
         out = ""
@@ -869,6 +882,47 @@ class LearnFeature:
         except Exception as e:
             return f"Reindex lỗi: {e}"
 
+    def _brain_last_active(self, brain: str) -> float:
+        """Lần CUỐI người dùng thật sự trò chuyện trên brain này (epoch), 0 = không rõ.
+
+        Đọc Memory/conversations/ chứ KHÔNG đọc mtime cả thư mục: chính curator ghi
+        Javis/learn-log mỗi vòng, nên lấy mtime thư mục là brain nào cũng "vừa mới hoạt
+        động" - curator tự nuôi lý do để chạy tiếp trên brain đã bỏ.
+        """
+        try:
+            d = Path(self.deps.brain_root(brain)) / "Memory" / "conversations"
+            if not d.is_dir():
+                return 0.0
+            return max((f.stat().st_mtime for f in d.glob("*.md")), default=0.0)
+        except Exception:
+            return 0.0
+
+    def _curator_targets(self, cfg: dict) -> Tuple[List[str], List[str]]:
+        """(brain nên chạy, lý do bỏ qua). Lọc brain không tồn tại + brain đã nguội.
+
+        Danh sách cfg['brains'] chỉ nối thêm mỗi lần chat brain mới, không bao giờ bớt.
+        Không lọc thì mỗi vòng curator là N phiên LINT Wiki, phần lớn cho brain đã bỏ.
+        """
+        stale_days = int((cfg.get("curator") or {}).get("stale_days", 14) or 0)
+        cutoff = time.time() - stale_days * 86400 if stale_days > 0 else 0
+        run, skip = [], []
+        for brain in (cfg.get("brains") or ["brain"]):
+            try:
+                root = Path(self.deps.brain_root(brain))
+            except Exception:
+                skip.append(f"{brain} (không giải được đường dẫn)")
+                continue
+            if not root.is_dir():
+                skip.append(f"{brain} (thư mục không còn)")
+                continue
+            last = self._brain_last_active(brain)
+            if cutoff and last and last < cutoff:
+                days = int((time.time() - last) / 86400)
+                skip.append(f"{brain} (im lặng {days} ngày)")
+                continue
+            run.append(brain)
+        return run, skip
+
     async def curator_tick(self) -> None:
         cfg = self.read_config()
         cur = cfg.get("curator", {})
@@ -876,7 +930,10 @@ class LearnFeature:
             return
         interval = max(1, int(cur.get("interval_hours", 24))) * 3600
         if time.time() - float(cur.get("last_run", 0)) >= interval:
-            for brain in (cfg.get("brains") or ["brain"]):
+            run, skip = self._curator_targets(cfg)
+            if skip:
+                print(f"[curator] bỏ qua {len(skip)} brain: " + "; ".join(skip), file=sys.stderr)
+            for brain in run:
                 await self.run_curator(brain, "scheduled")
 
     # ── learn-log (người đọc) ──

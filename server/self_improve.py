@@ -61,6 +61,7 @@ import yaml
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
+import aux_engine   # engine viec nen theo model phu nguoi dung chon
 import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 LEGACY_SLUG = "vong-lap-goc"
@@ -144,6 +145,9 @@ class LoopDeps:
     report: Optional[Callable] = None        # async report(owner_chat, text) - báo NGƯỜI YÊU CẦU loop mỗi vòng
     apply_mcp: Optional[Callable] = None      # apply_mcp(cli): gắn MCP Javis-quản-lý (config+strict+deny) - loop ĐỌC được dữ liệu thật
     mcp_allow_patterns: Optional[Callable] = None  # () -> ["mcp__<server>", ...] để thêm vào allowlist (MCP mới gọi được)
+    # Đổi engine việc nền theo model phụ người dùng chọn (Claude / Codex / API rẻ).
+    # None = giữ nguyên Claude như trước (test dựng deps tối giản không cần tiêm).
+    aux_swap: Optional[Callable] = None
 
 
 class LoopFeature:
@@ -746,7 +750,7 @@ class LoopFeature:
                     self.deps.apply_mcp(cli)   # deps cũ (test) không nhận mode
             else:
                 _isolate(cli)              # không có hook (vd unit test) → giữ 0-MCP như cũ
-        cli.model = self.deps.aux_model() or None
+        cli = aux_engine.apply(self.deps, cli, mode=("suggest" if for_verify else mode), tag="loop")
         return cli
 
     async def run_cycle(self, brain: str, slug: str, reason: str = "manual") -> dict:

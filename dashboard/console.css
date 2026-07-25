@@ -147,6 +147,10 @@ body.in-console .hud-actions { display: none; }
 }
 .aux-chip:hover { color: var(--text); border-color: var(--text2); }
 .aux-chip.sel { background: rgba(255,107,43,0.14); border-color: var(--accent); color: var(--accent); }
+/* Model việc nền gom theo nhà cung cấp - cùng tên model có ở nhiều nhà nên phải nêu rõ nhà nào */
+.aux-prov { margin-top: 14px; }
+.aux-prov-name { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); }
+.aux-prov .aux-chips { margin-top: 6px; }
 
 /* Picker model (SET MAIN MODEL) */
 .mp-overlay {

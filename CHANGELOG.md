@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.167] - 2026-07-25
+Việc nền chạy được bằng model NGOÀI Claude, và curator thôi quét những brain đã bỏ.
+### Thêm mới
+- **Chọn nhà cung cấp cho model việc nền**: ô "Auxiliary" ở trang Model trước đây khoá cứng vào danh sách của `anthropic-cli` (console.js đọc thẳng `providers.find(id==="anthropic-cli").models`), nên mọi việc nền - loop, việc Kanban, nhắc hẹn, tự học, tiêu hoá nguồn - đều ăn hạn mức Claude, không có đường đổi. Nay ô này liệt kê MỌI nhà cung cấp đã đấu (đã đăng nhập hoặc đã có key), gom theo từng nhà; chọn nhà nào thì việc nền chạy bằng gói/khoá của nhà đó (`server/aux_engine.py`).
+- **Ba loại engine nền, khác nhau ở công cụ**: Claude Code giữ nguyên như cũ (tool file native + Bash + MCP, chặn theo allowlist per-call). Codex CLI cũng là agent thật (đọc/ghi file + MCP qua profile javis) và nay nhận `--sandbox` ánh xạ theo mode của loop - suggest thành `read-only`, auto thành `workspace-write`, full giữ toàn quyền; trước đây Codex luôn chạy bypass sandbox nên không dùng cho việc nền có mức quyền được (`server/claude_cli.py`). Các model API (OpenRouter, OpenAI, Gemini, Anthropic API) không có tool native nhưng dùng tool vault của hub (`javis_read_file` / `javis_write_file` / `javis_use_skill` + MCP), và `javis_write_file` vốn đã tự chặn khi mode là suggest - nên loop chỉ-đọc vẫn chỉ-đọc trên mọi engine.
+- **Rào an toàn khi cấu hình hỏng**: chọn nhà chưa có key hoặc chưa cài Codex CLI thì việc nền LẲNG LẶNG dùng lại Claude kèm dòng log nêu lý do, thay vì chết giữa chừng. Provider lạ gửi lên `/settings` bị ép về `anthropic-cli`.
+### Cải thiện
+- **Curator thôi quét brain đã bỏ**: danh sách `learn_config['brains']` chỉ NỐI THÊM mỗi lần chat một brain mới, không bao giờ bớt - mà mỗi vòng curator là một phiên LINT Wiki đầy đủ cho TỪNG brain. Đo thực tế: tháng 7 chạy 22 lần hết 97M token trên 4 brain, trong đó 1 là đường dẫn không tồn tại và 2 là brain người dùng đã bỏ gần 3 tuần. Nay curator bỏ qua brain có thư mục không còn, và brain im lặng quá `curator.stale_days` (mặc định 14 ngày), có log nêu rõ bỏ cái nào vì sao (`server/learn.py`).
+- **Đo độ mới bằng Memory/conversations, KHÔNG bằng mtime thư mục**: chính curator ghi `Javis/learn-log` mỗi vòng, nên lấy mtime thư mục thì brain nào cũng "vừa hoạt động" và curator tự nuôi lý do chạy tiếp mãi trên brain đã chết.
+### Kiểm thử
+- `server/test_aux_engine.py`: mặc định và cấu hình cũ (thiếu `provider`) vẫn ra đúng engine Claude; đổi sang API thì thừa hưởng system_prompt/vault/mode; thiếu key hoặc provider lạ thì giữ Claude; mode ánh xạ đúng sang sandbox Codex và sandbox thật sự vào dòng lệnh; engine API gom nhiều mảnh text thành đúng một sự kiện `final`.
+- `server/test_curator_targets.py`: bỏ brain mất thư mục, bỏ brain nguội, giữ brain vừa chat, và chốt rằng learn-log mới KHÔNG cứu được brain đã nguội.
+
 ## [0.9.166] - 2026-07-25
 Gỡ hẳn bảng thẻ SỐ LIỆU KINH DOANH. Muốn xem số thì hỏi thẳng, Javis gọi MCP lấy về.
 ### Gỡ bỏ
