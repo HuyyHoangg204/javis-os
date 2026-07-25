@@ -785,6 +785,16 @@ def _write_codex_profile():
     return None
 
 
+def _apply_codex_hub(cli, vault_root=None):
+    """Gắn profile MCP và brain hiện tại vào riêng tiến trình Codex."""
+    cli.profile = _write_codex_profile()
+    if _hub_enabled():
+        override = mcp_hub.codex_vault_override(vault_root)
+        if override and override not in cli.extra_config:
+            cli.extra_config.append(override)
+    return cli
+
+
 def _apply_mcp(cli, mode="full", brain=None):
     """Gắn MCP do Javis quản lý vào 1 engine Claude (registry rỗng → không đổi gì, dùng MCP sẵn của máy).
     Hub bật: config 1 entry trỏ hub kèm X-Javis-Mode - deny/perm/audit chặn TẠI hub (lớp cứng),
@@ -2953,7 +2963,7 @@ async def execute_workflow(brain, slug, input="", tools=None):
         if model and _is_codex_model(model) and tools is None and find_codex_cli():
             openai_oauth.write_codex_auth()   # bắc cầu token ChatGPT → ~/.codex/auth.json
             cc = CodexCLI(cwd=vault_root, tag="workflow", model=_codex_safe_model(model), instructions=sysprompt)
-            cc.profile = _write_codex_profile()   # đẩy MCP của Javis (POS...) sang codex
+            _apply_codex_hub(cc, vault_root)   # MCP + đúng brain cho cron/nhắc hẹn
             return cc
         c = claude_engine(system_prompt=sysprompt, cwd=vault_root, tag="workflow", allowed_tools=tools)
         # Model Claude của AGENT (sonnet/opus/haiku/fable) được ÁP THẬT vào CLI.
@@ -4652,24 +4662,61 @@ async def websocket_endpoint(ws: WebSocket):
                 openai_oauth.write_codex_auth()   # bắc cầu token đã nối ở Models → ~/.codex/auth.json (codex dùng được)
                 # cwd=brain (để Codex đọc được Javis/skills + .claude/skills mirror bằng tool file
                 # native, như nhánh workflow) + instructions=sysprompt (kèm ROUTER SKILL) → Codex
-                # dùng được skill. CodexCLI stateless (không --resume) nên đổi cwd an toàn.
+                # dùng được skill. Mỗi hội thoại dashboard giữ riêng codex_thread_id để resume.
                 ccli = CodexCLI(cwd=_brain_root(brain), model=actual_model, tag=conn_tag, instructions=sysprompt)
-                ccli.profile = _write_codex_profile()   # đẩy MCP của Javis (POSCake...) sang codex
+                _apply_codex_hub(ccli, _brain_root(brain))   # MCP + đúng brain cho cron/nhắc hẹn
+                stored_codex_thread = (_row0.get("codex_thread_id") or "").strip()
+                ccli.session_id = stored_codex_thread or None
                 if not ccli.is_available():
                     await ws.send_text(json.dumps({"type": "error", "content": "Chưa cài Codex CLI trong container. ChatGPT subscription là THỬ NGHIỆM - dùng Claude Code hoặc OpenRouter cho ổn định (đổi ở Models)."}))
                 else:
-                    async for ev in ccli.query(_cli_think(reasoning, user_message)):
-                        et = ev["type"]
-                        if et == "tool_call":
-                            await ws.send_text(json.dumps({"type": "tool_call", "tool": ev.get("name", ""), "content": f"⚙ {ev.get('name', '')}"}))
-                        elif et == "text":
-                            final_text += ev["content"]
-                            await ws.send_text(json.dumps({"type": "stream", "content": ev["content"], "tts": False}))
-                        elif et == "final":
-                            final_text = ev.get("content") or final_text
-                            usage_store.record("codex", actual_model, ev.get("tokens_in", 0), ev.get("tokens_out", 0))
-                        elif et == "error":
-                            await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
+                    _codex_current = _cli_think(reasoning, user_message)
+                    _codex_raw = [{"role": _m["role"], "content": _m["content"]}
+                                  for _m in store.get_messages(conv_sid)[:-1]
+                                  if _m["role"] in ("user", "assistant") and _m.get("content")]
+                    # Phiên tạo trước bản vá chưa có thread_id: seed transcript đúng 1 lượt để
+                    # không mất mạch, rồi thread.started sẽ được lưu và resume native từ lượt sau.
+                    _codex_prompt = (_codex_current if stored_codex_thread else
+                                     compaction.codex_bootstrap_prompt(_codex_raw, _codex_current))
+
+                    async def _consume_codex(prompt, suppress_resume_error=False):
+                        nonlocal final_text
+                        resume_failed = False
+                        async for ev in ccli.query(prompt):
+                            et = ev["type"]
+                            if et == "session":
+                                if ev.get("session_id"):
+                                    store.set_codex_thread_id(conv_sid, ev["session_id"])
+                            elif et == "tool_call":
+                                await ws.send_text(json.dumps({"type": "tool_call", "tool": ev.get("name", ""), "content": f"⚙ {ev.get('name', '')}"}))
+                            elif et == "text":
+                                final_text += ev["content"]
+                                await ws.send_text(json.dumps({"type": "stream", "content": ev["content"], "tts": False}))
+                            elif et == "final":
+                                final_text = ev.get("content") or final_text
+                                if ev.get("session_id"):
+                                    store.set_codex_thread_id(conv_sid, ev["session_id"])
+                                usage_store.record("codex", actual_model, ev.get("tokens_in", 0), ev.get("tokens_out", 0))
+                            elif et == "error":
+                                if ev.get("resume_failed"):
+                                    resume_failed = True
+                                    if suppress_resume_error:
+                                        continue
+                                await ws.send_text(json.dumps({"type": "error", "content": ev["content"]}))
+                        return resume_failed
+
+                    _resume_failed = await _consume_codex(
+                        _codex_prompt, suppress_resume_error=bool(stored_codex_thread))
+                    if stored_codex_thread and _resume_failed and not final_text:
+                        # Rollout local có thể bị dọn/mất sau nâng cấp máy. Không bỏ luôn context:
+                        # tạo thread mới từ transcript SQLite, lưu ID mới, rồi các lượt sau resume nó.
+                        await ws.send_text(json.dumps({
+                            "type": "system",
+                            "content": "Phiên Codex cũ không còn trên máy - Javis đang khôi phục ngữ cảnh từ lịch sử đã lưu."
+                        }))
+                        ccli.session_id = None
+                        _fallback = compaction.codex_bootstrap_prompt(_codex_raw, _codex_current)
+                        await _consume_codex(_fallback)
                     await ws.send_text(json.dumps({"type": "response", "content": final_text, "engine": "codex", "model": actual_model, "session_id": conv_sid}))
             elif (kind == "api" and api_key) or kind == "oauth":
                 # ===== PROVIDER API/OAuth (openrouter | openai | anthropic-api) - chat thuần (MCP đa-model cho openrouter/openai) =====
@@ -4787,6 +4834,10 @@ async def websocket_endpoint(ws: WebSocket):
             conv_sid = store.get_or_create(
                 payload.get("session_id"), brain=brain, engine=engine_label,
                 model=(api_model or mcfg.get("claude_model")))
+            if engine_label != "codex":
+                # Provider khác vừa chen một lượt: thread Codex cũ không chứa lượt này nữa.
+                # Xoá liên kết để lần quay lại Codex bootstrap từ SQLite thay vì resume mạch stale.
+                store.clear_codex_thread_id(conv_sid)
             if conv_sid in running and not running[conv_sid].done():
                 await send_raw({"type": "error", "content": "Phiên này đang trả lời - đợi lượt hiện tại xong đã.", "session_id": conv_sid})
                 continue

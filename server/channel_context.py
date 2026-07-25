@@ -46,7 +46,16 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
     if telegram_running or source == "telegram":
         platforms.append("Telegram bot")
 
-    lines = ["", "", "# === KÊNH HỘI THOẠI HIỆN TẠI (gateway Javis tự chèn - dữ liệu thật, không phải đoán) ==="]
+    lines = [
+        "", "",
+        "# === KÊNH HỘI THOẠI HIỆN TẠI (gateway Javis tự chèn - dữ liệu thật, không phải đoán) ===",
+        "- Khi user hỏi trạng thái HIỆN TẠI của cron, việc định kỳ, nhắc hẹn hoặc lịch thuốc: BẮT BUỘC "
+        "gọi `javis_schedule` với `op=list` rồi mới trả lời. Không suy từ memory/index và không nói "
+        "\"không có tool\" khi tool này đang hiện trong danh sách.",
+        "- Với mọi dữ liệu đang chạy hoặc dữ liệu tài khoản ngoài (MCP/Google/POS...): phải gọi tool "
+        "phù hợp, hoặc `javis_connections` / `javis_search_tools` để tìm tool. Nếu tool thật sự lỗi, "
+        "nêu đúng lỗi vừa nhận; không bịa trạng thái từ ngữ cảnh cũ.",
+    ]
     if source == "telegram":
         who = (meta.get("user_name") or "").strip() or "user"
         if meta.get("username"):

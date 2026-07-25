@@ -651,7 +651,7 @@ def _rpc_error(mid, code, message):
     return {"jsonrpc": "2.0", "id": mid, "error": {"code": code, "message": message}}
 
 
-async def _handle_one(msg, mode, include_plugins=True, include_ambient=False):
+async def _handle_one(msg, mode, include_plugins=True, include_ambient=False, vault_root=None):
     mid = msg.get("id")
     method = msg.get("method") or ""
     params = msg.get("params") or {}
@@ -666,14 +666,14 @@ async def _handle_one(msg, mode, include_plugins=True, include_ambient=False):
     if method == "ping":
         return {"jsonrpc": "2.0", "id": mid, "result": {}}
     if method == "tools/list":
-        tools, _ = await discover_all(mode, include_plugins=include_plugins,
+        tools, _ = await discover_all(mode, vault_root=vault_root, include_plugins=include_plugins,
                                       include_ambient=include_ambient)   # Claude/Codex có tool file native → không builtin file
         return {"jsonrpc": "2.0", "id": mid, "result": {"tools": [
             {"name": t["fn"], "description": (t.get("description") or t["fn"]),
              "inputSchema": t.get("schema") or {"type": "object", "properties": {}}}
             for t in tools]}}
     if method == "tools/call":
-        _, route = await discover_all(mode, include_plugins=include_plugins,
+        _, route = await discover_all(mode, vault_root=vault_root, include_plugins=include_plugins,
                                       include_ambient=include_ambient)
         name = params.get("name") or ""
         result = await mcp_client.call_route(route, name, params.get("arguments") or {})
@@ -697,18 +697,30 @@ async def handle_http(request):
     # Chỉ engine Claude (config claude_config_path gắn X-Javis-Engine=claude) mới có tool native
     # mcp__* của connector tài khoản Claude → chỉ nó cần gợi ý ambient. Codex/engine API không có.
     include_ambient = (request.headers.get("x-javis-engine") or "").strip().lower() == "claude"
+    # Codex chạy MCP qua HTTP hub (khác Claude SDK đấu plugin in-process), nên nếu không mang
+    # brain hiện tại thì plugin javis_schedule có tool nhưng không biết phải đọc kho cron nào.
+    # Chỉ nhận đường dẫn thư mục có thật; Bearer hub_token vẫn là lớp auth bắt buộc phía trên.
+    vault_root = None
+    raw_vault = (request.headers.get("x-javis-vault") or "").strip()
+    if raw_vault:
+        try:
+            candidate = Path(raw_vault).expanduser().resolve()
+            if candidate.is_dir():
+                vault_root = str(candidate)
+        except Exception:
+            pass
     try:
         body = await request.json()
     except Exception:
         return JSONResponse(_rpc_error(None, -32700, "parse error"), status_code=400)
     try:
         if isinstance(body, list):
-            out = [r for r in [await _handle_one(m, mode, include_plugins, include_ambient)
+            out = [r for r in [await _handle_one(m, mode, include_plugins, include_ambient, vault_root)
                                for m in body] if r is not None]
             if not out:
                 return Response(status_code=202)
             return JSONResponse(out)
-        res = await _handle_one(body, mode, include_plugins, include_ambient)
+        res = await _handle_one(body, mode, include_plugins, include_ambient, vault_root)
         if res is None:
             return Response(status_code=202)
         return JSONResponse(res)
@@ -757,10 +769,8 @@ def codex_profile(mode="full"):
     """Ghi ~/.codex/javis.config.toml 1 entry hub → `codex exec -p javis` thấy MỌI MCP của Javis."""
     path = Path.home() / ".codex" / "javis.config.toml"
     try:
-        if not _has_connections():
-            if path.exists():
-                path.unlink()
-            return None
+        # Hub còn cung cấp plugin nội bộ (javis_schedule, datetime-vn...) ngay cả khi user chưa
+        # đấu connector ngoài. Không được xoá profile chỉ vì mcp_store đang rỗng.
         lines = ["[mcp_servers.javis]",
                  f"url = {_toml_str(hub_url())}",
                  "startup_timeout_sec = 20",
@@ -777,6 +787,21 @@ def codex_profile(mode="full"):
     except Exception as e:
         print(f"[hub codex profile] {e}", file=sys.stderr)
         return None
+
+
+def codex_vault_override(vault_root):
+    """Override `-c` theo từng tiến trình Codex để hub nhận đúng brain mà không ghi đè profile chung.
+
+    Profile javis là file dùng chung cho mọi cuộc chat. Nhét X-Javis-Vault thẳng vào file đó sẽ
+    race khi hai brain chạy đồng thời; override argv giữ context tách biệt theo đúng phiên.
+    """
+    if not vault_root:
+        return None
+    try:
+        vault = str(Path(vault_root).expanduser().resolve())
+    except Exception:
+        vault = str(vault_root)
+    return f'mcp_servers.javis.http_headers."X-Javis-Vault"={_toml_str(vault)}'
 
 
 # ============================================================

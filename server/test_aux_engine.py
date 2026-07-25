@@ -104,10 +104,13 @@ from claude_cli import CodexCLI  # noqa: E402
 cc = CodexCLI(cwd=".", model="gpt-5.5")
 check("CodexCLI mac dinh van toan quyen (khong doi hanh vi chat/workflow)", cc.sandbox is None)
 
-import inspect  # noqa: E402
-src = inspect.getsource(CodexCLI.query)
-check("sandbox co vao dong lenh", '"--sandbox", self.sandbox' in src)
-check("sandbox bat thi khong con co bypass", 'else:\n            args += ["--dangerously-bypass' in src)
+cc.cli_path = "codex"
+cc.sandbox = "read-only"
+sandbox_args = cc._build_args()
+check("sandbox co vao dong lenh",
+      "--sandbox" in sandbox_args and sandbox_args[sandbox_args.index("--sandbox") + 1] == "read-only")
+check("sandbox bat thi khong con co bypass",
+      "--dangerously-bypass-approvals-and-sandbox" not in sandbox_args)
 
 
 # ---- apply(): deps cũ không có aux_swap ----

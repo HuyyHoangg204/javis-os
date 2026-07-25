@@ -23,6 +23,18 @@ from typing import AsyncIterator, Optional
 _ACTIVE_PROCS = {}
 _PROC_LOCK = threading.Lock()
 
+
+def _looks_like_codex_resume_error(message: str) -> bool:
+    """Nhận diện lỗi rollout/thread không còn để caller bootstrap từ SQLite đúng một lần."""
+    s = (message or "").lower()
+    subject = any(x in s for x in ("resume", "session", "thread", "rollout"))
+    failure = any(x in s for x in (
+        "not found", "does not exist", "could not find", "failed to load",
+        "failed to resume", "unable to resume", "invalid session", "no session",
+    ))
+    return subject and failure
+
+
 def cancel_all(tag=None):
     """Ngắt tiến trình Claude. tag=None → tất cả; có tag → ngắt nhóm khớp.
     Khớp theo HỌ tag: 'chat' ngắt cả 'chat:abc' (tag đa phiên per-kết-nối/per-chat_id);
@@ -623,6 +635,7 @@ class CodexCLI:
         self.instructions = instructions
         self.extra_config = []          # list '-c key=value' (override config, vd thêm mcp_servers)
         self.profile = None             # tên profile codex (-p) - Javis ghi javis.config.toml để thêm MCP
+        self.session_id = None          # Codex thread_id; có giá trị → `codex exec resume <id>`
         # Sandbox của Codex: None = toàn quyền (mặc định, giữ nguyên hành vi cũ của chat/workflow).
         # Việc nền đặt 'read-only' / 'workspace-write' để khớp mode suggest/auto của loop -
         # Codex KHÔNG có allowlist per-call như Claude nên đây là lớp chặn thật sự duy nhất.
@@ -631,10 +644,8 @@ class CodexCLI:
     def is_available(self) -> bool:
         return self.cli_path is not None
 
-    async def query(self, prompt: str) -> AsyncIterator[dict]:
-        if not self.cli_path:
-            yield {"type": "error", "content": "Không tìm thấy Codex CLI (cần ChatGPT login qua codex)."}
-            return
+    def _build_args(self) -> list[str]:
+        """Dựng argv cho lượt mới/resume. Các option `exec` là global nên đặt trước subcommand."""
         args = [self.cli_path, "exec", "--json", "--skip-git-repo-check"]
         if self.sandbox:
             args += ["--sandbox", self.sandbox, "--ask-for-approval", "never"]
@@ -646,12 +657,21 @@ class CodexCLI:
             args += ["-p", self.profile]
         for c in (self.extra_config or []):
             args += ["-c", c]
+        if self.session_id:
+            args += ["resume", self.session_id]
+        args.append("-")
+        return args
+
+    async def query(self, prompt: str) -> AsyncIterator[dict]:
+        if not self.cli_path:
+            yield {"type": "error", "content": "Không tìm thấy Codex CLI (cần ChatGPT login qua codex)."}
+            return
+        resume_requested = bool(self.session_id)
+        args = self._build_args()
         # Codex exec không nhận system-prompt riêng → gộp instructions (vai trò agent) vào đầu prompt.
         # Prompt bơm qua STDIN (positional "-") thay vì argv - né trần command line 32767 ký tự
         # của Windows (WinError 206 khi dán bài dài).
         full_prompt = (self.instructions.strip() + "\n\n" + prompt) if self.instructions else prompt
-        args.append("-")
-
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
         SENTINEL = object()
@@ -751,7 +771,13 @@ class CodexCLI:
             except json.JSONDecodeError:
                 continue
             t = ev.get("type")
-            if t == "item.completed":
+            if t == "thread.started":
+                thread_id = ev.get("thread_id") or ""
+                if thread_id:
+                    self.session_id = thread_id
+                    # Phát ngay để caller lưu trước cả khi lượt bị ngắt giữa chừng.
+                    yield {"type": "session", "session_id": thread_id}
+            elif t == "item.completed":
                 it = ev.get("item") or {}
                 itype = it.get("type")
                 if itype == "agent_message":
@@ -765,9 +791,10 @@ class CodexCLI:
                     yield {"type": "tool_call", "name": str(name)[:80]}
             elif t == "turn.completed":
                 u = ev.get("usage") or {}
-                yield {"type": "final", "content": final_text, "session_id": None,
+                yield {"type": "final", "content": final_text, "session_id": self.session_id,
                        "tokens_in": (u.get("input_tokens") or 0) + (u.get("cached_input_tokens") or 0),
                        "tokens_out": u.get("output_tokens") or 0}
             elif t in ("error", "turn.failed", "thread.error", "stream.error"):
                 msg = ev.get("message") or (ev.get("error") or {}).get("message") or json.dumps(ev)[:200]
-                yield {"type": "error", "content": "Codex: " + str(msg)}
+                yield {"type": "error", "content": "Codex: " + str(msg),
+                       "resume_failed": resume_requested and _looks_like_codex_resume_error(str(msg))}
