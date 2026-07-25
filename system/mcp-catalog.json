@@ -30,7 +30,7 @@
         "danger": ["COMPOSIO_MULTI_EXECUTE_TOOL", "COMPOSIO_REMOTE_BASH_TOOL", "COMPOSIO_REMOTE_WORKBENCH"]
       },
       "default_perm": "readonly",
-      "risk": "Composio là cổng đa ứng dụng: mọi hành động lên app thật (đọc mail, gửi mail, sửa sheet, tạo issue...) đều chạy qua MỘT tool chung nên Javis KHÔNG tách được lệnh đọc với lệnh ghi bên trong.\n\nMức Chỉ đọc: chỉ tìm và xem mô tả tool, chưa chạy được hành động nào.\n\nMức Ghi nháp: thêm quyền nối app mới (Composio đưa link đăng nhập, bạn tự đăng nhập, Javis không thấy mật khẩu).\n\nMức Toàn quyền: Javis chạy được MỌI hành động của các app bạn đã nối qua Composio, kể cả gửi tin, sửa và xoá dữ liệu thật. Chỉ nâng khi thật sự cần; phạm vi đúng bằng quyền bạn đã cấp cho từng app bên Composio."
+      "risk": "Composio là cổng đa ứng dụng: mọi hành động lên app thật (đọc mail, gửi mail, sửa sheet, tạo issue...) đều chạy qua MỘT tool chung nên Javis KHÔNG tách được lệnh đọc với lệnh ghi bên trong.\n\nMức Chỉ đọc: chỉ tìm và xem mô tả tool, chưa chạy được hành động nào.\n\nMức Ghi nháp: thêm quyền nối app mới (Composio đưa link đăng nhập, bạn tự đăng nhập, Javis không thấy mật khẩu).\n\nMức Toàn quyền: Javis chạy được MỌI hành động của các app bạn đã nối qua Composio, kể cả gửi tin, sửa và xoá dữ liệu thật.\nChỉ nâng khi thật sự cần; phạm vi đúng bằng quyền bạn đã cấp cho từng app bên Composio."
     },
     {
       "id": "pancake-pos",

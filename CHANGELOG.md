@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.168] - 2026-07-25
+Vá cảnh báo rủi ro của Composio bị dính thành một khối chữ khó đọc.
+### Sửa lỗi
+- **Cảnh báo Composio xuống dòng đúng chỗ**: đoạn "Mức Toàn quyền" dài 210 ký tự nằm liền một dòng, vượt ngưỡng 200 mà `test_canh_bao_rui_ro.py` đặt ra để cảnh báo còn đọc được (khối `.conn-risk` dùng `white-space: pre-line` nên xuống dòng trong JSON mới hiện ra). Tách câu "Chỉ nâng khi thật sự cần..." xuống dòng riêng, giữ nguyên từng chữ của cảnh báo - đây là lỗi trình bày, không hạ nhẹ nội dung (`system/mcp-catalog.json`). Lỗi có từ 0.9.162 lúc thêm connector Composio.
+
 ## [0.9.167] - 2026-07-25
 Việc nền chạy được bằng model NGOÀI Claude, và curator thôi quét những brain đã bỏ.
 ### Thêm mới
