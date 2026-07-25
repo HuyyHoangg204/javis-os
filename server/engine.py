@@ -619,6 +619,53 @@ def _mcp_to_openai_tools(mcp_tools):
     }} for t in mcp_tools]
 
 
+def _plain_vn(text):
+    """Chuẩn hoá nhẹ để nhận intent tiếng Việt có/không dấu."""
+    import unicodedata
+    s = unicodedata.normalize("NFD", str(text or "").lower())
+    return "".join(c for c in s if unicodedata.category(c) != "Mn").replace("đ", "d")
+
+
+def _tool_requirement(messages, mcp_tools):
+    """Tool phải gọi ở vòng đầu cho câu hỏi cần dữ liệu sống; None nếu chat kiến thức thuần."""
+    names = {t.get("fn") for t in (mcp_tools or [])}
+    last = next((m.get("content") or "" for m in reversed(messages or [])
+                 if m.get("role") == "user"), "")
+    q = _plain_vn(last)
+    action = any(x in q for x in (
+        "kiem tra", "check", "xem", "doc", "liet ke", "tim", "lay", "dang chay",
+        "hien co", "hom nay", "con ", "tao", "dat", "them", "huy", "tat", "bat", "sua", "doi",
+    ))
+    schedule = any(x in q for x in (
+        "cron", "nhac hen", "nhac thuoc", "lich thuoc", "lich nhac", "uong thuoc",
+        "viec dinh ky", "morning briefing", "reminder",
+    ))
+    if action and schedule and "javis_schedule" in names:
+        return "javis_schedule"
+
+    live_source = any(x in q for x in (
+        "google", "gmail", "drive", "calendar", "keep", "task", "mcp", "pos",
+        "don hang", "doanh thu", "ton kho", "lich dang chay", "du lieu hien tai",
+    ))
+    if action and live_source and names:
+        return "required"
+    return None
+
+
+def _schedule_read_request(messages):
+    """Câu hỏi chỉ-đọc lịch có thể dispatch thẳng, không phụ thuộc model biết function calling."""
+    last = next((m.get("content") or "" for m in reversed(messages or [])
+                 if m.get("role") == "user"), "")
+    q = _plain_vn(last)
+    read = any(x in q for x in (
+        "kiem tra", "check", "xem", "doc", "liet ke", "dang chay", "hien co", "hom nay", "con ",
+    ))
+    mutate = any(x in q for x in (
+        "tao", "dat", "them", "huy", "tat", "bat", "sua", "doi",
+    ))
+    return read and not mutate
+
+
 async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, reasoning_extra, label,
                         cache_system=False):
     """Vòng Chat Completions + tool (OpenAI/OpenRouter). Non-stream từng vòng; yield tool_call + text cuối.
@@ -628,12 +675,43 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
     tools = _mcp_to_openai_tools(mcp_tools)
     msgs = _or_mark_system(messages) if cache_system else list(messages)
     usage_in = usage_out = 0
+    requirement = _tool_requirement(messages, mcp_tools)
+    requirement_pending = bool(requirement)
+    ignored_required = 0
+    # Đây là đường quan trọng nhất của cron/lịch thuốc: op=list là read-only và args xác định hoàn
+    # toàn, nên server tự dispatch trước. OpenRouter/free dù route tới model không có function calling
+    # vẫn nhận dữ liệu thật để tóm tắt, thay vì rơi về memory hoặc nói "không có tool".
+    if requirement == "javis_schedule" and _schedule_read_request(messages):
+        yield {"type": "tool_call", "name": "javis_schedule"}
+        result = await mcp_client.call_route(mcp_route, "javis_schedule", {"op": "list"})
+        clipped = _clip_tool_result(result)
+        if clipped.startswith("ERROR:"):
+            yield {"type": "error", "content": clipped}
+            return
+        msgs.append({
+            "role": "system",
+            "content": (
+                "DỮ LIỆU THẬT vừa đọc bằng javis_schedule(op=list). Trả lời dựa trên dữ liệu này, "
+                "không dùng memory để thay thế:\n\n" + clipped
+            ),
+        })
+        requirement_pending = False
     for _ in range(8):
         payload = {"model": model, "messages": msgs, "tools": tools, "stream": False}
+        if requirement_pending:
+            payload["tool_choice"] = (
+                {"type": "function", "function": {"name": requirement}}
+                if requirement != "required" else "required"
+            )
         payload.update(reasoning_extra or {})
         try:
             async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=15)) as client:
                 r = await client.post(url, headers=headers, json=payload)
+                # Một số endpoint OpenAI-compatible chỉ nhận "required", không nhận named choice.
+                if (r.status_code in (400, 422) and requirement_pending
+                        and requirement not in (None, "required")):
+                    payload["tool_choice"] = "required"
+                    r = await client.post(url, headers=headers, json=payload)
             if r.status_code != 200:
                 yield {"type": "error", "content": f"{label} {r.status_code}: {(r.text or '')[:300]}"}
                 return
@@ -647,6 +725,7 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
         msg = ((data.get("choices") or [{}])[0]).get("message") or {}
         tcs = msg.get("tool_calls") or []
         if tcs:
+            requirement_pending = False
             msgs.append({"role": "assistant", "content": msg.get("content") or "", "tool_calls": tcs})
             for tc in tcs:
                 fn = (tc.get("function") or {}).get("name")
@@ -659,6 +738,25 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
                 msgs.append({"role": "tool", "tool_call_id": tc.get("id"), "content": _clip_tool_result(result)})
             continue
         content = msg.get("content") or ""
+        if requirement_pending:
+            ignored_required += 1
+            if ignored_required < 2:
+                msgs.append({
+                    "role": "system",
+                    "content": (
+                        "Yêu cầu này cần dữ liệu đang chạy. BẮT BUỘC gọi tool được cung cấp ngay bây giờ; "
+                        "không trả lời từ memory, không tự nhận là không có tool."
+                    ),
+                })
+                continue
+            yield {
+                "type": "error",
+                "content": (
+                    f"{label} model '{model}' đã bỏ qua tool bắt buộc nên Javis không dùng câu trả lời "
+                    "có nguy cơ bịa dữ liệu. Hãy chọn model có hỗ trợ tool/function calling."
+                ),
+            }
+            return
         if usage_in or usage_out:
             yield {"type": "usage", "input": usage_in, "output": usage_out}
         if content:

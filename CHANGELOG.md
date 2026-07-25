@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.172] - 2026-07-25
+ChatGPT nhớ đúng mạch hội thoại, và mọi model đọc cron/lịch thuốc từ dữ liệu thật thay vì đoán theo memory.
+### Sửa lỗi
+- **ChatGPT/Codex không còn quên ngữ cảnh giữa các lượt**: mỗi hội thoại lưu riêng `codex_thread_id` và dùng `codex exec resume`; phiên cũ bị mất rollout thì tự dựng lại mạch từ lịch sử SQLite. Khi đổi qua provider khác, liên kết Codex cũ được xoá để tránh resume một nhánh hội thoại đã stale (`server/claude_cli.py`, `server/sessions.py`, `server/compaction.py`, `server/main.py`).
+- **Codex đọc cron đúng brain đang chat**: MCP hub nhận `X-Javis-Vault` theo từng tiến trình Codex rồi truyền xuống plugin. Trước đây Codex nhìn thấy `javis_schedule` nhưng context thiếu `vault_root`, nên tool dừng ở lỗi “không xác định được brain đang làm việc” (`server/mcp_hub.py`, `server/main.py`, `server/aux_engine.py`).
+- **OpenRouter không còn báo “không có tool” hoặc đoán lịch từ memory**: câu hỏi chỉ xem cron/nhắc hẹn/lịch thuốc được server gọi thẳng `javis_schedule(op=list)` trước khi model trả lời, nên vẫn hoạt động khi `openrouter/free` route tới model không có function calling. Tạo/sửa/hủy lịch vẫn bắt buộc gọi tool; model bỏ qua hai lần thì Javis chặn câu trả lời có nguy cơ bịa (`server/engine.py`).
+### Cải thiện
+- **Một nguyên tắc dữ liệu thật cho mọi provider và mọi kênh**: Claude, ChatGPT/Codex, OpenAI-compatible và OpenRouter đều được nhắc bắt buộc gọi tool khi user hỏi trạng thái đang chạy hoặc dữ liệu tài khoản ngoài; lỗi tool phải được báo đúng, không thay bằng ký ức cũ (`server/channel_context.py`).
+- **Plugin nội bộ vẫn có trên Codex khi chưa đấu connector ngoài**: profile hub không còn bị xoá chỉ vì danh sách MCP bên ngoài rỗng; các tool hệ thống như `javis_schedule` và `datetime-vn` vẫn dùng được.
+### Kiểm thử
+- Thêm `server/test_codex_context.py` và `server/test_tool_reliability.py`; chạy đạt các bộ hồi quy context Codex, MCP lazy, lịch/cron, provider việc nền, channel reminder, Claude SDK và session brain.
+
 ## [0.9.171] - 2026-07-25
 Gọt phần đầu cố định của mỗi lượt chat, KHÔNG động tới bộ nhớ.
 ### Cải thiện

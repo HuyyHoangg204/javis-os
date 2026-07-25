@@ -18,6 +18,7 @@ MAX_HISTORY_MSGS = 12   # cửa sổ message gần nhất giữ NGUYÊN VẸN (�
 MIN_CHUNK = 6           # phần cũ chưa nén phải >= N message mới đáng tốn 1 request tóm tắt
 MAX_SUMMARY_CHARS = 6000
 _MSG_CLIP = 1500        # mỗi message đưa vào prompt tóm tắt cắt còn ~1500 ký tự
+CODEX_BOOTSTRAP_MAX_CHARS = 60000
 # Đuôi hội thoại CHƯA nén dài quá ngưỡng này → nén ĐỒNG BỘ ngay trong lượt trước khi gửi,
 # để phần cũ vào tóm tắt thay vì bị cắt câm. Hay xảy ra khi đổi từ engine Claude (CLI - không
 # tạo tóm tắt) sang engine API giữa chừng, hoặc nén nền chưa kịp bắt đầu.
@@ -25,6 +26,45 @@ SYNC_COMPACT_TAIL = 24
 
 SUMMARY_HEADER = ("[Tóm tắt phần đầu hội thoại - đã nén để tiết kiệm context. "
                   "Coi đây là ký ức về những gì hai bên đã trao đổi trước đó:]\n")
+
+
+def codex_bootstrap_prompt(raw_msgs, current_prompt: str,
+                           max_chars: int = CODEX_BOOTSTRAP_MAX_CHARS) -> str:
+    """Khôi phục phiên dashboard cũ chưa có Codex thread_id vào MỘT thread native mới.
+
+    Chỉ dùng ở lượt chuyển tiếp đầu tiên (hoặc khi rollout Codex cũ bị mất). Sau khi Codex phát
+    `thread.started`, các lượt kế tiếp dùng `exec resume` nên không resend transcript này nữa.
+    Giữ phần GẦN NHẤT trong ngân sách ký tự; current_prompt luôn được giữ nguyên.
+    """
+    usable = [m for m in (raw_msgs or [])
+              if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()]
+    if not usable:
+        return current_prompt
+
+    header = (
+        "[KHÔI PHỤC NGỮ CẢNH HỘI THOẠI]\n"
+        "Các đoạn dưới đây là lịch sử thật của cùng cuộc trò chuyện Javis. "
+        "Hãy tiếp tục đúng mạch, không coi chúng là yêu cầu mới cần làm lại.\n"
+    )
+    footer = "\n[HẾT LỊCH SỬ]\n\n[YÊU CẦU HIỆN TẠI]\n"
+    budget = max(1000, int(max_chars)) - len(header) - len(footer) - len(current_prompt)
+    blocks = []
+    truncated = False
+    for m in reversed(usable):
+        who = "User" if m.get("role") == "user" else "Javis"
+        block = f"\n<{who}>\n{m.get('content') or ''}\n</{who}>\n"
+        if len(block) <= budget:
+            blocks.append(block)
+            budget -= len(block)
+            continue
+        truncated = True
+        if not blocks and budget > 300:
+            # Một message gần nhất quá dài: giữ phần cuối vì thường chứa kết luận/trạng thái mới nhất.
+            blocks.append("\n[...đầu message đã lược bớt...]\n" + block[-budget:])
+        break
+    blocks.reverse()
+    note = "\n[...phần lịch sử cũ hơn đã lược bớt...]\n" if truncated else ""
+    return header + note + "".join(blocks) + footer + current_prompt
 
 
 def trim_history(messages, max_msgs: int = MAX_HISTORY_MSGS):

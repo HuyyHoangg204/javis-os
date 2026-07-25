@@ -12,9 +12,10 @@ Thiết kế port từ Hermes `hermes_state.py` SessionDB:
   - FTS5 mirror table qua trigger                          (hermes_state.py:738)
   - Probe FTS5 lúc chạy -> fallback LIKE                   (hermes_state.py:955)
 
-Phân biệt 2 loại id:
+Phân biệt 3 loại id:
   - conv id (uuid hex)  : phiên hội thoại dashboard quản lý (engine-agnostic).
   - cli_session_id      : session_id RIÊNG của Claude CLI (để --resume).
+  - codex_thread_id     : thread_id RIÊNG của Codex CLI/OpenAI OAuth (để `exec resume`).
 """
 from __future__ import annotations
 
@@ -42,6 +43,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     engine         TEXT,
     model          TEXT,
     cli_session_id TEXT,
+    codex_thread_id TEXT,
     created_at     REAL NOT NULL,
     updated_at     REAL NOT NULL,
     msg_count      INTEGER NOT NULL DEFAULT 0,
@@ -130,7 +132,8 @@ class SessionStore:
             self._conn.executescript(_SCHEMA_SQL)
             # Migration cột mới cho DB cũ (CREATE IF NOT EXISTS không tự thêm cột)
             cols = {r[1] for r in self._conn.execute("PRAGMA table_info(sessions)").fetchall()}
-            for name, ddl in (("compact_summary", "TEXT"),
+            for name, ddl in (("codex_thread_id", "TEXT"),
+                              ("compact_summary", "TEXT"),
                               ("compact_count", "INTEGER NOT NULL DEFAULT 0")):
                 if name not in cols:
                     self._conn.execute(f"ALTER TABLE sessions ADD COLUMN {name} {ddl}")
@@ -177,17 +180,19 @@ class SessionStore:
     def create_session(self, brain: str = "brain", engine: Optional[str] = None,
                         model: Optional[str] = None, title: Optional[str] = None,
                         session_id: Optional[str] = None,
-                        cli_session_id: Optional[str] = None) -> str:
+                        cli_session_id: Optional[str] = None,
+                        codex_thread_id: Optional[str] = None) -> str:
         sid = session_id or uuid.uuid4().hex
         now = time.time()
 
         def _do(conn):
             conn.execute(
                 """INSERT INTO sessions
-                   (id, title, brain, engine, model, cli_session_id, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   (id, title, brain, engine, model, cli_session_id, codex_thread_id,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(id) DO NOTHING""",
-                (sid, title, brain, engine, model, cli_session_id, now, now),
+                (sid, title, brain, engine, model, cli_session_id, codex_thread_id, now, now),
             )
         self._write(_do)
         return sid
@@ -304,6 +309,22 @@ class SessionStore:
         self._write(lambda c: c.execute(
             "UPDATE sessions SET cli_session_id = ?, updated_at = ? WHERE id = ?",
             (cli_session_id, time.time(), session_id),
+        ))
+
+    def set_codex_thread_id(self, session_id: str, thread_id: str) -> None:
+        """Gắn thread native của Codex vào hội thoại dashboard để lượt sau resume đúng mạch."""
+        if not thread_id:
+            return
+        self._write(lambda c: c.execute(
+            "UPDATE sessions SET codex_thread_id = ?, updated_at = ? WHERE id = ?",
+            (thread_id, time.time(), session_id),
+        ))
+
+    def clear_codex_thread_id(self, session_id: str) -> None:
+        """Thread Codex thành stale khi provider khác chen lượt vào cùng hội thoại."""
+        self._write(lambda c: c.execute(
+            "UPDATE sessions SET codex_thread_id = NULL WHERE id = ? AND codex_thread_id IS NOT NULL",
+            (session_id,),
         ))
 
     # ── auto-title ──
