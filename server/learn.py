@@ -200,7 +200,11 @@ class LearnFeature:
             # Danh sách brains chỉ có thêm chứ không bớt (mỗi brain từng chat một lần là nằm đó
             # mãi), nên không có mốc này thì curator cứ 24h lại chạy LINT Wiki - một phiên agent
             # đầy đủ - trên cả những brain người dùng đã bỏ từ lâu.
-            "curator": {"enabled": False, "interval_hours": 24, "last_run": 0.0, "stale_days": 14},
+            # full_every_days: bao lâu quét TOÀN BỘ wiki một lần (0 = không bao giờ). Giữa các
+            # lần đó curator chỉ soi note mới đổi, và bỏ hẳn vòng khi wiki không đổi gì.
+            # state: mốc quét gần nhất + chữ ký tập tên file, theo TỪNG brain.
+            "curator": {"enabled": False, "interval_hours": 24, "last_run": 0.0,
+                        "stale_days": 14, "full_every_days": 30, "state": {}},
             "aux_model": "",
             "brains": ["brain"],               # brain nào được học (mặc định brain đang dùng)
             "_state": {"day": "", "fork_count": 0, "token_est": 0, "last_fork_ts": 0.0},
@@ -349,14 +353,84 @@ class LearnFeature:
         digest = "\n\n".join(parts)
         return sanitize_source(digest)
 
+    def _wiki_dir(self, brain: str) -> Path:
+        return Path(self.deps.resolve_subfolder(self.deps.brain_root(brain),
+                    r"^(\d+\s*[-_.]\s*)?wiki$", "Wiki"))
+
     def _read_index(self, brain: str) -> str:
         try:
-            wiki = Path(self.deps.resolve_subfolder(self.deps.brain_root(brain),
-                        r"^(\d+\s*[-_.]\s*)?wiki$", "Wiki"))
-            idx = wiki / "index.md"
+            idx = self._wiki_dir(brain) / "index.md"
             return idx.read_text(encoding="utf-8")[:6000] if idx.exists() else ""
         except Exception:
             return ""
+
+    def _wiki_scan(self, brain: str) -> Tuple[List[Tuple[str, float]], str]:
+        """(danh sách (đường-dẫn-tương-đối, mtime) của note wiki, chữ ký tập tên file).
+
+        Chữ ký để bắt XOÁ/ĐỔI TÊN - thứ mtime không thấy được, mà lại chính là nguyên nhân
+        sinh wikilink gãy. Tên đổi thì chữ ký đổi, curator sẽ quét lại toàn bộ vòng đó.
+        """
+        import hashlib
+        out = []
+        try:
+            wiki = self._wiki_dir(brain)
+            if not wiki.is_dir():
+                return [], ""
+            for p in wiki.rglob("*.md"):
+                try:
+                    out.append((str(p.relative_to(wiki)).replace("\\", "/"), p.stat().st_mtime))
+                except OSError:
+                    continue
+        except Exception:
+            return [], ""
+        out.sort()
+        sig = hashlib.sha1("\n".join(n for n, _ in out).encode("utf-8")).hexdigest()[:16]
+        return out, sig
+
+    def _curator_scope(self, cfg: dict, brain: str) -> dict:
+        """Vòng curator này nên quét gì: bỏ qua / quét phần đổi / quét toàn bộ.
+
+        Vì sao cần: curator vốn quét LẠI TOÀN BỘ wiki mỗi vòng như chưa từng thấy, nên chi phí
+        bám theo ĐỘ LỚN của brain chứ không theo lượng thay đổi. Đo trên brain thật: chi phí
+        mỗi vòng tăng gấp đôi trong ba tuần (2,46M -> 5,22M) dù số lượt chỉ tăng 16% - ngữ cảnh
+        mỗi lượt phình ra vì vòng nào cũng đọc lại cả kho. Trong khi 7/14 ngày gần nhất wiki
+        KHÔNG đổi note nào, ngày có đổi cũng chỉ 2-7 note trên 174.
+        """
+        cur = cfg.get("curator") or {}
+        st = ((cur.get("state") or {}).get(brain)) or {}
+        files, sig = self._wiki_scan(brain)
+        if not files:
+            return {"mode": "skip", "changed": [], "sig": sig, "n": 0, "reason": "chưa có note wiki nào"}
+
+        last = float(st.get("last_scan") or 0)
+        if not last:
+            return {"mode": "full", "changed": [], "sig": sig, "n": len(files),
+                    "reason": "lần đầu, chưa có mốc so sánh"}
+
+        # Quét toàn bộ định kỳ: quét-phần-đổi không thấy được vấn đề liên-trang tích tụ dần.
+        full_every = int(cur.get("full_every_days", 30) or 0)
+        last_full = float(st.get("last_full") or 0)
+        if full_every > 0 and (time.time() - last_full) >= full_every * 86400:
+            return {"mode": "full", "changed": [], "sig": sig, "n": len(files),
+                    "reason": f"đến hẹn quét toàn bộ ({full_every} ngày một lần)"}
+
+        # Đổi tập tên file: chỉ XOÁ và ĐỔI TÊN mới cần quét lại toàn wiki (chúng sinh wikilink
+        # gãy ở những trang KHÔNG đổi, mtime không thấy được). THÊM note thì không - đó là việc
+        # thường ngày, và note mới vốn đã lọt vào danh sách đổi qua mtime. Ép quét toàn bộ mỗi
+        # lần thêm note là xoá sạch ý nghĩa của việc quét-phần-đổi.
+        # Đổi tên KHÔNG làm đổi mtime, nên phải bắt bằng số lượng: ít đi = có xoá; giữ nguyên mà
+        # chữ ký khác = có đổi tên. Nhiều lên mà chữ ký khác = thêm note (kèm đổi tên thì vòng
+        # quét toàn bộ định kỳ sẽ dọn).
+        if sig != (st.get("sig") or "") and len(files) <= int(st.get("n") or 0):
+            return {"mode": "full", "changed": [], "sig": sig, "n": len(files),
+                    "reason": "có note bị xoá/đổi tên - phải soi lại wikilink toàn wiki"}
+
+        changed = [n for n, m in files if m > last]
+        if not changed:
+            return {"mode": "skip", "changed": [], "sig": sig, "n": len(files),
+                    "reason": "wiki không đổi note nào"}
+        return {"mode": "incremental", "changed": changed, "sig": sig, "n": len(files),
+                "reason": f"{len(changed)}/{len(files)} note đổi kể từ vòng trước"}
 
     def _read_memory_index(self, brain: str) -> str:
         try:
@@ -844,21 +918,44 @@ class LearnFeature:
             root = self.deps.brain_root(brain)
             # 1) rebuild MEMORY.md index từ facts/ (bắt drift) + báo trần size
             note = self._curator_reindex_memory(brain, root)
-            # 2) fork read-only LINT Wiki → suggestion (không tự sửa)
+            # 2) fork read-only LINT Wiki → suggestion (không tự sửa).
+            # Chỉ spawn khi wiki THẬT SỰ đổi, và chỉ soi phần đổi - xem _curator_scope.
+            scope = self._curator_scope(cfg, brain)
             wiki_idx = self._read_index(brain)
             sug = ""
-            if wiki_idx:
-                prompt = ("LINT Wiki (READ-ONLY, CHỈ trả JSON). Quét Wiki tìm: trùng lặp, orphan, "
-                          "broken wikilink, mâu thuẫn chưa giải, gap. INDEX:\n" + wiki_idx +
-                          '\nTrả {"issues":["mô tả ngắn từng vấn đề, tối đa 8"]}.')
+            skipped = scope["mode"] == "skip"
+            if wiki_idx and not skipped:
+                if scope["mode"] == "incremental":
+                    ds = "\n".join("- " + n for n in scope["changed"][:60])
+                    if len(scope["changed"]) > 60:
+                        ds += f"\n- …(+{len(scope['changed']) - 60} note nữa)"
+                    prompt = ("LINT Wiki (READ-ONLY, CHỈ trả JSON). CHỈ soi các note MỚI ĐỔI dưới đây, "
+                              "đối chiếu với INDEX - KHÔNG quét lại cả wiki. Tìm: trùng lặp với note "
+                              "đã có, orphan (không ai trỏ tới), wikilink gãy, mâu thuẫn chưa giải, gap.\n"
+                              "NOTE MỚI ĐỔI:\n" + ds + "\n\nINDEX:\n" + wiki_idx +
+                              '\nTrả {"issues":["mô tả ngắn từng vấn đề, tối đa 8"]}.')
+                else:
+                    prompt = ("LINT Wiki (READ-ONLY, CHỈ trả JSON). Quét Wiki tìm: trùng lặp, orphan, "
+                              "broken wikilink, mâu thuẫn chưa giải, gap. INDEX:\n" + wiki_idx +
+                              '\nTrả {"issues":["mô tả ngắn từng vấn đề, tối đa 8"]}.')
                 out = await self._spawn_readonly(brain, prompt, cfg, tag="curator")
                 d = _extract_json(out) or {}
                 sug = "\n".join(f"- {i}" for i in (d.get("issues") or [])[:8])
             cur = cfg.setdefault("curator", {})
             cur["last_run"] = time.time()
+            st = cur.setdefault("state", {}).setdefault(brain, {})
+            st["sig"] = scope["sig"]
+            st["n"] = scope.get("n", 0)
+            if not skipped:
+                st["last_scan"] = time.time()   # bỏ qua thì GIỮ mốc cũ, kẻo đổi trước đó bị nuốt
+                if scope["mode"] == "full":
+                    st["last_full"] = time.time()
             self.write_config(cfg)
-            self._log(brain, "curator", reason, (note + ("\n\n**Wiki LINT (đề xuất, chưa sửa):**\n" + sug if sug else "")))
-            return {"ok": True, "summary": note, "suggestions": sug}
+            self._log(brain, "curator", reason,
+                      note + f"\n\n**Wiki:** {scope['reason']}."
+                      + ("\n\n**Wiki LINT (đề xuất, chưa sửa):**\n" + sug if sug else ""))
+            return {"ok": True, "summary": note, "suggestions": sug,
+                    "wiki_scope": scope["mode"], "wiki_reason": scope["reason"]}
 
     def _curator_reindex_memory(self, brain, root) -> str:
         try:

@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.170] - 2026-07-25
+Curator chỉ soi phần wiki thật sự đổi, thôi quét lại cả kho mỗi ngày.
+### Cải thiện
+- **Chi phí curator bám theo LƯỢNG THAY ĐỔI, không còn bám theo độ lớn brain**: trước đây mỗi vòng curator quét lại toàn bộ wiki như chưa từng thấy. Đo trên brain thật: đầu tháng 7 tốn 2,46M/vòng, cuối tháng 7 đã 5,22M/vòng - gấp đôi trong ba tuần - dù số lượt chỉ tăng 16% (37 lên 43); ngữ cảnh mỗi lượt phình ra vì vòng nào cũng đọc lại cả kho. Nghĩa là càng bồi đắp Second Brain thì việc nền càng đắt, không có trần. Nay curator so mốc quét lần trước rồi quyết định: wiki không đổi note nào thì **bỏ hẳn vòng, không spawn agent**; có đổi thì prompt liệt kê đúng những note đó và cấm quét lại cả wiki (`server/learn.py`).
+- **Đo thật sau khi sửa**: một vòng với 10/174 note đổi (tồn đọng cả tuần) tốn **1,62M**, so với 5,22M của vòng quét toàn bộ - rẻ hơn khoảng 69%. Mà thực tế 7/14 ngày gần nhất wiki không đổi note nào, những ngày đó giờ tốn 0.
+- **Vẫn quét toàn bộ định kỳ**: mặc định 30 ngày một lần (`curator.full_every_days`, đặt 0 để tắt) vì soi-phần-đổi không thấy được vấn đề liên-trang tích tụ dần. Ngoài ra xoá hoặc đổi tên note cũng ép quét toàn bộ ngay vòng đó, vì chúng sinh wikilink gãy ở những trang KHÔNG đổi - thứ mtime không nhìn thấy. Thêm note mới thì không ép, đó là việc thường ngày và note mới vốn đã nằm trong danh sách đổi.
+- **Bỏ qua vòng thì giữ nguyên mốc cũ**: nếu vòng bỏ qua cũng dời mốc lên hiện tại, note sửa trước đó mà chưa kịp soi sẽ rơi khỏi cửa sổ vĩnh viễn, im lặng không bao giờ được lint.
+### Kiểm thử
+- `server/test_curator_scope.py`: phủ lần đầu, không đổi, có đổi, xoá, đổi tên, thêm note, đến hẹn quét toàn bộ, tắt quét định kỳ, wiki rỗng, và chốt bẫy giữ mốc khi bỏ qua vòng.
+
 ## [0.9.169] - 2026-07-25
 Chọn model việc nền bằng hộp có ô tìm, thay cho dãy chip tràn trang.
 ### Cải thiện
