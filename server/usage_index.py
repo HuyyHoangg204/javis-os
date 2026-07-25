@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from config import STATE_DIR
+import session_brain   # {session_id: brain} - nhan du an dung cho phien Javis (cwd luon la goc project)
 import usage_parsers as up
 
 _TZ = timezone(timedelta(hours=7))
@@ -120,7 +121,7 @@ def _insert_events(conn, path, events) -> None:
             [(path,) + k + tuple(g) for k, g in groups.items()])
 
 
-def _scan_claude(conn, chat) -> int:
+def _scan_claude(conn, chat, brains) -> int:
     n = 0
     for path in glob.glob(os.path.join(_claude_dir(), "**", "*.jsonl"), recursive=True):
         try:
@@ -141,7 +142,7 @@ def _scan_claude(conn, chat) -> int:
                         obj = json.loads(line)
                     except Exception:
                         continue
-                    ev = up.parse_claude_line(obj, chat)
+                    ev = up.parse_claude_line(obj, chat, brains)
                     if ev:
                         events.append(ev)
         except OSError:
@@ -278,7 +279,8 @@ def refresh() -> dict:
     try:
         _migrate_events_once(conn)                  # 1 lan: backfill cli/codex tu events cu
         chat = _chat_sessions()
-        res["claude_files"] = _scan_claude(conn, chat)
+        brains = session_brain.mapping()   # phien nao thuoc brain nao -> nhan du an dung
+        res["claude_files"] = _scan_claude(conn, chat, brains)
         res["codex_files"] = _scan_codex(conn)
         res["api_events"] = _ingest_events(conn)   # API + du phong cli/codex tu usage-events.jsonl
         _dedup_events_vs_raw(conn)                  # log tho phu ngay nao thi xoa event ngay do

@@ -70,10 +70,14 @@ def _basename(path: str) -> str:
     return p.rsplit("/", 1)[-1] or "(unknown)"
 
 
-def parse_claude_line(obj: dict, chat_sessions: set) -> dict | None:
+def parse_claude_line(obj: dict, chat_sessions: set, session_brains: dict = None) -> dict | None:
     """Mot dong JSONL da json.loads cua Claude Code -> UsageEvent hoac None.
 
     Bo qua: khong phai type=assistant, model synthetic/thieu, khong co usage, tong token = 0.
+
+    session_brains: {session_id: duong_dan_brain} tu session_brain.py. Moi engine Javis chay
+    voi cwd = goc project nen 'project' suy tu cwd gop het ve mot cho ('Javis-OS' / 'app');
+    phien nao tra duoc brain thi lay TEN BRAIN lam nhan dung hon. Khong tra duoc -> cwd nhu cu.
     """
     if not isinstance(obj, dict) or obj.get("type") != "assistant":
         return None
@@ -107,10 +111,13 @@ def parse_claude_line(obj: dict, chat_sessions: set) -> dict | None:
     parsed = _parse_ts(obj.get("timestamp"))
     ts, day = parsed if parsed else (0, "")
 
+    brain = (session_brains or {}).get(session_id)
+    project = _basename(brain) if brain else _basename(obj.get("cwd") or "")
+
     return {
         "ts": ts, "day": day, "provider": "claude",
         "engine": entrypoint or "claude", "model": model,
-        "project": _basename(obj.get("cwd") or ""), "session_id": session_id,
+        "project": project, "session_id": session_id,
         "source": source, "activity": activity,
         "input": inp, "output": out, "cache_read": cread, "cache_create": ccreate,
     }

@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.165] - 2026-07-25
+Chặn khoản hao token âm thầm: mở dashboard không còn spawn agent mới mỗi vài phút.
+### Sửa lỗi
+- **Thẻ số liệu dashboard đốt hạn mức mà không ai dùng**: đo trên log phiên thật của bản VPS, dự án "app" tốn 22M token thì 402/502 phiên là đúng một job lặp - "tạo các thẻ SỐ LIỆU KINH DOANH cho dashboard" (~16k token mỗi lần, cộng dồn ~6.5M). Gốc rễ ở `/metrics`: cache chỉ 180 giây, chỉ nằm trong RAM, không nhớ lần lỗi và không gộp request trùng, nên gần như mỗi lần MỞ dashboard là một phiên Claude đầy đủ kèm MCP. Nay cache mặc định 15 phút (`METRICS_TTL`), **ghi ra đĩa** nên restart hay tự cập nhật không làm mất, **nhớ cả kết quả lỗi** 2 phút (`METRICS_ERR_TTL`) để MCP hỏng không thành spawn lại mỗi lần F5, và **gộp request trùng** bằng một khoá chung - mở dashboard trên điện thoại lẫn máy tính cùng lúc chỉ tính một lần (`server/main.py`).
+- **Trang Token gọi sai tên dự án**: mọi engine Claude đều chạy với `cwd` = gốc project chứ không phải thư mục brain, mà log thô của Claude Code chỉ ghi `cwd`, nên chat Telegram, việc nền và job dashboard bị gộp hết vào một dự án ("Javis-OS" khi chạy ở máy, "app" khi chạy trong Docker) - nhìn vào tưởng đang code Javis mà thật ra là hội thoại của chủ trên brain khác. Nay engine ghi riêng phiên nào thuộc brain nào (`server/session_brain.py`) và bộ index token lấy tên brain làm nhãn, nên số liệu về đúng "My Bullet Journal", "Brain Default"... Không đụng vào `cwd` vì đổi nó sẽ phá dò `.claude/skills` và `vault_root` của plugin. Chỉ có tác dụng với phiên chạy từ bản này trở đi; phiên cũ giữ nhãn như trước.
+### Kiểm thử
+- Thêm `server/test_metrics_cache.py`: phủ TTL dài/ngắn theo chất lượng kết quả, cache sống qua khởi động lại, hết hạn thì tính lại, và nhãn dự án theo brain (kèm trường hợp không tra được brain thì vẫn giữ nhãn cũ).
+
 ## [0.9.164] - 2026-07-25
 Đổi model Claude giờ lấy DANH SÁCH SỐNG từ Anthropic, ra bản mới là thấy ngay.
 ### Cải thiện

@@ -1534,9 +1534,62 @@ async def health():
     }
 
 
-# Cache số liệu trong RAM - tránh gọi Claude mỗi lần F5 (tốn phí + chậm)
+# Cache số liệu - tránh spawn agent mỗi lần MỞ dashboard (tốn hạn mức + chậm).
+# Mỗi lần tính lại là một phiên Claude đầy đủ kèm MCP (~16k token), nên cache phải:
+#   - đủ dài (mặc định 15 phút, chỉnh bằng METRICS_TTL),
+#   - SỐNG QUA khởi động lại (VPS tự cập nhật/restart là mất sạch cache RAM),
+#   - nhớ cả lần LỖI trong thời gian ngắn (kẻo MCP hỏng là F5 phát nào spawn phát đó),
+#   - gộp các request trùng nhau (mở dashboard trên điện thoại + máy tính cùng lúc = 1 lần tính).
 _METRICS_CACHE = {"data": None, "ts": 0.0}
-_METRICS_TTL = float(os.getenv("METRICS_TTL", "180"))   # giây
+_METRICS_TTL = float(os.getenv("METRICS_TTL", "900"))        # giây - số liệu tốt
+_METRICS_ERR_TTL = float(os.getenv("METRICS_ERR_TTL", "120"))  # giây - kết quả lỗi
+_METRICS_CACHE_FILE = cfgmod.STATE_DIR / "metrics_cache.json"
+_METRICS_LOCK = asyncio.Lock()
+_METRICS_LOADED = False
+
+
+def _metrics_ttl_for(data: dict) -> float:
+    """Kết quả lỗi/rỗng chỉ nhớ ngắn - đừng ghim một lần hỏng suốt 15 phút."""
+    if not isinstance(data, dict) or data.get("error") or not data.get("cards"):
+        return _METRICS_ERR_TTL
+    return _METRICS_TTL
+
+
+def _metrics_cache_load() -> None:
+    """Nạp cache từ đĩa MỘT lần lúc chạy - restart không làm mất, khỏi tính lại."""
+    global _METRICS_LOADED
+    if _METRICS_LOADED:
+        return
+    _METRICS_LOADED = True
+    try:
+        raw = json.loads(_METRICS_CACHE_FILE.read_text(encoding="utf-8"))
+        if isinstance(raw.get("data"), dict):
+            _METRICS_CACHE["data"] = raw["data"]
+            _METRICS_CACHE["ts"] = float(raw.get("ts") or 0)
+    except Exception:
+        pass
+
+
+def _metrics_cache_save(data: dict, ts: float) -> None:
+    _METRICS_CACHE["data"] = data
+    _METRICS_CACHE["ts"] = ts
+    try:
+        _METRICS_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _METRICS_CACHE_FILE.write_text(
+            json.dumps({"data": data, "ts": ts}, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _metrics_cached(now: float) -> dict | None:
+    """Bản cache còn hạn (đã kèm cờ cached), hoặc None."""
+    data = _METRICS_CACHE["data"]
+    if not data or (now - _METRICS_CACHE["ts"]) >= _metrics_ttl_for(data):
+        return None
+    out = dict(data)
+    out["cached"] = True
+    out["age_s"] = int(now - _METRICS_CACHE["ts"])
+    return out
 
 
 @app.get("/metrics")
@@ -1544,19 +1597,30 @@ async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới
     """
     Số liệu động - Javis tự phát hiện MCP đang kết nối và trả về các card
     phù hợp (kinh doanh và/hoặc cuộc sống). Không hardcode ngành nào.
-    Có cache TTL: F5 liên tục không gọi lại Claude.
+    Có cache TTL bền qua restart: mở dashboard liên tục không gọi lại Claude.
     """
+    _metrics_cache_load()
     now = time.time()
-    if not fresh and _METRICS_CACHE["data"] and (now - _METRICS_CACHE["ts"]) < _METRICS_TTL:
-        cached = dict(_METRICS_CACHE["data"])
-        cached["cached"] = True
-        return cached
+    if not fresh:
+        hit = _metrics_cached(now)
+        if hit:
+            return hit
 
+    async with _METRICS_LOCK:
+        # Có thể đã có người khác tính xong trong lúc mình xếp hàng - đừng spawn thêm.
+        if not fresh:
+            hit = _metrics_cached(time.time())
+            if hit:
+                return hit
+        return await _metrics_compute()
+
+
+async def _metrics_compute() -> dict:
     cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag="metrics")
     cli.model = _aux_model() or None   # việc nền: dùng model phụ nếu có cấu hình
     _apply_mcp(cli)   # metrics cần MCP (POS/ads) - dùng server Javis quản lý nếu có
     if not cli.is_available():
-        return {"error": "Claude CLI chưa cài", "cards": []}
+        return _metrics_fail({"error": "Claude CLI chưa cài", "cards": []})
 
     prompt = (
         "Bạn đang tạo các thẻ SỐ LIỆU KINH DOANH cho dashboard. Xem các MCP/tool đang kết nối, "
@@ -1579,7 +1643,7 @@ async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới
         if event["type"] == "final":
             final = event.get("content", "")
         elif event["type"] == "error":
-            return {"error": event["content"][:200], "cards": []}
+            return _metrics_fail({"error": event["content"][:200], "cards": []})
 
     # Tìm object JSON ngoài cùng có "cards"
     m = re.search(r"\{.*\}", final, re.DOTALL)
@@ -1587,12 +1651,17 @@ async def metrics(fresh: int = Query(0, description="1 = bỏ cache, gọi mới
         try:
             data = json.loads(m.group(0))
             if "cards" in data:
-                _METRICS_CACHE["data"] = data      # lưu cache cho các lần F5 sau
-                _METRICS_CACHE["ts"] = time.time()
+                _metrics_cache_save(data, time.time())   # lưu cache cho các lần mở sau
                 return data
         except json.JSONDecodeError:
             pass
-    return {"error": "Không parse được số liệu", "raw": final[:300], "cards": []}
+    return _metrics_fail({"error": "Không parse được số liệu", "raw": final[:300], "cards": []})
+
+
+def _metrics_fail(data: dict) -> dict:
+    """Nhớ cả kết quả hỏng (TTL ngắn) - MCP lỗi thì đừng spawn agent lại mỗi lần mở dashboard."""
+    _metrics_cache_save(data, time.time())
+    return data
 
 
 def _resolve_graph_roots(source: str, path: str = None):

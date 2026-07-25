@@ -359,6 +359,14 @@ class ClaudeSDK:
                     break
                 events, sid = map_message(msg)
                 if sid:
+                    if sid != self.session_id and self.javis_vault:
+                        # Nhãn dự án cho trang Token: log thô chỉ có cwd (= gốc project ở MỌI
+                        # phiên), nên ghi riêng phiên này thuộc brain nào. Xem session_brain.py.
+                        try:
+                            import session_brain
+                            session_brain.record(sid, self.javis_vault)
+                        except Exception:
+                            pass
                     self.session_id = sid
                 for ev in events:
                     if ev["type"] == "tool_call":
