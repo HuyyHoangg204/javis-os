@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.169] - 2026-07-25
+Chọn model việc nền bằng hộp có ô tìm, thay cho dãy chip tràn trang.
+### Cải thiện
+- **Model việc nền không còn phơi hết ra thành chip**: bản 0.9.167 mở ô này cho mọi nhà cung cấp nhưng vẫn vẽ từng model thành một chip, mà riêng OpenRouter đo live đã **345 model** - dán hết ra trang thì tràn dài và không có đường tìm kiếm. Nay mục này chỉ hiện LỰA CHỌN HIỆN TẠI (tên model + nhà cung cấp, kèm cảnh báo nếu nhà đó chưa kết nối) cùng hai nút "Đổi model" và "Về mặc định"; việc chọn giao cho hộp `openModelPicker` - đúng hộp đang dùng cho model chính ngay phía trên, có ô lọc, cột nhà cung cấp và tự nạp danh sách model live.
+- **Một hộp chọn dùng chung cho cả hai chỗ**: `openModelPicker` nhận thêm tham số tuỳ chọn `{title, note, save}` nên model chính và model việc nền dùng chung một giao diện, không nhân đôi mã. Thiếu tham số thì giữ nguyên hành vi cũ.
+### Sửa lỗi
+- **Ô lọc không còn mất chữ khi đổi nhà cung cấp**: bấm sang nhà khác là `draw()` dựng lại DOM, chữ đang gõ trong ô lọc bị xoá và phải gõ lại từ đầu - khó chịu nhất đúng lúc đang dò trong danh sách vài trăm dòng. Nay chữ lọc được giữ và tự áp lại sau mỗi lần vẽ.
+- **Nhãn "đang dùng" chỉ sai chỗ ở hộp chọn model việc nền**: nhãn này đọc `is_main` do máy chủ tính cho MODEL CHÍNH, nên khi mở hộp để chọn model việc nền nó đánh dấu nhầm sang nhà cung cấp của model chính. Nay so trực tiếp với lựa chọn được truyền vào, đúng cho cả hai chỗ (đổi chữ CURRENT thành "ĐANG DÙNG").
+
 ## [0.9.168] - 2026-07-25
 Vá cảnh báo rủi ro của Composio bị dính thành một khối chữ khó đọc.
 ### Sửa lỗi

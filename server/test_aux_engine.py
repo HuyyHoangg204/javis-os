@@ -182,8 +182,24 @@ check("main: luu ca provider cho auxiliary", 'aux["provider"]' in main_src)
 console = (root.parent / "dashboard" / "console.js").read_text(encoding="utf-8")
 check("UI: khong con khoa cung vao anthropic-cli",
       'providers.find(p => p.id === "anthropic-cli") || {}).models' not in console)
-check("UI: gui kem provider khi luu", 'provider: b.dataset.auxprov' in console)
+check("UI: luu kem ca provider", "auxiliary: { provider: prov, model: mod }" in console)
 check("UI: bo nhan 'metrics' da go", "loop · metrics · ingest" not in console)
+
+# Không phơi hết model thành chip nữa: riêng OpenRouter đã 345 model (đo live), dán ra trang
+# thì tràn và không có đường tìm. Phải đi qua openModelPicker - hộp có ô lọc + cột provider.
+check("UI: khong con day chip model viec nen", "auxGroups" not in console)
+check("UI: co hang tom tat lua chon hien tai", 'class="aux-now"' in console)
+check("UI: nut mo picker", 'id="auxChange"' in console and "openModelPicker(providers, { provider: auxProv" in console)
+check("UI: co duong ve mac dinh", 'id="auxReset"' in console)
+check("UI: picker nhan tuy chon (dung chung cho model chinh va model nen)",
+      "function openModelPicker(providers, main, onDone, opts)" in console)
+check("UI: picker luu qua SAVE cua nguoi goi", "await SAVE(selProv, selModel)" in console)
+# Bấm provider là draw() dựng lại DOM - trước đây chữ đang lọc bị mất, phải gõ lại từ đầu.
+check("UI: o loc giu chu qua moi lan ve lai",
+      'value="${esc(filterQ)}"' in console and "applyFilter();   //" in console)
+# is_main do server tính cho MODEL CHÍNH - dùng nó ở chế độ model nền là đánh dấu nhầm.
+check("UI: nhan 'dang dung' theo lua chon truyen vao, khong theo is_main",
+      'p.id === main.provider ? " · ĐANG DÙNG"' in console)
 
 print()
 if fails:

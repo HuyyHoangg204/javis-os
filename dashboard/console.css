@@ -147,10 +147,18 @@ body.in-console .hud-actions { display: none; }
 }
 .aux-chip:hover { color: var(--text); border-color: var(--text2); }
 .aux-chip.sel { background: rgba(255,107,43,0.14); border-color: var(--accent); color: var(--accent); }
-/* Model việc nền gom theo nhà cung cấp - cùng tên model có ở nhiều nhà nên phải nêu rõ nhà nào */
-.aux-prov { margin-top: 14px; }
-.aux-prov-name { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); }
-.aux-prov .aux-chips { margin-top: 6px; }
+
+/* Model việc nền: chỉ hiện LỰA CHỌN HIỆN TẠI + nút mở picker. Phơi hết model thành chip thì
+   tràn trang (riêng OpenRouter đã vài trăm dòng) và không có đường tìm kiếm. */
+.aux-now {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-top: 12px; padding: 12px 14px;
+  background: rgba(255,255,255,0.03); border: 1px solid var(--glass-brd); border-radius: 10px;
+}
+.aux-now-model { font-family: var(--font); font-size: 16px; color: var(--accent); }
+.aux-now-prov { font-size: 13px; color: var(--text3); margin-top: 3px; }
+.aux-now-act { display: flex; gap: 8px; flex-shrink: 0; }
+.aux-warn { color: var(--yellow); }
 
 /* Picker model (SET MAIN MODEL) */
 .mp-overlay {

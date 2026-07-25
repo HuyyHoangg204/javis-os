@@ -1879,16 +1879,12 @@
     const auxCfg = m.auxiliary || {};
     const aux = auxCfg.model || "";
     const auxProv = auxCfg.provider || "anthropic-cli";
-    // Việc nền chạy được trên MỌI provider đã đấu, không riêng Claude: Codex là agent thật
-    // (đọc/ghi file + MCP), còn engine API dùng tool file của vault qua hub. Chỉ liệt kê
-    // provider ĐANG dùng được (đã đăng nhập / đã có key) để khỏi chọn nhầm rồi việc nền chết.
-    const auxReady = providers.filter(p => p.configured && (p.models || []).length);
-    const auxGroups = auxReady.map(p => {
-      const chips = (p.models || []).map(mod =>
-        `<button class="aux-chip ${(auxProv === p.id && aux === mod) ? "sel" : ""}" data-aux="${esc(mod)}" data-auxprov="${esc(p.id)}">${esc(mod)}</button>`).join("");
-      return `<div class="aux-prov"><div class="aux-prov-name">${esc(p.label || p.id)}</div><div class="aux-chips">${chips}</div></div>`;
-    }).join("");
-    const auxChips = '<button class="aux-chip ' + (!aux ? "sel" : "") + '" data-aux="" data-auxprov="anthropic-cli">Mặc định</button>';
+    // Việc nền chạy được trên MỌI provider đã đấu, không riêng Claude. Nhưng OpenRouter một
+    // mình đã vài trăm model, phơi hết ra thành chip thì tràn trang và không tìm nổi - nên ở
+    // đây chỉ hiện LỰA CHỌN HIỆN TẠI, còn việc chọn giao cho openModelPicker (có ô lọc, có
+    // cột provider, tự nạp model live) - đúng cái đang dùng cho model chính ngay phía trên.
+    const auxProvDef = providers.find(p => p.id === auxProv) || {};
+    const auxReady = auxProv === "anthropic-cli" || auxProvDef.configured;
     const reasoning = m.reasoning || "off";
     const reasonChips = [["off", "Tắt"], ["low", "Thấp"], ["medium", "Vừa"], ["high", "Cao"]]
       .map(([v, l]) => `<button class="aux-chip ${reasoning === v ? "sel" : ""}" data-reason="${v}">${l}</button>`).join("");
@@ -1959,9 +1955,17 @@
         <h3>◆ Model việc nền <span style="opacity:.5">loop · việc Kanban · nhắc hẹn · tự học · tiêu hoá nguồn</span></h3>
         <div class="gcard" style="max-width:640px">
           <div class="gcard-meta">Chọn model rẻ cho việc chạy nền để đỡ hạn mức. "Mặc định" = model mặc định của Claude Code. Chọn nhà cung cấp khác thì việc nền chạy bằng gói/khoá của nhà đó, không ăn vào hạn mức Claude nữa.</div>
-          <div class="aux-chips">${auxChips}</div>
-          ${auxGroups}
-          <div class="gcard-meta" style="margin-top:10px;opacity:.75">Lưu ý công cụ: Claude Code và Codex đọc/ghi file trực tiếp trong brain. Các model API (OpenRouter, OpenAI, Gemini, Anthropic API) đọc/ghi qua công cụ vault của Javis và không chạy được lệnh máy, nên hợp với việc đọc - tổng hợp - ghi ghi chú; việc nền cần chạy lệnh thì cứ để Claude.</div>
+          <div class="aux-now">
+            <div class="aux-now-txt">
+              <div class="aux-now-model">${aux ? esc(aux) : "Mặc định của Claude Code"}</div>
+              <div class="aux-now-prov">${aux ? esc(auxProvDef.label || auxProv) : "không đổi model, dùng model mặc định"}${auxReady ? "" : ' <span class="aux-warn">⚠ nhà cung cấp này chưa kết nối - việc nền sẽ tự dùng lại Claude</span>'}</div>
+            </div>
+            <div class="aux-now-act">
+              ${aux ? '<button class="gcard-btn" id="auxReset">Về mặc định</button>' : ""}
+              <button class="gcard-btn" id="auxChange">Đổi model ▾</button>
+            </div>
+          </div>
+          <div class="gcard-meta" style="margin-top:12px;opacity:.75">Lưu ý công cụ: Claude Code và Codex đọc/ghi file trực tiếp trong brain. Các model API (OpenRouter, OpenAI, Gemini, Anthropic API) đọc/ghi qua công cụ vault của Javis và không chạy được lệnh máy, nên hợp với việc đọc - tổng hợp - ghi ghi chú; việc nền cần chạy lệnh thì cứ để Claude.</div>
         </div>
       </div>
       <div class="cview-section">
@@ -1974,10 +1978,17 @@
 
     const chg = document.getElementById("mdChange");
     if (chg) chg.onclick = () => openModelPicker(providers, main, () => renderModels(el));
-    el.querySelectorAll(".aux-chip[data-aux]").forEach(b => b.onclick = async () => {
-      await saveSetting("model", { auxiliary: { model: b.dataset.aux, provider: b.dataset.auxprov || "anthropic-cli" } });
-      renderModels(el);
+    const auxChg = document.getElementById("auxChange");
+    if (auxChg) auxChg.onclick = () => openModelPicker(providers, { provider: auxProv, model: aux }, () => renderModels(el), {
+      title: "MODEL VIỆC NỀN",
+      note: "Việc nền: loop · việc Kanban · nhắc hẹn · tự học · tiêu hoá nguồn",
+      save: (prov, mod) => saveSetting("model", { auxiliary: { provider: prov, model: mod } }),
     });
+    const auxRst = document.getElementById("auxReset");
+    if (auxRst) auxRst.onclick = async () => {
+      await saveSetting("model", { auxiliary: { provider: "anthropic-cli", model: "" } });
+      renderModels(el);
+    };
     el.querySelectorAll(".aux-chip[data-reason]").forEach(b => b.onclick = async () => {
       await saveSetting("model", { reasoning: b.dataset.reason });
       renderModels(el);
@@ -2150,11 +2161,18 @@
   }
 
   // ---- Picker model (kiểu Hermes SET MAIN MODEL) ----
-  function openModelPicker(providers, main, onDone) {
+  function openModelPicker(providers, main, onDone, opts) {
+    // opts (tuỳ chọn) để dùng lại hộp này cho MODEL VIỆC NỀN, không chỉ model chính:
+    //   {title, note, save(provider, model)}. Thiếu opts = hành vi cũ (đổi model chính).
+    opts = opts || {};
+    const SAVE = opts.save || ((prov, mod) => saveSetting("model", { main: { provider: prov, model: mod } }));
+    let filterQ = "";   // giữ chữ đang lọc qua mỗi lần vẽ lại (bấm provider là draw() dựng lại DOM)
     let modal = document.getElementById("modelPicker");
     if (!modal) { modal = document.createElement("div"); modal.id = "modelPicker"; modal.className = "mp-overlay"; document.body.appendChild(modal); }
     let selProv = main.provider || (providers[0] && providers[0].id);
-    let selModel = (providers.find(p => p.id === selProv) || {}).is_main ? main.model : null;
+    // "đang chọn" phải so với main truyền vào, KHÔNG dùng p.is_main: is_main do server tính cho
+    // MODEL CHÍNH, nên ở chế độ model việc nền nó sẽ đánh dấu nhầm nhà cung cấp của model chính.
+    let selModel = (selProv === main.provider) ? (main.model || null) : null;
     const liveCache = {};      // pid -> {models:[], live:bool} - model load động từ API provider
     let loadingProv = null;
 
@@ -2187,23 +2205,23 @@
       modal.innerHTML = `
         <div class="mp-box">
           <div class="mp-head">
-            <div><div class="mp-title">SET MAIN MODEL</div><div class="mp-sub">hiện tại: ${esc(main.model || "-")} · ${esc(main.provider || "")}</div></div>
+            <div><div class="mp-title">${esc(opts.title || "SET MAIN MODEL")}</div><div class="mp-sub">hiện tại: ${esc(main.model || "mặc định")} · ${esc(main.provider || "")}</div></div>
             <button class="mp-x" data-act="close">✕</button>
           </div>
-          <input class="mp-filter" placeholder="Lọc provider / model…">
+          <input class="mp-filter" placeholder="Lọc provider / model…" value="${esc(filterQ)}">
           <div class="mp-body">
             <div class="mp-provs">${providers.map(p => `
               <button class="mp-prov ${p.id === selProv ? "active" : ""}" data-prov="${p.id}">
                 <div class="mp-prov-l">${esc(p.label)}</div>
-                <div class="mp-prov-c">${esc(p.id)}${p.is_main ? " · CURRENT" : ""}${esc(tagFor(p.id))}${p.configured ? "" : " · ⚠ cần kết nối"}</div>
+                <div class="mp-prov-c">${esc(p.id)}${p.id === main.provider ? " · ĐANG DÙNG" : ""}${esc(tagFor(p.id))}${p.configured ? "" : " · ⚠ cần kết nối"}</div>
               </button>`).join("")}</div>
             <div class="mp-models">${models.length ? models.map(mod => `
-              <button class="mp-model ${mod === selModel ? "sel" : ""}" data-mod="${esc(mod)}">${esc(mod)}${(selProv === main.provider && mod === main.model) ? ' <span class="mp-cur">CURRENT</span>' : ""}</button>`).join("")
+              <button class="mp-model ${mod === selModel ? "sel" : ""}" data-mod="${esc(mod)}">${esc(mod)}${(selProv === main.provider && mod === main.model) ? ' <span class="mp-cur">ĐANG DÙNG</span>' : ""}</button>`).join("")
                 : (loadingProv === selProv ? '<div class="mp-empty">Đang tải model…</div>' : '<div class="mp-empty">Provider chưa kết nối hoặc không có model. Kết nối ở Providers (hoặc thêm vào settings.json → model.catalog).</div>')}</div>
           </div>
           <div class="mp-foot">
-            <span class="mp-note">Model load động theo provider · lưu cho phiên mới</span>
-            <div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" data-act="switch" ${selModel ? "" : "disabled"}>Switch</button></div>
+            <span class="mp-note">${esc(opts.note || "Model load động theo provider · lưu cho phiên mới")}</span>
+            <div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" data-act="switch" ${selModel ? "" : "disabled"}>${esc(opts.title ? "Chọn" : "Switch")}</button></div>
           </div>
         </div>`;
       modal.querySelectorAll(".mp-prov").forEach(b => b.onclick = () => {
@@ -2214,15 +2232,17 @@
       });
       modal.querySelectorAll(".mp-model").forEach(b => b.onclick = () => { selModel = b.dataset.mod; draw(); });
       modal.querySelectorAll('[data-act="close"]').forEach(b => b.onclick = () => modal.classList.remove("open"));
-      modal.querySelector(".mp-filter").oninput = (e) => {
-        const q = (e.target.value || "").toLowerCase();
+      const applyFilter = () => {
+        const q = filterQ.toLowerCase();
         modal.querySelectorAll(".mp-prov,.mp-model").forEach(x => { x.style.display = (!q || x.textContent.toLowerCase().includes(q)) ? "" : "none"; });
       };
+      modal.querySelector(".mp-filter").oninput = (e) => { filterQ = e.target.value || ""; applyFilter(); };
+      applyFilter();   // đổi provider xong vẫn giữ nguyên chữ đang lọc, khỏi gõ lại
       const sw = modal.querySelector('[data-act="switch"]');
       if (sw) sw.onclick = async () => {
         if (!selModel) return;
-        sw.disabled = true; sw.textContent = "Đang đổi...";
-        await saveSetting("model", { main: { provider: selProv, model: selModel } });
+        sw.disabled = true; sw.textContent = "Đang lưu...";
+        await SAVE(selProv, selModel);
         modal.classList.remove("open");
         if (onDone) onDone();
       };
