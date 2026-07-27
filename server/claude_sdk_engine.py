@@ -163,8 +163,15 @@ class ClaudeSDK:
         _audit(self.tag, tool_name, ok, "" if ok else "ngoài whitelist chế độ nền an toàn")
         if ok:
             return PermissionResultAllow()
+        # Nói RÕ đây là rào quyền của phiên nền, KHÔNG phải connector/MCP hỏng - thiếu câu này
+        # agent từng suy diễn "OAuth chết / cần re-auth" rồi kết luận sai cho user (vụ 0.9.189).
+        extra = ""
+        if tool_name.startswith("mcp__"):
+            extra = (" Kết nối MCP/connector KHÔNG hỏng - đừng thử đăng nhập lại hay chẩn đoán "
+                     "OAuth. Việc này cần quyền rộng hơn thì báo lại người giao việc.")
         return PermissionResultDeny(
-            message=f"Tool '{tool_name}' bị chặn: phiên nền này chỉ được dùng {', '.join(allowed)}.")
+            message=f"Tool '{tool_name}' bị chặn bởi rào quyền phiên nền an toàn: phiên này chỉ "
+                    f"được dùng {', '.join(allowed)}.{extra}")
 
     def _plugins_server(self):
         """Phase 3: dựng MCP server IN-PROCESS từ tool plugin (plugins_host) - engine SDK gọi

@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.190] - 2026-07-27
+Khi phiên nền bị chặn tool, thông điệp lỗi nói thẳng lý do thật để agent không chẩn đoán nhầm.
+### Cải thiện
+- **Thông điệp chặn tool của phiên nền hết đánh lừa**: trước đây tool MCP bị rào quyền từ chối chỉ hiện "user cancelled MCP tool call", agent đọc vào suy diễn connector chết rồi đề nghị đăng nhập lại OAuth (vụ nghi oan Google Workspace ở 0.9.189). Giờ thông điệp nói rõ đây là rào quyền phiên nền an toàn, kết nối không hỏng, đừng thử re-auth, việc cần quyền rộng hơn thì báo lại người giao việc.
+
 ## [0.9.189] - 2026-07-27
 Việc nền dùng lại được các nguồn dữ liệu (MCP): sửa lỗi chặn nhầm khiến task và loop báo "connector hỏng" dù kết nối vẫn sống.
 ### Sửa lỗi
