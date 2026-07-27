@@ -417,6 +417,14 @@
         ],
         "guide": "Làm 1 lần, khoảng 10 phút:\n1. Bấm 'Bước 1: Tạo App mới' bên dưới, chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ.\n2. Trong app thêm sản phẩm 'Facebook Login' THƯỜNG, không phải 'for Business'.\n3. Facebook Login > Settings > ô 'Valid OAuth Redirect URIs': dán đúng địa chỉ ở nút 'Sao chép' bên dưới. Dùng 'localhost' KHÔNG phải 127.0.0.1.\n4. GIỮ app ở chế độ Development (góc trên) và đảm bảo bạn là Admin của app + ad account. Khi đó tự cấp được quyền ads_read mà KHÔNG cần App Review.\n5. App Settings > Basic: copy App ID + App Secret dán vào ô dưới rồi bấm Kết nối.\n\nToken sống khoảng 60 ngày, Javis tự gia hạn. Hết hạn thì Kết nối lại.",
         "guide_url": "https://developers.facebook.com/docs/marketing-api/get-started/authorization",
+        "steps": [
+          { "text": "Tạo app Meta: chọn trường hợp sử dụng 'Khác' (Other), loại 'Doanh nghiệp' (Business), đặt tên bất kỳ.", "link": "https://developers.facebook.com/apps/creation/", "link_label": "Tạo App mới" },
+          { "text": "Trong trang app, thêm sản phẩm 'Đăng nhập bằng Facebook' (Facebook Login) bản THƯỜNG, không phải bản 'for Business'.", "link": "https://developers.facebook.com/apps/", "link_label": "App của tôi" },
+          { "text": "Menu bên trái bấm 'Đăng nhập bằng Facebook' rồi 'Cài đặt', dán địa chỉ dưới đây vào ô 'URI chuyển hướng OAuth hợp lệ' rồi bấm Lưu. ĐỪNG vào 'Cài đặt ứng dụng > Nâng cao' - đó là chỗ khác, không liên quan.", "copy": "redirect" },
+          { "text": "GIỮ app ở Chế độ phát triển (Development) và bạn là Quản trị viên của cả app lẫn tài khoản quảng cáo - như vậy tự cấp được quyền đọc số liệu, KHÔNG cần App Review." },
+          { "text": "Menu trái 'Cài đặt ứng dụng' > 'Thông tin cơ bản': copy 'ID ứng dụng' và 'Khóa bí mật của ứng dụng' (bấm Hiện), dán vào hai ô bên dưới rồi bấm 'Lưu & mở trang đăng nhập'." },
+          { "text": "Token sống khoảng 60 ngày, Javis tự gia hạn. Hết hẳn thì bấm Kết nối lại trên card." }
+        ],
         "setup": {
           "redirect": true,
           "links": [
@@ -452,6 +460,14 @@
         ],
         "guide": "Làm 1 lần, khoảng 5 phút. Dùng lại được app bạn đã tạo cho Meta Ads.\n\n1. Bấm 'Bước 1: Tạo App mới' bên dưới, chọn loại 'Business' (hoặc 'Other'), đặt tên bất kỳ.\n2. Trong app thêm sản phẩm 'Facebook Login' THƯỜNG, không phải 'for Business'.\n3. Facebook Login > Settings > ô 'Valid OAuth Redirect URIs': dán đúng địa chỉ ở nút 'Sao chép' bên dưới. Dùng 'localhost' KHÔNG phải 127.0.0.1.\n4. GIỮ app ở chế độ Development (góc trên) và đảm bảo bạn là Admin của app + Admin các Trang muốn quản lý. Khi đó tự cấp được quyền Trang mà KHÔNG cần App Review.\n5. App Settings > Basic: copy App ID + App Secret dán vào ô dưới rồi bấm Kết nối.\n\nKhi Facebook hỏi quyền, nhớ TICK chọn các Trang.\n\nToken sống khoảng 60 ngày, Javis tự gia hạn. Hết hạn thì Kết nối lại.",
         "guide_url": "https://developers.facebook.com/docs/pages-api/getting-started",
+        "steps": [
+          { "text": "Đã tạo app cho Meta Ads rồi thì DÙNG LẠI app đó, nhảy thẳng tới bước 5 lấy App ID + Secret. Chưa có thì tạo app Meta: chọn trường hợp sử dụng 'Khác' (Other), loại 'Doanh nghiệp' (Business).", "link": "https://developers.facebook.com/apps/creation/", "link_label": "Tạo App mới" },
+          { "text": "Trong trang app, thêm sản phẩm 'Đăng nhập bằng Facebook' (Facebook Login) bản THƯỜNG, không phải bản 'for Business'.", "link": "https://developers.facebook.com/apps/", "link_label": "App của tôi" },
+          { "text": "Menu bên trái bấm 'Đăng nhập bằng Facebook' rồi 'Cài đặt', dán địa chỉ dưới đây vào ô 'URI chuyển hướng OAuth hợp lệ' rồi bấm Lưu. ĐỪNG vào 'Cài đặt ứng dụng > Nâng cao' - đó là chỗ khác, không liên quan.", "copy": "redirect" },
+          { "text": "GIỮ app ở Chế độ phát triển (Development) và bạn là Quản trị viên của cả app lẫn các Trang muốn quản lý - như vậy tự cấp được quyền Trang, KHÔNG cần App Review." },
+          { "text": "Menu trái 'Cài đặt ứng dụng' > 'Thông tin cơ bản': copy 'ID ứng dụng' và 'Khóa bí mật của ứng dụng' (bấm Hiện), dán vào hai ô bên dưới rồi bấm 'Lưu & mở trang đăng nhập'." },
+          { "text": "Khi Facebook hỏi quyền, nhớ TICK chọn các Trang muốn cho Javis quản lý. Token sống khoảng 60 ngày, Javis tự gia hạn." }
+        ],
         "setup": {
           "redirect": true,
           "links": [

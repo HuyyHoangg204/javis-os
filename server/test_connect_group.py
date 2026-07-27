@@ -32,10 +32,20 @@ def test_moi_thanh_vien_nhom_co_group_line():
         assert "—" not in line, f"{cid}: group_line chứa em dash"
 
 
-def test_steps_dung_schema():
+def test_cac_connector_bat_buoc_co_steps():
     pc = _public()
-    for cid in STEP_CONNECTORS:
-        steps = pc[cid].get("steps") or []
+    for cid in STEP_CONNECTORS | {"meta-ads-graph", "facebook-pages"}:
+        assert pc[cid].get("steps"), f"{cid}: thiếu wizard steps"
+
+
+def test_steps_dung_schema():
+    """Soi schema MỌI connector có steps (không chỉ nhóm Google) - thêm connector mới
+    có steps là tự động được kiểm."""
+    for c in mcp_catalog.public_catalog():
+        steps = c.get("steps") or []
+        if not steps:
+            continue
+        cid = c["id"]
         assert len(steps) >= 4, f"{cid}: quá ít bước"
         for i, s in enumerate(steps):
             assert s.get("text", "").strip(), f"{cid} bước {i}: thiếu text"
@@ -47,12 +57,24 @@ def test_steps_dung_schema():
             assert s.get("copy", "") in ("", "redirect"), f"{cid} bước {i}: copy lạ"
 
 
-def test_oauth_google_co_buoc_redirect():
-    """Connector oauth BYO của Google phải có đúng một bước chèn ô copy Redirect URI."""
+def test_oauth_byo_co_buoc_redirect():
+    """Connector oauth BYO (Google lẫn Facebook) phải có đúng MỘT bước chèn ô copy
+    Redirect URI - thiếu là user không biết dán gì, thừa là rối."""
     pc = _public()
-    for cid in ("google-calendar", "gmail"):
+    for cid in ("google-calendar", "gmail", "meta-ads-graph", "facebook-pages"):
         n = sum(1 for s in pc[cid]["steps"] if s.get("copy") == "redirect")
         assert n == 1, cid
+
+
+def test_steps_che_setup_thi_link_khong_mat():
+    """Có steps là khối setup links cũ bị ẩn - mọi link trong setup phải xuất hiện lại
+    trong steps, không thì nút bị nuốt mất (từng suýt xảy ra với Facebook)."""
+    for c in mcp_catalog.public_catalog():
+        if not c.get("steps"):
+            continue
+        step_links = {s.get("link") for s in c["steps"] if s.get("link")}
+        for l in (c.get("setup") or {}).get("links", []):
+            assert l["url"] in step_links, f"{c['id']}: setup link '{l['label']}' không có trong steps"
 
 
 def test_public_catalog_khong_lo_secret_noi_bo():

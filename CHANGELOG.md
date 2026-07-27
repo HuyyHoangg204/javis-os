@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.200] - 2026-07-27
+Redirect URI theo đúng tên miền đang mở và hướng dẫn Facebook viết lại khớp giao diện tiếng Việt.
+### Sửa lỗi
+- **Redirect URI hết ghi cứng localhost**: người chạy Javis trên VPS (vd Hostinger) mở form Facebook thấy ô sao chép hiện http://localhost:7777 - dán vào Meta là đăng nhập xong trả về sai chỗ, hỏng cả luồng. Giờ ô này lấy đúng địa chỉ đang mở (https://tên-miền/connect/oauth/callback); riêng 127.0.0.1 vẫn ép về localhost vì Meta chỉ miễn HTTP cho host localhost.
+### Cải thiện
+- **Hướng dẫn Facebook thành wizard từng bước khớp giao diện tiếng Việt của Meta**: chỉ đúng menu 'Đăng nhập bằng Facebook > Cài đặt' và ô 'URI chuyển hướng OAuth hợp lệ', kèm cảnh báo đừng lạc vào 'Cài đặt ứng dụng > Nâng cao' (chỗ người dùng hay lạc nhất). Facebook Trang nhắc rõ dùng lại được app của Meta Ads.
+### Kiểm thử
+- `test_connect_group.py` mở rộng: schema tự soi MỌI connector có steps, connector BYO phải có đúng một bước copy Redirect URI, và steps che khối setup cũ thì mọi link phải xuất hiện lại trong steps.
+
 ## [0.9.199] - 2026-07-27
 Ô kéo thả file JSON key không mọc nhầm sang form Facebook nữa.
 ### Sửa lỗi

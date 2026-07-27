@@ -3240,18 +3240,22 @@
       ).join("") + '</div>';
     }
     if (s.redirect) {
-      const uri = 'http://localhost:' + (location.port || '7777') + '/connect/oauth/callback';
-      h += '<label class="mcp-lb">Redirect URI - dán vào ô "Valid OAuth Redirect URIs" (Facebook Login &gt; Settings)'
-        + '<div class="wiz-copy"><input class="js-input" id="wizRedirect" readonly value="' + esc(uri) + '">'
+      h += '<label class="mcp-lb">Redirect URI - dán vào ô "URI chuyển hướng OAuth hợp lệ" (menu trái: Đăng nhập bằng Facebook &gt; Cài đặt)'
+        + '<div class="wiz-copy"><input class="js-input" id="wizRedirect" readonly value="' + esc(_redirectUri()) + '">'
         + '<button type="button" class="mp-btn wiz-copy-btn" id="wizCopy">Sao chép</button></div></label>';
     }
     return h + '</div>';
   }
 
   // ── Khối B: wizard từng bước + kéo thả JSON + dùng lại key (nhóm Google) ──
+  function _redirectUri() {
+    // Theo ĐÚNG địa chỉ đang mở: VPS có tên miền thì ra https://<tên-miền>/... (trước đây
+    // ghi cứng localhost nên người chạy Hostinger dán vào là hỏng). Riêng 127.0.0.1 ép về
+    // localhost vì Meta chỉ miễn HTTP cho host 'localhost'.
+    return location.origin.replace("://127.0.0.1", "://localhost") + "/connect/oauth/callback";
+  }
   function redirectCopyBox() {
-    // location.origin chạy đúng cả localhost lẫn VPS có domain (khỏi hardcode localhost)
-    const uri = location.origin + "/connect/oauth/callback";
+    const uri = _redirectUri();
     return '<div class="wiz-copy"><input class="js-input" readonly value="' + esc(uri) + '">'
       + '<button type="button" class="mp-btn wiz-copy-btn">Sao chép</button></div>';
   }
