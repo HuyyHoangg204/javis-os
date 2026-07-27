@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.219] - 2026-07-28
+Bộ sổ bullet journal (Daily/Weekly/Monthly/Future Log) vào cấu trúc chuẩn của vault.
+### Thêm mới
+- **4 thư mục sổ vào cấu trúc chuẩn**: `01 - Daily Log`, `02 - Weekly Log`, `03 - Monthly Log`, `04 - Future Log`. Brain mới tạo có sẵn; brain cũ thiếu thì banner "cấu trúc vault" liệt kê và nút tạo thiếu (/vault/init) tự tạo đủ. Đây là nơi ghi chép + task hằng ngày mà khối dataview kéo việc từ đó.
+- Nhận diện tên linh hoạt như các mục khác: `01 - Daily Log`, `Daily Log`, `daily` đều tính là có - vault đã có sổ theo tên riêng thì KHÔNG bị đẻ thêm bản trùng. Là mục tuỳ chọn (không essential) nên vault không dùng bullet journal không bị báo "chưa chuẩn".
+- Seed `AGENTS.md` của brain mới ghi rõ bộ sổ trong schema để AI hiểu vai trò từng thư mục.
+### Kiểm thử
+- `test_vault_scaffold.py` mới (9 case): nhận diện các biến thể tên, /vault/init tạo đủ 4 sổ, idempotent, không tạo trùng khi đã có sổ tên khác.
+
 ## [0.9.218] - 2026-07-28
 Dataview nhanh hơn hẳn với vault lớn: cache tăng dần, ETag 304, khoanh vùng theo FROM.
 ### Cải thiện

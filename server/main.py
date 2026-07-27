@@ -2003,6 +2003,12 @@ STANDARD_STRUCTURE = [
     # Tuỳ chọn - Javis chưng cất source → wiki (nuôi graph); đính kèm ảnh/file
     {"key": "wiki", "label": "wiki", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?wiki$", "create": "wiki", "essential": False},
     {"key": "attachments", "label": "attachments", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?attachments$", "create": "attachments", "essential": False},
+    # Bộ sổ bullet journal - nơi ghi chép + task hằng ngày, dataview kéo từ đây.
+    # detect linh hoạt: "01 - Daily Log" / "Daily Log" / "Daily" đều tính là có.
+    {"key": "daily", "label": "daily log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?daily(\s*log)?$", "create": "01 - Daily Log", "essential": False},
+    {"key": "weekly", "label": "weekly log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?weekly(\s*log)?$", "create": "02 - Weekly Log", "essential": False},
+    {"key": "monthly", "label": "monthly log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?monthly(\s*log)?$", "create": "03 - Monthly Log", "essential": False},
+    {"key": "future", "label": "future log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?future(\s*log)?$", "create": "04 - Future Log", "essential": False},
 ]
 
 def _check_structure(root: Path):
@@ -2042,6 +2048,7 @@ JAVIS_README = (
 SCHEMA_SEED = (
     "# AGENTS.md - Vault Schema (Javis)\n\n"
     "> Vault này hoạt động với Javis OS. Cấu trúc:\n\n"
+    "- `01 - Daily Log/` → `04 - Future Log/` - bộ sổ bullet journal (nhật ký ngày/tuần/tháng/tương lai, chứa task `- [ ]`; khối dataview kéo việc từ đây)\n"
     "- `06 - Sources/` - ghi chú thô (source of truth)\n"
     "- `07 - Wiki/` - tri thức đã chưng cất, có `[[wikilink]]`\n"
     "- `Memory/` - bộ nhớ dài hạn của Javis (facts + conversations)\n"
