@@ -1254,7 +1254,12 @@ async def connect_oauth_start(request: Request):
                 return {"ok": False, "error": err}
     elif conn_id and fields:
         mcp_store.update_connection(conn_id, {"fields": fields})
-    redirect = str(request.base_url).rstrip("/") + "/connect/oauth/callback"
+    # Địa chỉ quay về NHƯ NGƯỜI DÙNG THẤY: sau reverse proxy (VPS https) phải theo
+    # X-Forwarded-Proto/Host, không thì dựng ra http://... và Meta/Google từ chối.
+    redirect = web_security.external_base(
+        request.url.scheme, request.url.netloc,
+        request.headers.get("x-forwarded-proto", ""),
+        request.headers.get("x-forwarded-host", "")) + "/connect/oauth/callback"
     res = await oauth_mcp.start_auth(conn_id, redirect)
     res["id"] = conn_id
     return res

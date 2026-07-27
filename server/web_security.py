@@ -32,6 +32,23 @@ _cache = {"hosts": None, "ts": 0.0}
 _CACHE_TTL = 5.0
 
 
+def external_base(url_scheme, host, xf_proto="", xf_host="") -> str:
+    """Địa chỉ gốc NHƯ NGƯỜI DÙNG THẤY, dùng để dựng OAuth redirect_uri.
+
+    Chạy sau reverse proxy (Traefik/Caddy trên VPS) thì uvicorn thấy http nội bộ trong khi
+    trình duyệt đang https - dựng redirect từ request.base_url ra http://... là Meta/Google
+    từ chối ("không dùng kết nối bảo mật", vụ Hostinger 2026-07-27). Ưu tiên header
+    X-Forwarded-Proto/Host do proxy đặt; thiếu thì rơi về scheme/host của chính request.
+
+    AN TOÀN: giá trị này CHỈ được nhét vào redirect_uri gửi cho nhà cung cấp OAuth - kẻ tự
+    đặt header chỉ phá được luồng đăng nhập của CHÍNH request đó, và provider còn đối chiếu
+    whitelist redirect của app. TUYỆT ĐỐI không dùng hàm này cho quyết định quyền/địa chỉ
+    client (đường _AUTH_LOCAL_EXACT vẫn phải dựa vào request.client.host thật)."""
+    scheme = (xf_proto or "").split(",")[0].strip().lower() or (url_scheme or "http")
+    h = (xf_host or "").split(",")[0].strip() or (host or "")
+    return f"{scheme}://{h}"
+
+
 def host_only(v) -> str:
     """Bóc hostname (bỏ scheme + path + port). Giữ IPv6 trong ngoặc: '[::1]:7777' → '::1'."""
     v = (v or "").strip().lower()

@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.201] - 2026-07-27
+Đăng nhập OAuth trên VPS https hết bị Meta chặn "không dùng kết nối bảo mật".
+### Sửa lỗi
+- **Redirect OAuth phía server theo đúng https của người dùng**: chạy sau reverse proxy (VPS Hostinger...), server nhìn thấy request dạng http nội bộ nên dựng redirect_uri thành http://... gửi cho Meta/Google - Meta chặn thẳng với thông báo app "không sử dụng kết nối bảo mật". Giờ server ưu tiên header X-Forwarded-Proto/Host do proxy đặt khi dựng địa chỉ quay về. Giá trị này chỉ dùng cho redirect_uri nên không ảnh hưởng các quyết định quyền theo địa chỉ client.
+### Kiểm thử
+- `test_security.py` thêm 5 case external_base: lấy proto/host từ proxy, proxy chồng lấy giá trị đầu, không proxy giữ nguyên, và chốt hàm này không được lẫn vào auth guard.
+
 ## [0.9.200] - 2026-07-27
 Redirect URI theo đúng tên miền đang mở và hướng dẫn Facebook viết lại khớp giao diện tiếng Việt.
 ### Sửa lỗi

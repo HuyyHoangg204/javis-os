@@ -171,6 +171,23 @@ import inspect  # noqa: E402
 check("rào: _notify_owner gửi plain text, KHÔNG parse_mode (tin người lạ không dựng được markup)",
       "parse_mode" not in inspect.getsource(main._notify_owner))
 
+# external_base: dựng redirect OAuth theo địa chỉ NGƯỜI DÙNG thấy (vụ VPS Hostinger:
+# uvicorn sau proxy thấy http nội bộ, dựng redirect http:// làm Meta chặn "không bảo mật").
+check("external_base: sau proxy https → lấy X-Forwarded-Proto",
+      web_security.external_base("http", "javis.example.com", "https", "")
+      == "https://javis.example.com")
+check("external_base: X-Forwarded-Host thắng host nội bộ",
+      web_security.external_base("http", "10.0.0.5:7777", "https", "javis.example.com")
+      == "https://javis.example.com")
+check("external_base: không proxy → giữ nguyên scheme/host của request",
+      web_security.external_base("http", "localhost:7777", "", "")
+      == "http://localhost:7777")
+check("external_base: header nhiều giá trị (proxy chồng) → lấy giá trị ĐẦU",
+      web_security.external_base("http", "x", "https, http", "a.com, b.com")
+      == "https://a.com")
+check("external_base: CHỈ dùng cho redirect_uri - không được lẫn vào quyết định localhost",
+      "external_base" not in inspect.getsource(main._auth_guard))
+
 print()
 if _fails:
     print(f"THẤT BẠI {len(_fails)}: {_fails}")
