@@ -2732,6 +2732,80 @@
       + '<span class="cdot' + (c.enabled ? " on" : "") + '">●</span> ' + esc(c.label || c.name || "?")
       + (c.is_default ? ' <span class="cstar">★</span>' : "") + " " + permChip(c.perm) + '</button>';
   }
+
+  // ── Sức khoẻ kết nối (khối A): tô chấm màu chip theo /connect/health + nút Kết nối lại ──
+  let _healthTimer = null;
+  async function refreshConnHealth(el, conns, byId) {
+    if (!document.body.contains(el)) { clearInterval(_healthTimer); _healthTimer = null; return; }
+    let h = {};
+    try { h = (await (await fetch("/connect/health")).json()).health || {}; } catch (e) { return; }
+    el.querySelectorAll(".conn-chip[data-conn]").forEach(chip => {
+      const dot = chip.querySelector(".cdot");
+      if (!dot) return;
+      if (chip.classList.contains("off")) { chip.title = "Đang tắt tạm"; return; }
+      const rec = h[chip.dataset.conn];
+      dot.classList.remove("hok", "herr", "hunk");
+      if (!rec) { dot.classList.add("hunk"); chip.title = "Chưa kiểm tra - vòng check nền sẽ tự chạy"; return; }
+      const when = rec.checked_at ? " · kiểm tra " + zlAgo(rec.checked_at) : "";
+      if (rec.ok) {
+        dot.classList.add("hok");
+        chip.title = "Hoạt động bình thường (" + (rec.tools || 0) + " công cụ)" + when;
+      } else {
+        dot.classList.add("herr");
+        chip.title = "⚠ " + (rec.message || "Lỗi") + when;
+      }
+    });
+    // Connection chết vì HẾT PHIÊN ĐĂNG NHẬP → nút sửa ngay trên card, khỏi mò vào menu
+    el.querySelectorAll(".conn-fix").forEach(b => b.remove());
+    (conns || []).forEach(c => {
+      const rec = h[c.id];
+      if (!rec || rec.ok || rec.kind !== "auth" || !c.enabled) return;
+      const chip = el.querySelector('.conn-chip[data-conn="' + c.id + '"]');
+      if (!chip) return;
+      const fix = document.createElement("button");
+      fix.className = "conn-chip conn-fix";
+      fix.innerHTML = "🔁 Kết nối lại " + esc(c.label || "");
+      fix.onclick = () => reconnectAccount(el, c, byId[c.connector_id]);
+      chip.after(fix);
+    });
+  }
+
+  // Kết nối lại GIỮ NGUYÊN connection (id, label, quyền, deny) - không xoá tạo lại.
+  function reconnectAccount(el, c, con) {
+    if ((c.auth || "") === "oauth" || (con && con.auth_type === "oauth")) {
+      postJson("/connect/oauth/start", { id: c.id }).then(r => {
+        if (!r || r.ok === false) { alert("Không mở được đăng nhập: " + ((r && r.error) || "lỗi")); return; }
+        window.open(r.url, "_blank");
+      });
+      return;
+    }
+    openReKey(el, c, con);
+  }
+  function openReKey(el, c, con) {
+    const flds = (con && con.fields) || [];
+    const rows = flds.map(f =>
+      '<label class="mcp-lb">' + esc(f.label || f.key)
+      + '<input class="js-input" data-rk="' + esc(f.key) + '" placeholder="Để trống = giữ giá trị cũ"'
+      + ((/secret|password|token|key/i.test(f.key)) ? ' type="password"' : "") + '></label>').join("");
+    const m = connModal(mHead("KẾT NỐI LẠI: " + esc(c.label || ""))
+      + '<div class="conn-form"><div class="mp-note">Dán key/thông tin MỚI cho tài khoản này. Ô để trống sẽ giữ nguyên giá trị cũ.</div>'
+      + (rows || '<div class="mp-note">Kết nối này không có trường key để thay - dùng menu Test để kiểm tra.</div>')
+      + '<div class="mp-note" id="rkErr" style="color:#e0664a"></div></div>'
+      + '<div class="mp-foot"><button class="mp-btn" data-act="close">Huỷ</button>'
+      + (rows ? '<button class="mp-btn primary" id="rkGo">Lưu và kiểm tra</button>' : "") + '</div>');
+    const go = m.querySelector("#rkGo");
+    if (go) go.onclick = async () => {
+      const fields = {};
+      m.querySelectorAll("[data-rk]").forEach(i => { if (i.value.trim()) fields[i.dataset.rk] = i.value.trim(); });
+      if (!Object.keys(fields).length) { m.querySelector("#rkErr").textContent = "Chưa nhập giá trị mới nào."; return; }
+      go.disabled = true; go.textContent = "Đang kiểm tra…";
+      await postJson("/connect/update", { id: c.id, fields: fields });
+      const r = await postJson("/connect/health/check", { id: c.id });
+      if (r && r.ok) { closeConnModal(); renderConnect(el); return; }
+      go.disabled = false; go.textContent = "Lưu và kiểm tra";
+      m.querySelector("#rkErr").textContent = "⚠ " + ((r && r.message) || "Vẫn chưa kết nối được.");
+    };
+  }
   function connectorCard(con, conns) {
     const chips = conns.map(connChip).join("")
       + '<button class="conn-chip add" data-addacc="' + esc(con.id) + '">＋ Thêm tài khoản</button>';
@@ -3202,6 +3276,7 @@
     const m = connModal(mHead(esc(c.label || "Tài khoản"))
       + '<div class="conn-menu">'
       + '<button class="conn-menu-btn" data-m="test">🔄 Test kết nối</button>'
+      + '<button class="conn-menu-btn" data-m="rekey">🔁 Kết nối lại (đăng nhập / đổi key)</button>'
       + '<button class="conn-menu-btn" data-m="default"' + (c.is_default ? " disabled" : "") + '>★ Đặt làm mặc định</button>'
       + '<button class="conn-menu-btn" data-m="rename">✏ Đổi tên</button>'
       + '<button class="conn-menu-btn" data-m="perm">🛡 Đổi quyền (' + ((PERM_META[c.perm] || {}).label || c.perm) + ')</button>'
@@ -3217,6 +3292,8 @@
         note.textContent = "Đang test…";
         const r = await postJson("/connect/test", { id: c.id });
         note.textContent = r.ok ? "✓ OK - " + (r.tools || 0) + " công cụ" + (r.label ? " (" + r.label + ")" : "") : "⚠ " + (r.error || "lỗi");
+      } else if (act === "rekey") {
+        closeConnModal(); reconnectAccount(el, c, con);
       } else if (act === "default") {
         await postJson("/connect/default", { id: c.id }); closeConnModal(); renderConnect(el);
       } else if (act === "rename") {
@@ -3309,6 +3386,10 @@
       + '<div class="prov-list" id="mcpAmbientCodex" style="margin-top:12px"><div class="mp-empty">Đang tải…</div></div></div>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
     wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
+    // Sức khoẻ kết nối: tô ngay khi mở trang + làm tươi mỗi 60s (tự dừng khi rời trang)
+    clearInterval(_healthTimer);
+    refreshConnHealth(el, conns, byId);
+    _healthTimer = setInterval(() => refreshConnHealth(el, conns, byId), 60000);
     const isFirst = conns.length === 0;
     el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst));
     el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false));

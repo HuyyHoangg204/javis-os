@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.192] - 2026-07-27
+Trang Kết nối biết tự khám sức khoẻ: chấm màu trên từng tài khoản và nút Kết nối lại một chạm.
+### Thêm mới
+- **Sức khoẻ kết nối thường trực**: server có vòng check nền (10 phút một lần) ping từng tài khoản đang bật qua session pool, không gọi tool thật nên không tốn quota. Mỗi chip tài khoản trên trang Kết nối hiện chấm màu: xanh là sống, đỏ là lỗi, vàng là chưa kiểm tra; rê chuột thấy nguyên nhân và thời điểm kiểm tra. Trạng thái tự làm tươi mỗi phút khi đang mở trang.
+- **Lỗi nói tiếng người**: lỗi kỹ thuật được phân loại ngay tại server thành hết phiên đăng nhập, dịch vụ không phản hồi, không khởi động được trình kết nối trên máy - thay vì chuỗi lỗi thô. Bài học từ vụ nghi oan Google Workspace: thông điệp mù mờ làm chẩn đoán sai cả loạt.
+- **Kết nối lại một chạm**: tài khoản chết vì hết phiên đăng nhập hiện thẳng nút Kết nối lại trên card - tài khoản OAuth mở lại đúng luồng đăng nhập cũ, tài khoản dán key mở hộp dán key mới đè lên; giữ nguyên tên, quyền, cài đặt, không phải xoá đi thêm lại. Menu tài khoản cũng thêm mục này để chủ động đổi key bất cứ lúc nào.
+### Kiểm thử
+- `test_connect_health.py` mới: phân loại lỗi đủ nhánh, connector ảo không báo đỏ oan, một kết nối lỗi không giết cả vòng quét, snapshot trả bản sao.
+
 ## [0.9.191] - 2026-07-27
 Bảng Việc tự dọn: việc một-lần đã xong không nằm lì trên bảng nữa.
 ### Thêm mới

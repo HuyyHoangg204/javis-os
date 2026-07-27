@@ -560,6 +560,12 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .conn-chip.add { border-style: dashed; opacity: .75; }
 .conn-chip .cdot { color: #666; font-size: 10px; }
 .conn-chip .cdot.on { color: #3fb96a; }
+/* Sức khoẻ kết nối (vòng check nền): sống / lỗi / chưa rõ - đè lên màu on/off cơ bản */
+.conn-chip .cdot.hok { color: #3fb96a; }
+.conn-chip .cdot.herr { color: #e0664a; }
+.conn-chip .cdot.hunk { color: #d9a521; }
+.conn-chip.conn-fix { border-color: #e0664a88; color: #f0a08c; background: rgba(224,102,74,.08); }
+.conn-chip.conn-fix:hover { background: rgba(224,102,74,.16); }
 .conn-chip .cstar { color: #d9a521; }
 .perm-chip { font-size: 11px; border: 1px solid; border-radius: 10px; padding: 1px 7px; opacity: .9; }
 .cat-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 4px; }

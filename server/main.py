@@ -43,6 +43,7 @@ import mcp_store
 import mcp_client
 import mcp_catalog
 import mcp_hub
+import connect_health   # sức khoẻ kết nối: vòng check nền + phân loại lỗi tiếng người
 import cred_exchange   # đổi credential hộ user (vd App Password -> Google master token) khi đấu
 import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
 import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
@@ -1096,6 +1097,21 @@ async def connect_test(request: Request):
     return await mcp_hub.validate_connection(data.get("id"))
 
 
+@app.get("/connect/health")
+async def connect_health_all():
+    """Sức khoẻ mọi connection (vòng nền connect_health cập nhật). Connection chưa
+    check thì vắng mặt - UI hiểu là 'chưa rõ' (chấm vàng)."""
+    return {"health": connect_health.snapshot()}
+
+
+@app.post("/connect/health/check")
+async def connect_health_check(request: Request):
+    """Ép check ngay một connection (nút test/refresh trên chip tài khoản)."""
+    data = await request.json()
+    rec = await connect_health.check_by_id((data.get("id") or "").strip())
+    return {"ok": rec.get("ok", False), **rec}
+
+
 @app.get("/connect/substack/resolve-uid")
 async def connect_substack_resolve_uid(q: str = Query("")):
     """Tra User ID (+ gợi ý Publication URL) của một tài khoản Substack từ handle hoặc URL trang
@@ -1166,6 +1182,7 @@ async def connect_delete(request: Request):
     data = await request.json()
     cid = data.get("id")
     oauth_mcp.forget(cid)
+    connect_health.forget(cid)   # khỏi hiện trạng thái ma của connection đã xoá
     ok = mcp_store.delete_connection(cid)
     mcp_hub.invalidate_cache()
     _write_codex_profile()
@@ -3838,6 +3855,10 @@ async def _start_scheduler():
         tasks_feature.start()
     except Exception as e:
         print(f"[kanban start] {e}", file=_sys.stderr)
+    try:
+        connect_health.start()   # vòng check sức khoẻ kết nối cho trang Kết nối
+    except Exception as e:
+        print(f"[connect health start] {e}", file=_sys.stderr)
     try:
         if cfgmod.provision_admin_from_env():
             print("[auth] Đã tạo tài khoản admin từ JAVIS_ADMIN_PASSWORD (env).", file=_sys.stderr)
