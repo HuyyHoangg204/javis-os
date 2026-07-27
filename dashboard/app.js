@@ -356,8 +356,16 @@ function notifySessions() { try { window.dispatchEvent(new Event("javis:sessions
 
 // Hàng nút dưới bong bóng (giờ + gửi lại / sửa lại / copy). Tách sang chat-acts.js để
 // test được bằng node; ở đây chỉ là lối thoát khi file đó chưa kịp nạp.
-function actsHtml(role, ts) {
-  return window.JavisActs ? window.JavisActs.actsHtml(role, ts) : "";
+function actsHtml(role, ts, canResend) {
+  return window.JavisActs ? window.JavisActs.actsHtml(role, ts, canResend) : "";
+}
+// Tin chỉ có ảnh (không kèm lời nhắn) thì chẳng có chữ nào để gửi lại. Ở tin của Javis
+// thì cái quyết định là CÂU HỎI ngay trên nó, nên soi tin người dùng cuối cùng đã nằm
+// trong khung (chatAppend chèn theo đúng thứ tự nên lúc này nó đã có mặt).
+function lastUserText() {
+  const els = chatArea.querySelectorAll(".msg-user");
+  const el = els.length ? els[els.length - 1] : null;
+  return el ? (el.dataset.text || "") : "";
 }
 // ts === undefined nghĩa là tin VỪA xảy ra; còn khôi phục tin cũ thì truyền ts thật
 // (hoặc 0 nếu tin lưu từ trước bản này chưa có mốc giờ, khi đó phần giờ được ẩn).
@@ -380,21 +388,22 @@ function appendUserMessage(text, attachments, ts) {
       (isLong ? `<button class="clamp-more" type="button">Xem thêm</button>` : "")
     : "";
   div.innerHTML = `<div class="bubble">${textHtml}${attHtml}</div>` +
-    actsHtml("user", ts === undefined ? Date.now() : ts);
+    actsHtml("user", ts === undefined ? Date.now() : ts, !!(text || "").trim());
   chatAppend(div); scrollBottom(true);
 }
 function appendJavisMessage(text, ts) {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
-    actsHtml("javis", ts === undefined ? Date.now() : ts);
+    actsHtml("javis", ts === undefined ? Date.now() : ts, !!lastUserText().trim());
   chatAppend(div); scrollBottom();
   return div;
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
-  div.innerHTML = `<div class="bubble"></div>` + actsHtml("javis", Date.now());
+  div.innerHTML = `<div class="bubble"></div>` +
+    actsHtml("javis", Date.now(), !!lastUserText().trim());
   chatAppend(div); scrollBottom();
   return div;
 }

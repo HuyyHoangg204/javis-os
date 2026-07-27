@@ -44,18 +44,24 @@
 
   // role: "user" | "javis". Tin cua Javis khong co nut sua (sua cau tra loi cua may
   // roi gui di thi khong con y nghia gi) - nut gui lai o do chay lai CAU HOI ngay tren no.
-  function actsHtml(role, ts) {
+  //
+  // canResend=false khi khong co CHU de gui lai (tin chi co anh, khong kem loi nhan).
+  // Khi do bo han nut gui lai + sua lai thay vi de nut bam vao khong ra gi. Bo trong
+  // tham so nay thi mac dinh van co nut, de cac cho goi cu khong doi hanh vi.
+  function actsHtml(role, ts, canResend) {
     var t = fmtTime(ts);
     var time = t
       ? '<span class="msg-time" title="' + esc(fmtTimeFull(ts)) + '">' + esc(t) + "</span>"
       : "";
-    var retryTitle = role === "user" ? "Gửi lại câu này" : "Trả lời lại câu hỏi phía trên";
-    var edit = role === "user"
-      ? '<button class="msg-act" type="button" data-act="edit" title="Sửa lại rồi gửi">✎</button>'
-      : "";
-    return '<div class="msg-acts">' + time +
-      '<button class="msg-act" type="button" data-act="retry" title="' + esc(retryTitle) + '">↻</button>' +
-      edit +
+    var send = "";
+    if (canResend !== false) {
+      var retryTitle = role === "user" ? "Gửi lại câu này" : "Trả lời lại câu hỏi phía trên";
+      send = '<button class="msg-act" type="button" data-act="retry" title="' + esc(retryTitle) + '">↻</button>' +
+        (role === "user"
+          ? '<button class="msg-act" type="button" data-act="edit" title="Sửa lại rồi gửi">✎</button>'
+          : "");
+    }
+    return '<div class="msg-acts">' + time + send +
       '<button class="msg-act" type="button" data-act="copy" title="Sao chép nội dung">⧉</button>' +
       "</div>";
   }

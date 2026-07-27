@@ -76,7 +76,24 @@ check("tìm ngược: msgEl rỗng thì rỗng", A.prevUserText(null) === "");
 check("nhận diện tin user", A.isUserMsg(u1) === true && A.isUserMsg(j1) === false);
 check("nhận diện: node rỗng không nổ", A.isUserMsg(null) === false);
 
-// ---- 7. Escape: nhãn/giờ nhét vào HTML không được mở thẻ ----
+// ---- 7. Tin chỉ có ảnh (không có chữ): bỏ hẳn nút gửi lại + sửa lại ----
+h = A.actsHtml("user", TS, false);
+check("chỉ có ảnh: bỏ nút gửi lại", !has(h, 'data-act="retry"'));
+check("chỉ có ảnh: bỏ nút sửa lại", !has(h, 'data-act="edit"'));
+check("chỉ có ảnh: vẫn còn nút copy", has(h, 'data-act="copy"'));
+check("chỉ có ảnh: vẫn còn giờ", has(h, "msg-time"));
+check("chỉ có ảnh: chỉ còn đúng 1 nút", (h.match(/class="msg-act"/g) || []).length === 1);
+
+h = A.actsHtml("javis", TS, false);
+check("javis không có câu hỏi chữ: bỏ nút gửi lại", !has(h, 'data-act="retry"'));
+check("javis không có câu hỏi chữ: vẫn còn copy", has(h, 'data-act="copy"'));
+
+// Bỏ trống tham số thì giữ nguyên hành vi cũ (các chỗ gọi cũ không đổi)
+h = A.actsHtml("user", TS);
+check("không truyền canResend: vẫn đủ 3 nút", (h.match(/class="msg-act"/g) || []).length === 3);
+check("canResend=true: vẫn đủ 3 nút", (A.actsHtml("user", TS, true).match(/class="msg-act"/g) || []).length === 3);
+
+// ---- 8. Escape: nhãn/giờ nhét vào HTML không được mở thẻ ----
 check("hàng nút không chứa thẻ lạ", !has(A.actsHtml("user", TS), "<script"));
 
 console.log(fails.length ? "\n" + fails.length + " test HỎNG" : "\nTất cả test đều đạt");

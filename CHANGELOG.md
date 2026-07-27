@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.188] - 2026-07-27
+Bỏ nút bấm không làm gì ở tin chỉ có ảnh.
+### Sửa lỗi
+- **Tin chỉ có ảnh không còn nút chết**: tin gửi kèm ảnh mà không có lời nhắn thì chẳng có chữ nào để gửi lại, nên hai nút gửi lại và sửa lại được ẩn hẳn thay vì bấm vào không ra gì. Câu trả lời của Javis cho tin dạng đó cũng ẩn nút gửi lại theo. Tin có cả chữ lẫn ảnh vẫn giữ đủ nút và gửi lại phần chữ như cũ.
+
 ## [0.9.187] - 2026-07-27
 Mỗi tin nhắn trong khung chat có thêm hàng nút nhỏ bên dưới: giờ gửi, gửi lại, sửa lại và sao chép.
 ### Thêm mới
