@@ -215,3 +215,31 @@ def test_run_selected_task_does_not_pick_older_ready_task(tmp_path):
         await feature.shutdown()
 
     asyncio.run(scenario())
+
+
+def test_auto_archive_old_terminal_tasks(tmp_path):
+    """Việc một-lần đã kết thúc không nằm mãi trên bảng: done/cancelled quá hạn
+    tự chuyển archived trong housekeep; task mới xong và task đang sống giữ nguyên."""
+    import time as _time
+
+    store = TaskStore(tmp_path / "queue.sqlite3")
+    root = str(tmp_path / "brain")
+    old_done = store.enqueue(root, "Xong lâu rồi", "old-done", status="done")
+    old_cancel = store.enqueue(root, "Huỷ lâu rồi", "old-cancel", status="cancelled")
+    fresh_done = store.enqueue(root, "Mới xong", "fresh-done", status="done")
+    still_ready = store.enqueue(root, "Đang chờ", "ready-1", status="ready")
+    past = _time.time() - 4 * 86400
+    with store._lock:
+        store._db.execute(
+            "UPDATE tasks SET updated_at=? WHERE id IN (?,?)", (past, old_done, old_cancel)
+        )
+        store._db.commit()
+
+    n = store.archive_old_terminal(root, age_days=3)
+    assert n == 2
+    assert store.get_task(old_done)["status"] == "archived"
+    assert store.get_task(old_cancel)["status"] == "archived"
+    assert store.get_task(fresh_done)["status"] == "done"
+    assert store.get_task(still_ready)["status"] == "ready"
+    # chạy lại không dọn thêm gì (idempotent)
+    assert store.archive_old_terminal(root, age_days=3) == 0

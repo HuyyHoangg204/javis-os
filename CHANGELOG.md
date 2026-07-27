@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.191] - 2026-07-27
+Bảng Việc tự dọn: việc một-lần đã xong không nằm lì trên bảng nữa.
+### Thêm mới
+- **Tự lưu trữ việc đã kết thúc**: task done hoặc cancelled quá 3 ngày tự chuyển sang lưu trữ trong vòng dọn dẹp định kỳ của bộ điều phối. Bảng Việc chỉ còn việc đang sống và việc mới xong gần đây; lịch sử không mất, vẫn tra được ở khu lưu trữ. Trước đây không có cơ chế dọn nào nên việc giao một lần cứ ở lại bảng vĩnh viễn.
+### Kiểm thử
+- `test_tasks_autonomous.py` thêm test tự lưu trữ: dọn đúng task cũ, giữ task mới xong và task đang chờ, chạy lại không dọn trùng.
+
 ## [0.9.190] - 2026-07-27
 Khi phiên nền bị chặn tool, thông điệp lỗi nói thẳng lý do thật để agent không chẩn đoán nhầm.
 ### Cải thiện

@@ -433,6 +433,39 @@ class TaskStore:
                 self._db.rollback()
                 raise
 
+    def archive_old_terminal(self, brain_root: str, age_days: float = 3.0) -> int:
+        """Tự dọn bảng: task đã kết thúc (done/cancelled) quá age_days thì chuyển archived.
+
+        Việc một-lần xong rồi không nằm mãi trên bảng Việc; archived chỉ bị ẨN
+        (list_tasks mặc định lọc ra), lịch sử vẫn tra được với include_archived=True.
+        Chạy trong housekeep mỗi vòng dispatch nên phải idempotent và rẻ."""
+        ts = now()
+        cutoff = ts - age_days * 86400
+        with self._lock:
+            self._tx()
+            try:
+                rows = self._db.execute(
+                    """SELECT id, status FROM tasks
+                       WHERE brain_root=? AND status IN ('done','cancelled')
+                         AND updated_at < ?""",
+                    (brain_root, cutoff),
+                ).fetchall()
+                for row in rows:
+                    tid = str(row["id"])
+                    self._db.execute(
+                        "UPDATE tasks SET status='archived', updated_at=? WHERE id=?",
+                        (ts, tid),
+                    )
+                    self._event(
+                        tid, "auto_archive",
+                        f"{row['status']} -> archived: đã kết thúc quá {age_days:g} ngày",
+                    )
+                self._db.commit()
+                return len(rows)
+            except Exception:
+                self._db.rollback()
+                raise
+
     def next_candidate(self, brain_root: str) -> Optional[dict]:
         with self._lock:
             row = self._db.execute(

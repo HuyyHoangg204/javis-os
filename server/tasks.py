@@ -38,6 +38,8 @@ DISPATCH_INTERVAL_SECONDS = 5
 MAX_RESULT_CHARS = 20_000
 SPECIFIER_TIMEOUT_SECONDS = 180
 WORKER_TIMEOUT_SECONDS = 900
+# Việc đã kết thúc (done/cancelled) quá số ngày này tự chuyển archived (rời bảng, còn tra được).
+ARCHIVE_TERMINAL_AFTER_DAYS = 3.0
 CAPABILITIES = {"auto", "files", "research", "mcp-read", "code", "external-write"}
 EXECUTION_MODES = {"suggest", "auto", "full"}
 
@@ -250,6 +252,9 @@ class TasksFeature:
         active = set(self._worker_ids.values())
         changed = self.store.reclaim_stale(root, active)
         changed += self.store.promote_dependencies(root)
+        # Việc một-lần đã xong/huỷ quá hạn tự rời bảng (archived) - bảng Việc chỉ giữ
+        # việc còn sống và việc mới kết thúc gần đây, lịch sử vẫn tra được khi cần.
+        changed += self.store.archive_old_terminal(root, ARCHIVE_TERMINAL_AFTER_DAYS)
         if changed:
             self._snapshot(root)
 
