@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.217] - 2026-07-28
+Tài liệu hướng dẫn cho Task & Dataview.
+### Thêm mới
+- **Trang docs mới [19 - Task & Dataview trong note](docs/19-task-va-dataview.md)**: tick checkbox tự lưu ở đâu, bảng ký hiệu 📅⏳🛫✅ + độ ưu tiên, đầy đủ cú pháp truy vấn dataview (TASK/LIST/TABLE, FROM, WHERE, SORT, LIMIT) kèm ví dụ thực dụng, danh sách thứ chưa hỗ trợ, giới hạn kỹ thuật và mục khắc phục sự cố. Đã thêm vào mục lục docs.
+
 ## [0.9.216] - 2026-07-28
 Task tick được ngay trên note + khối dataview chạy thật, lấy cảm hứng từ obsidian-tasks và obsidian-dataview.
 ### Thêm mới
