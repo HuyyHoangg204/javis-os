@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.206] - 2026-07-27
+Kết nối OAuth bỏ dở không còn hiện như tài khoản thật và không mọc lại sau khi xoá.
+### Sửa lỗi
+- **Hết cảnh "xoá rồi lại hiện" của kết nối OAuth**: bấm nút đăng nhập một connector OAuth là connection được tạo TRƯỚC rồi mới đi xin đăng nhập; xin thất bại (vd Meta Ads MCP đang là beta chỉ mở theo danh sách) thì cái xác chưa-có-token nằm lại trên trang Kết nối như tài khoản thật, mỗi lần bấm thử là một lần mọc lại. Giờ đăng nhập thất bại là server tự xoá connection vừa tạo và trả lỗi rõ ràng.
+- **Xác OAuth còn sót hiện chấm đỏ nói thật**: connection OAuth chưa từng có token (đăng nhập bỏ dở) được vòng health đánh dấu đỏ với thông điệp "Chưa hoàn tất đăng nhập - bấm Kết nối lại", kèm nút sửa ngay trên card - áp dụng cả connector ảo kiểu Meta Ads Graph trước đây bị báo xanh oan.
+### Kiểm thử
+- `test_connect_health.py` thêm case: xác oauth bỏ dở báo đỏ đúng lý do và không dial server.
+
 ## [0.9.205] - 2026-07-27
 Dán văn bản siêu dài vào khung chat tự thành file .txt đính kèm, kiểu Claude.
 ### Thêm mới

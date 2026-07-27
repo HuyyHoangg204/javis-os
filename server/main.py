@@ -1261,6 +1261,15 @@ async def connect_oauth_start(request: Request):
         request.headers.get("x-forwarded-proto", ""),
         request.headers.get("x-forwarded-host", "")) + "/connect/oauth/callback"
     res = await oauth_mcp.start_auth(conn_id, redirect)
+    # start_auth FAIL (vd Meta MCP beta allowlist từ chối DCR) mà connection chưa từng có
+    # token → XOÁ ngay, đừng để "xác chưa đăng nhập" nằm lại trên trang Kết nối như tài
+    # khoản thật (vụ Meta Ads xoá rồi cứ mọc lại mỗi lần bấm thử nút Kết nối).
+    if not res.get("ok") and conn_id and not oauth_mcp.status(conn_id).get("connected"):
+        oauth_mcp.forget(conn_id)
+        connect_health.forget(conn_id)
+        mcp_store.delete_connection(conn_id)
+        mcp_hub.invalidate_cache()
+        return {"ok": False, "error": res.get("error") or "Không mở được trang đăng nhập."}
     res["id"] = conn_id
     return res
 

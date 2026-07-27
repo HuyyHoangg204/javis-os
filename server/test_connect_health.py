@@ -86,6 +86,17 @@ def test_check_one_loi_auth():
     assert "Kết nối lại" in rec["message"]
 
 
+def test_check_one_oauth_chua_dang_nhap_bao_do_khong_dial():
+    """Xác oauth bỏ dở (chưa từng có token) phải đỏ với lý do thật, không dial server.
+    Vụ Meta Ads: connection mồ côi hiện như tài khoản thật, xanh oan trên UI."""
+    connect_health._state.clear()
+    pool = _FakePool()
+    rec = asyncio.run(connect_health.check_one(_conn("orphan", auth="oauth"), pool))
+    assert rec["ok"] is False and rec["kind"] == "auth"
+    assert "Chưa hoàn tất đăng nhập" in rec["message"]
+    assert pool.calls == 0
+
+
 def test_check_one_connector_ao_luon_song():
     """Connector ảo (không url/command, tool do plugin phục vụ) không được báo đỏ oan."""
     connect_health._state.clear()

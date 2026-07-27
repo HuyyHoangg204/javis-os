@@ -55,6 +55,19 @@ async def check_one(conn, pool=None) -> dict:
     """Ping MỘT connection, cập nhật _state và trả bản ghi kết quả."""
     pool = pool or mcp_client.pool
     rec = {"ok": False, "kind": "", "message": "", "checked_at": time.time(), "tools": 0}
+    # Connection OAuth CHƯA TỪNG có token (đăng nhập bỏ dở giữa chừng) → đỏ với lý do
+    # thật, khỏi dial cho tốn công. Soi TRƯỚC nhánh connector ảo: meta-ads-graph/facebook-
+    # pages cũng là oauth ảo, chưa đăng nhập mà báo xanh là nói dối.
+    if (conn.get("auth") == "oauth"):
+        try:
+            import oauth_mcp
+            if not oauth_mcp.status(conn["id"]).get("connected"):
+                rec.update(kind="auth",
+                           message="Chưa hoàn tất đăng nhập - bấm Kết nối lại để đăng nhập.")
+                _state[conn["id"]] = rec
+                return rec
+        except Exception:
+            pass
     # Connector ẢO (không URL, không command): tool do plugin phục vụ (vd Meta Ads Graph),
     # không có server nào để dial - coi là sống, khỏi báo đỏ oan.
     if not (conn.get("url") or "").strip() and not (conn.get("command") or "").strip():
