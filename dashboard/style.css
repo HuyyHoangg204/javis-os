@@ -194,6 +194,11 @@ body {
 @media (min-width: 861px) and (max-width: 1180px) {
   .ws-date, .notification-trigger-label { display: none; }
   .notification-trigger { width: 34px; min-width: 34px; padding: 0; }
+  /* Giống hệt bản mobile: số chưa đọc nổi ở góc trên nút, không chen vào trong viên 34px
+     cùng cái chuông (trước đây chen chung nhìn rất lôi thôi trên tablet). */
+  .notification-badge {
+    position: absolute; top: -4px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px;
+  }
 }
 .hud-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .hud-icon-btn {

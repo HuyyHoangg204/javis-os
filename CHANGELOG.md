@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.198] - 2026-07-27
+Nút Thông báo trên tablet gọn như bản mobile.
+### Cải thiện
+- **Nút Thông báo cỡ tablet (861-1180px) dùng đúng kiểu mobile**: số chưa đọc nổi ở góc trên nút thay vì chen chung với cái chuông trong viên 34px - trước đây hai thứ chen nhau nhìn rất lôi thôi.
+
 ## [0.9.197] - 2026-07-27
 Đèn báo não hết lộ vỏ rỗng trên thanh trạng thái khi não vẫn khoẻ.
 ### Sửa lỗi
