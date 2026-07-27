@@ -176,7 +176,25 @@ async def handler_tests():
     r_ph_out = await plug._publish_photo({"photo": "../ben-ngoai.jpg"}, _CtxVault())
     check("fb_page_photo: file NGOÀI vault → ERROR (sandbox)", r_ph_out.startswith("ERROR"))
     r_ph_novault = await plug._publish_photo({"photo": "attachments/a.jpg"}, _CtxNoVault())
-    check("fb_page_photo: đường dẫn file mà không rõ vault → ERROR", r_ph_novault.startswith("ERROR"))
+    check("fb_page_photo: đường dẫn file mà không rõ vault/staging → ERROR",
+          r_ph_novault.startswith("ERROR"))
+
+    # File dán vào khung chat rơi vào STATE_DIR/.staging → phải đăng được (vụ 2026-07-27:
+    # "không xác định được vault đang làm việc" dù ảnh do chính chủ vừa gửi).
+    import config as _cfg
+    staging = Path(_cfg.STATE_DIR) / ".staging" / "up_x"
+    staging.mkdir(parents=True, exist_ok=True)
+    (staging / "demo.jpg").write_bytes(b"img")
+    r_ph_stage_abs = await plug._publish_photo({"photo": str(staging / "demo.jpg")}, _CtxNoVault())
+    check("fb_page_photo: đường dẫn TUYỆT ĐỐI trong staging → đăng được",
+          '"ok": true' in r_ph_stage_abs.lower())
+    r_ph_stage_rel = await plug._publish_photo({"photo": "up_x/demo.jpg"}, _CtxNoVault())
+    check("fb_page_photo: đường dẫn tương đối tính từ staging → đăng được",
+          '"ok": true' in r_ph_stage_rel.lower())
+    r_ph_state = await plug._publish_photo(
+        {"photo": str(Path(_cfg.STATE_DIR) / "settings.json")}, _CtxNoVault())
+    check("fb_page_photo: file trong STATE_DIR nhưng NGOÀI .staging → ERROR",
+          r_ph_state.startswith("ERROR"))
 
     # fb_page_video: URL → file_url; file trong vault → đi host graph-video
     r_vd_url = await plug._publish_video(

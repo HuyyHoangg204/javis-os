@@ -200,29 +200,55 @@ async def _publish(args, ctx):
                       ensure_ascii=False, default=str)
 
 
+def _media_roots(cctx):
+    """Các gốc được phép đọc media: (1) vault đang làm việc, (2) vùng nhận file
+    STATE_DIR/.staging - nơi ảnh/video user dán vào khung chat dashboard rơi xuống.
+    File trong staging là file CHÍNH CHỦ vừa gửi nên đăng được, không phải mở sandbox bừa.
+    (File gửi qua Telegram đã rơi sẵn vào <vault>/inbox/telegram nên thuộc gốc 1.)"""
+    from pathlib import Path
+    roots = []
+    root = getattr(cctx, "vault_root", None)
+    if root:
+        try:
+            roots.append(Path(root).resolve())
+        except OSError:
+            pass
+    try:
+        from config import STATE_DIR
+        roots.append((Path(STATE_DIR) / ".staging").resolve())
+    except Exception:
+        pass
+    return roots
+
+
 def _resolve_media(ref, cctx):
-    """'photo'/'video' nhận URL http(s) HOẶC đường dẫn file trong vault (tương đối tính từ
-    gốc vault). Trả (url, path, err) - đúng một trong url/path có giá trị.
-    File BẮT BUỘC nằm trong vault (cùng sandbox với tool file của Javis) - plugin chạy full
-    quyền nhưng không vì thế mà cho đăng file tuỳ ý ngoài vault lên mạng."""
+    """'photo'/'video' nhận URL http(s) HOẶC đường dẫn file trong vault / vùng nhận file
+    của chat (tương đối thử lần lượt từng gốc). Trả (url, path, err) - đúng một trong
+    url/path có giá trị. File NGOÀI các gốc cho phép thì từ chối - plugin chạy full quyền
+    nhưng không vì thế mà cho đăng file tuỳ ý trên máy lên mạng."""
     from pathlib import Path
     ref = str(ref or "").strip()
     if not ref:
-        return None, None, "ERROR: thiếu đường dẫn file (trong vault) hoặc URL http(s) của media."
+        return None, None, "ERROR: thiếu đường dẫn file hoặc URL http(s) của media."
     if ref.startswith("http://") or ref.startswith("https://"):
         return ref, None, None
-    root = getattr(cctx, "vault_root", None)
-    if not root:
-        return None, None, "ERROR: không xác định được vault đang làm việc để tìm file."
+    roots = _media_roots(cctx)
+    if not roots:
+        return None, None, "ERROR: không xác định được vault/vùng nhận file để tìm media."
     try:
-        rp = (Path(root) / ref).resolve() if not Path(ref).is_absolute() else Path(ref).resolve()
-        if not str(rp).startswith(str(Path(root).resolve())):
-            return None, None, "ERROR: file phải nằm TRONG vault (chép vào vault rồi thử lại)."
-        if not rp.is_file():
-            return None, None, f"ERROR: không thấy file '{ref}' trong vault."
+        if Path(ref).is_absolute():
+            rp = Path(ref).resolve()
+            if any(str(rp).startswith(str(r)) for r in roots) and rp.is_file():
+                return None, rp, None
+        else:
+            for r in roots:
+                cand = (r / ref).resolve()
+                if str(cand).startswith(str(r)) and cand.is_file():
+                    return None, cand, None
     except OSError as e:
         return None, None, f"ERROR: không đọc được đường dẫn ({type(e).__name__})."
-    return None, rp, None
+    return None, None, (f"ERROR: không thấy '{ref}' trong vault hay vùng nhận file của chat. "
+                        "File phải nằm trong vault, hoặc là file vừa gửi qua khung chat/Telegram.")
 
 
 async def _post_file(path_in_graph, file_path, data, token, base=GRAPH, timeout=900):

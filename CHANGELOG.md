@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.204] - 2026-07-27
+Ảnh video dán vào khung chat đăng thẳng lên Facebook được, không phải chép vào vault trước.
+### Sửa lỗi
+- **Tool đăng Facebook nhận file từ vùng nhận file của chat**: ảnh video dán vào khung chat dashboard rơi vào vùng tạm ngoài vault, tool đăng từ chối với lỗi "không xác định được vault" dù file do chính chủ vừa gửi. Sandbox media giờ gồm hai gốc: vault đang làm việc và vùng nhận file của chat; file gửi qua Telegram vốn rơi vào inbox trong vault nên đã chạy từ trước. File ngoài hai gốc này vẫn bị từ chối như cũ - không đăng được file tuỳ ý trên máy.
+### Kiểm thử
+- `test_meta_pages.py` thêm 3 case: đường dẫn tuyệt đối trong vùng staging đăng được, đường dẫn tương đối tính từ staging đăng được, file trong STATE_DIR nhưng ngoài staging vẫn bị chặn.
+
 ## [0.9.203] - 2026-07-27
 Facebook Trang đăng được album nhiều ảnh và sửa được bài đã đăng.
 ### Thêm mới
