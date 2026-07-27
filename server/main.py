@@ -59,8 +59,10 @@ from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
 import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
 from sessions import get_store   # kho phiên hội thoại (sqlite + fts5): list/resume/search
 import compaction   # nén hội thoại dài cho engine API (tóm tắt phần cũ thay vì cắt bỏ)
+from chat_runtime import ChatRuntime
 
 app = FastAPI(title="Javis OS")
+_CHAT_RUNTIME = ChatRuntime()
 # CORS KHÔNG dùng '*' nữa: dashboard cùng-origin (không cần CORS). Chỉ mở cross-origin cho localhost
 # (tiện dev). Chống trang web độc ĐỌC API qua trình duyệt; phần chống GHI/CSRF ở _csrf_guard bên dưới.
 app.add_middleware(CORSMiddleware,
@@ -432,12 +434,21 @@ async def root():
 @app.post("/stop")
 async def stop(payload: dict = Body(None)):
     """Nút Stop: ngắt lệnh CHAT đang chạy, không đụng tới metrics/loop nền.
-    ĐA PHIÊN: body {"tag": "chat:abcd1234"} (server phát cho mỗi kết nối WS qua message hello)
-    → chỉ ngắt ĐÚNG phiên đó, không giết lượt của người khác đang chat song song.
-    Không có tag (frontend cũ) → ngắt cả họ 'chat' như trước."""
-    tag = str((payload or {}).get("tag") or "").strip()
+    Ưu tiên body {"session_id": "..."} để ngắt đúng job, kể cả job thuộc kết nối web cũ.
+    Body {"tag": "chat:..."} vẫn được giữ để tương thích; không có cả hai thì ngắt họ 'chat'."""
+    data = payload or {}
+    session_id = str(data.get("session_id") or "").strip()
+    tag = str(data.get("tag") or "").strip()
+    if session_id:
+        job_tag = _CHAT_RUNTIME.cancel_session(session_id)
+        n = cancel_all(job_tag) if job_tag else 0
+        return {"ok": True, "cancelled": max(1, n) if job_tag else 0}
     # chỉ chấp nhận tag họ chat - chặn lạm dụng endpoint này để giết loop/workflow nền
-    n = cancel_all(tag if tag.startswith("chat:") else "chat")
+    prefix = tag if tag.startswith("chat:") else "chat"
+    job_tags = _CHAT_RUNTIME.cancel_matching(prefix)
+    n = cancel_all(prefix)
+    if job_tags:
+        n = max(n, len(job_tags))
     return {"ok": True, "cancelled": n}
 
 
@@ -4845,28 +4856,34 @@ async def websocket_endpoint(ws: WebSocket):
         await ws.close(code=1008)
         return
     await ws.accept()
-    # ĐA PHIÊN: tag riêng cho từng kết nối → nút Stop của người này không giết lượt người khác.
-    # Frontend nhận tag qua message hello và gửi kèm khi POST /stop.
+    # WebSocket chỉ là subscriber. Job chat sống trong _CHAT_RUNTIME nên đóng/F5 tab
+    # không huỷ job; kết nối mới nhận snapshot để xem hoặc Stop tiếp.
     conn_tag = f"chat:{uuid.uuid4().hex[:8]}"
+    client_id = uuid.uuid4().hex
     _real_ws = ws                       # ws THẬT; mỗi lượt dùng proxy (bơm session_id + khoá ghi)
     store = get_store()
-    try:
-        await _real_ws.send_text(json.dumps({"type": "hello", "stop_tag": conn_tag}))
-    except Exception:
-        pass
 
     # ĐA HỘI THOẠI SONG SONG: mỗi lượt chat chạy như 1 task nền (không chặn vòng nhận tin), engine
     # riêng từng lượt nên 2 hội thoại generate cùng lúc được. Mọi gói gửi kèm session_id để client
     # định tuyến về đúng phiên; mở "hội thoại mới" KHÔNG giết lượt cũ (nó chạy nốt + tự lưu).
     send_lock = asyncio.Lock()          # nhiều lượt ghi chung 1 ws → khoá cho khỏi xen kẽ hỏng gói
-    running: dict = {}                  # conv_sid -> asyncio.Task (lượt đang chạy của phiên đó)
 
-    async def send_raw(obj):
+    async def send_client(obj):
         async with send_lock:
             try:
                 await _real_ws.send_text(json.dumps(obj))
             except Exception:
                 pass
+
+    _CHAT_RUNTIME.add_client(client_id, send_client)
+    await send_client({
+        "type": "hello",
+        "stop_tag": conn_tag,
+        "running": _CHAT_RUNTIME.snapshot(),
+    })
+
+    async def send_raw(obj):
+        await _CHAT_RUNTIME.publish(obj)
 
     class _SendProxy:
         """Đội lốt ws bên trong 1 lượt: mọi send_text tự gắn session_id của lượt + qua khoá ghi.
@@ -4876,19 +4893,15 @@ async def websocket_endpoint(ws: WebSocket):
 
         async def send_text(self, txt):
             try:
-                o = json.loads(txt); o["session_id"] = self._sid; txt = json.dumps(o)
+                o = json.loads(txt)
+                o["session_id"] = self._sid
             except Exception:
-                pass
-            async with send_lock:
-                try:
-                    await _real_ws.send_text(txt)
-                except Exception:
-                    pass
+                return
+            await _CHAT_RUNTIME.publish(o)
 
     try:
-        async def _do_turn(conv_sid, user_message, brain):
+        async def _do_turn(conv_sid, user_message, brain, turn_tag):
             ws = _SendProxy(conv_sid)               # các nhánh engine bên dưới dùng ws proxy này
-            turn_tag = f"{conn_tag}:{conv_sid[:8]}"
             mcfg = cfgmod.read_settings().get("model", {})
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
@@ -4935,7 +4948,7 @@ async def websocket_endpoint(ws: WebSocket):
                 # cwd=brain (để Codex đọc được Javis/skills + .claude/skills mirror bằng tool file
                 # native, như nhánh workflow) + instructions=sysprompt (kèm ROUTER SKILL) → Codex
                 # dùng được skill. Mỗi hội thoại dashboard giữ riêng codex_thread_id để resume.
-                ccli = CodexCLI(cwd=_brain_root(brain), model=actual_model, tag=conn_tag, instructions=sysprompt)
+                ccli = CodexCLI(cwd=_brain_root(brain), model=actual_model, tag=turn_tag, instructions=sysprompt)
                 _apply_codex_hub(ccli, _brain_root(brain))   # MCP + đúng brain cho cron/nhắc hẹn
                 stored_codex_thread = (_row0.get("codex_thread_id") or "").strip()
                 ccli.session_id = stored_codex_thread or None
@@ -5070,16 +5083,16 @@ async def websocket_endpoint(ws: WebSocket):
                 except Exception as _e:
                     print(f"[learn enqueue hook] {_e}", file=__import__('sys').stderr)
 
-        async def run_turn(conv_sid, user_message, brain):
+        async def run_turn(conv_sid, user_message, brain, turn_tag):
             try:
-                await _do_turn(conv_sid, user_message, brain)
+                await _do_turn(conv_sid, user_message, brain, turn_tag)
             except asyncio.CancelledError:
                 await send_raw({"type": "system", "content": "Đã dừng lượt này.", "session_id": conv_sid})
             except Exception as e:
                 await send_raw({"type": "error", "content": f"Lỗi xử lý: {type(e).__name__}: {e}", "session_id": conv_sid})
             finally:
-                running.pop(conv_sid, None)
                 await send_raw({"type": "turn_done", "session_id": conv_sid})
+                _CHAT_RUNTIME.finish_job(conv_sid, asyncio.current_task())
 
         while True:
             raw = await _real_ws.receive_text()
@@ -5089,10 +5102,9 @@ async def websocket_endpoint(ws: WebSocket):
                 continue                        # client tự quản phiên; reset KHÔNG còn giết lượt nào
             if action == "stop":
                 _sid = payload.get("session_id") or ""
-                _t = running.get(_sid)
-                if _t and not _t.done():
-                    _t.cancel()
-                cancel_all(f"{conn_tag}:{_sid[:8]}")     # giết subprocess engine của đúng lượt đó
+                _tag = _CHAT_RUNTIME.cancel_session(_sid)
+                if _tag:
+                    cancel_all(_tag)     # giết subprocess engine của đúng lượt đó
                 continue
             user_message = payload.get("message", "").strip()
             if not user_message:
@@ -5110,17 +5122,18 @@ async def websocket_endpoint(ws: WebSocket):
                 # Provider khác vừa chen một lượt: thread Codex cũ không chứa lượt này nữa.
                 # Xoá liên kết để lần quay lại Codex bootstrap từ SQLite thay vì resume mạch stale.
                 store.clear_codex_thread_id(conv_sid)
-            if conv_sid in running and not running[conv_sid].done():
+            if _CHAT_RUNTIME.get_job(conv_sid):
                 await send_raw({"type": "error", "content": "Phiên này đang trả lời - đợi lượt hiện tại xong đã.", "session_id": conv_sid})
                 continue
             store.append_message(conv_sid, "user", user_message)
-            running[conv_sid] = asyncio.create_task(run_turn(conv_sid, user_message, brain))
+            turn_tag = f"chat:{conv_sid[:12]}:{uuid.uuid4().hex[:8]}"
+            task = asyncio.create_task(run_turn(conv_sid, user_message, brain, turn_tag))
+            _CHAT_RUNTIME.register_job(conv_sid, task, turn_tag)
     except WebSocketDisconnect:
         pass
     finally:
-        for _t in list(running.values()):
-            if not _t.done():
-                _t.cancel()
+        # Chỉ bỏ subscriber; job server tiếp tục chạy và tự lưu kết quả.
+        _CHAT_RUNTIME.remove_client(client_id)
 
 
 # ============================================================

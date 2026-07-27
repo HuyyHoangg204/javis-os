@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.186] - 2026-07-27
+Lượt chat web tiếp tục chạy trên server khi đóng hoặc tải lại trang, đồng thời vẫn có thể quay lại xem tiến độ và dừng đúng lượt.
+### Sửa lỗi
+- **Đóng web không còn huỷ yêu cầu**: vòng đời job chat được tách khỏi WebSocket; mất kết nối chỉ gỡ kênh hiển thị, không `cancel()` tác vụ đang xử lý.
+- **Mở lại thấy job đang chạy**: server gửi snapshot các session đang xử lý và phần nội dung đã stream để Lịch sử hiện trạng thái, mở đúng hội thoại sẽ xem tiếp trực tiếp.
+- **Stop vẫn chính xác sau reconnect**: registry theo `session_id` giữ task và tag subprocess, nên nút Stop hoặc endpoint `/stop` chỉ huỷ đúng lượt đã chọn, kể cả lượt bắt đầu từ kết nối cũ.
+### Kiểm thử
+- Bổ sung kiểm thử vòng đời job, reconnect/snapshot, Stop theo session và tình huống WebSocket đóng ngay sau khi gửi nhưng kết quả vẫn được lưu đủ vào SQLite.
+
 ## [0.9.185] - 2026-07-26
 Dọn sạch form Environment khi cài Docker, chỉ để lại những trường người dùng thực sự cần.
 ### Cải thiện

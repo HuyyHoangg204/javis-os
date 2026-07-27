@@ -40,7 +40,16 @@ function stopCurrent() {
   voice.stopSpeaking();
   const sid = savedSessionId;
   // Dừng ĐÚNG phiên đang xem (phiên nền khác vẫn chạy). Server huỷ lượt + gửi turn_done về.
-  if (sid && ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ action: "stop", session_id: sid }));
+  if (sid && ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: "stop", session_id: sid }));
+  } else if (sid) {
+    // WebSocket đang reconnect vẫn Stop được qua HTTP; job không còn phụ thuộc connection cũ.
+    fetch("/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid }),
+    }).catch(() => {});
+  }
   hideActivity();
   if (sid && turns[sid]) turns[sid].running = false;
   setSessionRunning(sid, false);
@@ -122,8 +131,28 @@ function connect() {
 }
 
 function handleMessage(data) {
-  // Server chào khi kết nối: nhận tag phiên để nút Stop chỉ ngắt phiên của mình
-  if (data.type === "hello") { stopTag = data.stop_tag || null; return; }
+  // Server chào khi kết nối: đồng bộ các job vẫn đang chạy. Job thuộc server,
+  // không thuộc WebSocket nên đóng/F5 tab rồi mở lại vẫn xem và Stop được.
+  if (data.type === "hello") {
+    stopTag = data.stop_tag || null;
+    if (window.JavisRunning) window.JavisRunning.clear();
+    Object.keys(turns).forEach(sid => { if (turns[sid]) turns[sid].running = false; });
+    (data.running || []).forEach(job => {
+      const sid = job.session_id;
+      if (!sid) return;
+      const old = turns[sid] || {};
+      turns[sid] = {
+        text: (job.text || old.text || ""),
+        bubble: old.bubble || null,
+        spoke: !!old.spoke,
+        running: true,
+      };
+      setSessionRunning(sid, true);
+    });
+    syncActiveUI();
+    notifySessions();
+    return;
+  }
 
   // Định tuyến theo session_id: sự kiện của phiên ĐANG XEM thì render trực tiếp; phiên nền thì
   // chỉ tích luỹ vào buffer + đánh dấu "đang chạy" ở Lịch sử (server đã tự lưu vào DB).
