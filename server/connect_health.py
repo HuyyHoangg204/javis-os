@@ -107,10 +107,111 @@ def forget(conn_id) -> None:
     _state.pop(conn_id, None)
 
 
+# ─────────────── Đèn báo não (engine health) ───────────────
+# Não chết thì chính não KHÔNG tự báo được (mọi thông báo thông minh đều đi qua engine),
+# nên tín hiệu phải do server tự thắp: (1) probe hạn token định kỳ trong sweep,
+# (2) cờ phản ứng khi một lượt chạy engine trả lỗi đăng nhập (flag_engine_auth_error).
+
+_engines: dict = {}       # name -> {ok, message, source, ts, notified}
+on_engine_down = None     # main.py gắn: async fn(text) gửi Telegram MỘT lần khi não chuyển chết
+
+# Mẫu lỗi đăng nhập trong OUTPUT một lượt chạy engine (vụ 2026-07-27: Claude CLI hết phiên,
+# mọi task trả "Failed to authenticate: OAuth session expired and could not be refreshed").
+_ENGINE_AUTH_PATTERNS = ("failed to authenticate", "oauth session expired",
+                         "oauth token has expired", "please run /login",
+                         "api key not found", "not logged in", "invalid api key")
+
+ENGINE_FIX = {
+    "claude": "Mở terminal chạy claude rồi gõ /login để đăng nhập lại.",
+    "codex": "Vào trang Models bấm kết nối lại ChatGPT, hoặc chạy codex login trong terminal.",
+}
+
+
+def _set_engine(name, ok, message="", source="probe"):
+    prev = _engines.get(name) or {}
+    rec = {"ok": ok, "message": message, "source": source, "ts": time.time(),
+           "notified": bool(prev.get("notified"))}
+    if ok:
+        rec["notified"] = False   # hồi sinh → lần chết sau lại được báo
+    _engines[name] = rec
+    if not ok and not rec["notified"] and on_engine_down:
+        rec["notified"] = True
+        try:
+            coro = on_engine_down(f"⚠ Bộ não {name} của Javis đang mất đăng nhập: {message} "
+                                  + ENGINE_FIX.get(name, ""))
+            if asyncio.iscoroutine(coro):
+                asyncio.ensure_future(coro)
+        except Exception as e:
+            print(f"[engine health] notify lỗi: {e}", file=sys.stderr)
+
+
+def flag_engine_auth_error(name, raw) -> bool:
+    """Gọi từ engine khi một lượt chạy kết thúc: text khớp mẫu lỗi đăng nhập thì bật đèn đỏ.
+    Trả True nếu đã bật (caller khỏi phân tích lại)."""
+    low = (raw or "").lower()
+    if not any(p in low for p in _ENGINE_AUTH_PATTERNS):
+        return False
+    _set_engine(name, False, "Hết phiên đăng nhập (phát hiện khi chạy).", "run")
+    return True
+
+
+def engine_run_ok(name) -> None:
+    """Một lượt chạy thành công → não sống, tắt đèn (rẻ, chỉ ghi khi đang đỏ)."""
+    rec = _engines.get(name)
+    if rec and not rec.get("ok"):
+        _set_engine(name, True, "", "run")
+
+
+def probe_claude_credentials(path=None) -> tuple[bool, str]:
+    """Đọc hạn token Claude CLI (~/.claude/.credentials.json). CHỈ ĐỌC - tuyệt đối không
+    tự refresh (tự refresh làm user bị đăng xuất, xem bài học cũ).
+    Có refreshToken → CLI tự làm mới được, coi là sống dù access token đã quá hạn."""
+    from pathlib import Path
+    p = Path(path) if path else Path.home() / ".claude" / ".credentials.json"
+    try:
+        import json as _json
+        oa = _json.loads(p.read_text(encoding="utf-8")).get("claudeAiOauth") or {}
+    except FileNotFoundError:
+        return False, "Chưa đăng nhập Claude Code trên máy này."
+    except Exception:
+        return False, "Không đọc được thông tin đăng nhập Claude Code."
+    if not oa:
+        return False, "Chưa đăng nhập Claude Code trên máy này."
+    if oa.get("refreshToken"):
+        return True, ""
+    exp = oa.get("expiresAt") or 0
+    if exp / 1000 > time.time():
+        return True, ""
+    return False, "Phiên đăng nhập Claude Code đã hết hạn và không tự làm mới được."
+
+
+def probe_engines() -> None:
+    """Probe định kỳ (gọi trong sweep). Chỉ soi engine đang là Main Model để khỏi báo
+    đỏ oan máy không dùng Claude. Đèn do lượt chạy bật (source=run) không bị probe đè
+    sang xanh - lỗi lúc chạy là bằng chứng mạnh hơn suy đoán từ file token."""
+    try:
+        import config as _cfg
+        provider = (((_cfg.read_settings().get("model") or {}).get("main") or {})
+                    .get("provider") or "anthropic-cli")
+    except Exception:
+        provider = "anthropic-cli"
+    if provider == "anthropic-cli":
+        ok, msg = probe_claude_credentials()
+        cur = _engines.get("claude") or {}
+        if ok and cur.get("source") == "run" and not cur.get("ok"):
+            return   # đèn đỏ do lượt chạy thật - chờ engine_run_ok tắt, probe không đè
+        _set_engine("claude", ok, msg, "probe")
+
+
+def engines_snapshot() -> dict:
+    return {n: dict(r) for n, r in _engines.items()}
+
+
 async def _loop():
     await asyncio.sleep(_STARTUP_DELAY)
     while True:
         try:
+            probe_engines()
             await sweep()
         except Exception as e:
             print(f"[connect health] vòng quét lỗi: {type(e).__name__}: {e}",

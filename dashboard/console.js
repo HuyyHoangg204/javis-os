@@ -4625,8 +4625,33 @@
     });
   }
 
+  // ── Đèn báo não: bộ não (Claude/Codex) mất đăng nhập thì thắp dải đỏ trên thanh trạng thái.
+  // Não chết thì chính não không tự báo được, nên server probe + cắm cờ, UI chỉ việc hỏi.
+  const ENGINE_FIX_UI = {
+    claude: "Mở terminal chạy claude rồi gõ /login.",
+    codex: "Vào trang Models kết nối lại ChatGPT (hoặc chạy codex login).",
+  };
+  async function refreshEngineBanner() {
+    const b = document.getElementById("engineBanner");
+    if (!b) return;
+    let d;
+    try {
+      const r = await fetch("/connect/health", { cache: "no-store" });
+      if (!r.ok) return;   // chưa đăng nhập dashboard thì thôi, đừng nháy lỗi
+      d = await r.json();
+    } catch (e) { return; }
+    const dead = Object.entries(d.engines || {}).filter(([, rec]) => rec && rec.ok === false);
+    if (!dead.length) { b.hidden = true; return; }
+    const [name, rec] = dead[0];
+    b.textContent = "⚠ Bộ não " + name + " mất đăng nhập: " + (rec.message || "")
+      + " " + (ENGINE_FIX_UI[name] || "");
+    b.hidden = false;
+  }
+
   function boot() {
     document.body.classList.add("has-rail");
+    refreshEngineBanner();
+    setInterval(refreshEngineBanner, 90000);
     const ver = document.getElementById("railVersion");
     if (ver) {
       ver.textContent = "v" + APP_VERSION;   // hiện tạm, thay ngay bằng phiên bản thật từ server

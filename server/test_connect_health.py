@@ -138,3 +138,72 @@ def test_snapshot_tra_ban_sao():
     snap = connect_health.snapshot()
     snap["s1"]["ok"] = False
     assert connect_health.snapshot()["s1"]["ok"] is True
+
+
+# ---- Đèn báo não (engine health) ----
+
+def _reset_engines():
+    connect_health._engines.clear()
+    connect_health.on_engine_down = None
+
+
+def test_flag_engine_bat_den_voi_loi_that():
+    """Chuỗi lỗi THẬT của vụ 2026-07-27 phải bật đèn."""
+    _reset_engines()
+    hit = connect_health.flag_engine_auth_error(
+        "claude", "Failed to authenticate: OAuth session expired and could not be refreshed")
+    assert hit is True
+    assert connect_health.engines_snapshot()["claude"]["ok"] is False
+
+
+def test_flag_engine_khong_bat_voi_ket_qua_thuong():
+    _reset_engines()
+    assert connect_health.flag_engine_auth_error("claude", "Doanh thu hôm nay 5 triệu.") is False
+    assert "claude" not in connect_health.engines_snapshot()
+
+
+def test_notify_dung_mot_lan_moi_dot_chet():
+    """Chết báo Telegram MỘT lần; chết tiếp không spam; hồi sinh rồi chết lại thì báo lại."""
+    _reset_engines()
+    calls = []
+    connect_health.on_engine_down = lambda text: calls.append(text)
+    connect_health.flag_engine_auth_error("claude", "failed to authenticate")
+    connect_health.flag_engine_auth_error("claude", "failed to authenticate")
+    assert len(calls) == 1 and "claude" in calls[0]
+    connect_health.engine_run_ok("claude")
+    assert connect_health.engines_snapshot()["claude"]["ok"] is True
+    connect_health.flag_engine_auth_error("claude", "failed to authenticate")
+    assert len(calls) == 2
+    _reset_engines()
+
+
+def test_probe_khong_de_den_do_do_luot_chay(monkeypatch):
+    """Đèn đỏ do lượt chạy thật (source=run) mạnh hơn suy đoán từ file token - probe không đè."""
+    _reset_engines()
+    import config as _cfg
+    monkeypatch.setattr(_cfg, "read_settings",
+                        lambda: {"model": {"main": {"provider": "anthropic-cli"}}})
+    monkeypatch.setattr(connect_health, "probe_claude_credentials", lambda path=None: (True, ""))
+    connect_health.flag_engine_auth_error("claude", "failed to authenticate")
+    connect_health.probe_engines()
+    assert connect_health.engines_snapshot()["claude"]["ok"] is False
+    _reset_engines()
+
+
+def test_probe_claude_credentials_cac_nhanh(tmp_path):
+    import json as _json
+    import time as _time
+    p = tmp_path / "cred.json"
+    # chưa có file
+    ok, msg = connect_health.probe_claude_credentials(p)
+    assert ok is False and "Chưa đăng nhập" in msg
+    # có refreshToken → sống dù access token quá hạn
+    p.write_text(_json.dumps({"claudeAiOauth": {"refreshToken": "r", "expiresAt": 1}}), encoding="utf-8")
+    assert connect_health.probe_claude_credentials(p)[0] is True
+    # không refreshToken, token còn hạn → sống
+    p.write_text(_json.dumps({"claudeAiOauth": {"expiresAt": (_time.time() + 3600) * 1000}}), encoding="utf-8")
+    assert connect_health.probe_claude_credentials(p)[0] is True
+    # không refreshToken, token quá hạn → chết kèm lý do
+    p.write_text(_json.dumps({"claudeAiOauth": {"expiresAt": 1000}}), encoding="utf-8")
+    ok, msg = connect_health.probe_claude_credentials(p)
+    assert ok is False and "hết hạn" in msg

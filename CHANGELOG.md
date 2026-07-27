@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.195] - 2026-07-27
+Đèn báo não: bộ não mất đăng nhập là dashboard báo ngay, kèm dọn gọn thanh trạng thái.
+### Thêm mới
+- **Đèn báo não**: khi bộ não Claude hết phiên đăng nhập, thanh trạng thái hiện dải đỏ nói rõ chuyện gì và sửa thế nào (chạy claude rồi gõ /login), kèm MỘT tin Telegram - không spam lại mỗi vòng, hồi sinh rồi chết lại mới báo tiếp. Hai nguồn tín hiệu: server tự soi hạn token định kỳ trong vòng health sẵn có, và bất cứ lượt chạy nào của engine trả lỗi đăng nhập thì bật đèn ngay. Bài học từ vụ 2026-07-27: não chết âm thầm, 3 việc nền chạy ra rác mà không ai hay - não chết thì chính não không tự báo được, phải có đèn ngoài.
+### Cải thiện
+- **Thanh trạng thái dọn gọn**: bỏ chữ Javis OS và dòng thứ ngày tháng theo yêu cầu chủ - thanh đang quá tải; tên workspace vẫn hiện trong Cài đặt. Chỗ trống dành cho chuông Thông báo và đèn báo não.
+### Kiểm thử
+- `test_connect_health.py` thêm 5 test đèn báo: bật đèn với chuỗi lỗi thật, không bật với kết quả thường, báo Telegram đúng một lần mỗi đợt chết, probe không đè đèn đỏ do lượt chạy thật, đọc hạn token đủ nhánh.
+
 ## [0.9.194] - 2026-07-27
 Trang Kết nối bớt chữ kỹ thuật, gọn hơn và dễ đọc trên điện thoại.
 ### Cải thiện

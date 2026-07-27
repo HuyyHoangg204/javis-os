@@ -1103,9 +1103,9 @@ async def connect_test(request: Request):
 
 @app.get("/connect/health")
 async def connect_health_all():
-    """Sức khoẻ mọi connection (vòng nền connect_health cập nhật). Connection chưa
-    check thì vắng mặt - UI hiểu là 'chưa rõ' (chấm vàng)."""
-    return {"health": connect_health.snapshot()}
+    """Sức khoẻ mọi connection (vòng nền connect_health cập nhật) + đèn báo não (engines).
+    Connection chưa check thì vắng mặt - UI hiểu là 'chưa rõ' (chấm vàng)."""
+    return {"health": connect_health.snapshot(), "engines": connect_health.engines_snapshot()}
 
 
 @app.post("/connect/health/check")
@@ -3864,7 +3864,8 @@ async def _start_scheduler():
     except Exception as e:
         print(f"[kanban start] {e}", file=_sys.stderr)
     try:
-        connect_health.start()   # vòng check sức khoẻ kết nối cho trang Kết nối
+        connect_health.on_engine_down = _loop_notify   # đèn báo não → Telegram, chỉ 1 lần mỗi đợt chết
+        connect_health.start()   # vòng check sức khoẻ kết nối + probe đèn báo não
     except Exception as e:
         print(f"[connect health start] {e}", file=_sys.stderr)
     try:

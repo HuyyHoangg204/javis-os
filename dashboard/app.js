@@ -73,12 +73,11 @@ const ttsToggle = document.getElementById("ttsToggle");
 const voiceInterim = document.getElementById("voiceInterim");
 const orbState = document.getElementById("orbState");
 
-document.getElementById("currentDate").textContent = new Date().toLocaleDateString("vi-VN", {
-  weekday: "long", year: "numeric", month: "long", day: "numeric"
-});
-
+// Thanh trạng thái đã bỏ tên workspace + ngày tháng (0.9.195) - element có thể không còn,
+// nên mọi truy cập phải guard để trang không chết trắng nếu thiếu.
 fetch("/config").then(r => r.json()).then(cfg => {
-  document.getElementById("workspaceName").textContent = cfg.workspace_name || "Javis OS";
+  const wn = document.getElementById("workspaceName");
+  if (wn) wn.textContent = cfg.workspace_name || "Javis OS";
 }).catch(() => {});
 
 // ============================================

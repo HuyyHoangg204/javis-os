@@ -40,10 +40,11 @@
           <span class="graph-stats" id="graphStats">-</span>
         </div>
       </div>
-      <!-- NHÓM GIỮA: tên workspace + ngày (căn giữa) -->
+      <!-- NHÓM GIỮA: thanh trạng thái đang quá tải nên bỏ tên workspace lẫn ngày tháng theo
+           yêu cầu chủ (0.9.195) - tên vẫn hiện trong Cài đặt; chỗ này giờ dành cho chuông
+           Thông báo và đèn báo não khi bộ não mất đăng nhập. -->
       <div class="hud-center-title">
-        <span class="ws-name" id="workspaceName">Javis OS</span>
-        <span class="ws-date" id="currentDate"></span>
+        <span class="engine-banner" id="engineBanner" hidden></span>
         <button class="notification-trigger" id="notificationTrigger" type="button"
                 aria-haspopup="dialog" aria-expanded="false" title="Mở hộp thư Thông báo">
           <svg viewBox="0 0 24 24" aria-hidden="true">

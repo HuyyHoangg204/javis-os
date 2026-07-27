@@ -100,6 +100,15 @@ def map_message(msg):
         return events, None
     if isinstance(msg, ResultMessage):
         u = msg.usage or {}
+        # Đèn báo não: kết quả cuối khớp mẫu lỗi đăng nhập → bật đèn đỏ trên dashboard
+        # + Telegram; chạy sạch thì tắt đèn. Não chết không tự báo được nên phải bắt ở đây.
+        try:
+            import connect_health
+            if not connect_health.flag_engine_auth_error("claude", msg.result or ""):
+                if not msg.is_error:
+                    connect_health.engine_run_ok("claude")
+        except Exception:
+            pass
         # Kết thúc LỖI mà không có chữ nào trả về → nói rõ lý do thay vì để dashboard
         # hiện "(không có nội dung trả về)" trơ trọi (hay gặp sau khi phiên trước bị ngắt).
         if msg.is_error and not (msg.result or "").strip():
