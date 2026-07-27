@@ -6,8 +6,8 @@ Không cần pytest, không chạm mạng.
 
 Bối cảnh: trường `risk` trong mcp-catalog.json trước đây CHỈ được vẽ ở luồng QR (openQrFlow) và ở
 hộp thoại đổi quyền. 15/16 connector có cảnh báo thì không bao giờ hiện cảnh báo lúc bấm Kết nối,
-gồm cả facebook-personal (dán cookie tài khoản thật) và google-keep (token toàn quyền tài khoản
-Google). Test này giữ cho lỗi đó không quay lại.
+gồm cả google-keep (token toàn quyền tài khoản Google) và zalo. Test này giữ cho lỗi đó không
+quay lại.
 """
 import json
 import os
@@ -56,7 +56,7 @@ for ten in ("openApikeyFlow", "openOauthFlow", "openQrFlow"):
 cat = json.loads((ROOT / "system" / "mcp-catalog.json").read_text(encoding="utf-8"))
 by_id = {c["id"]: c for c in cat["connectors"]}
 
-for cid in ("google-keep", "facebook-personal", "zalo"):
+for cid in ("google-keep", "zalo"):
     check(f"{cid} có khai risk", bool((by_id.get(cid) or {}).get("risk")))
 
 # ---- google-keep: mô tả trên THẺ phải nói rõ bán kính thiệt hại ----

@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.207] - 2026-07-27
+Gỡ hẳn kết nối "Facebook cá nhân (cookie)" - đường mbasic đã chết, không cứu được.
+### Gỡ bỏ
+- **Xoá connector `facebook-personal` và plugin `fb-personal`** cùng 11 tool đi kèm (`fb_feed_read`, `fb_personal_post`, `fb_personal_comment`, `fb_personal_comments`, `fb_personal_comment_reply`, `fb_personal_delete`, `fb_personal_react`, `fb_personal_share`, `fb_messages_read`, `fb_message_thread`, `fb_message_send`). Lý do: Facebook đã khai tử mbasic nên plugin không còn đọc hay ghi được dù cookie còn tốt, và bản thân cách làm này vi phạm điều khoản Facebook, rủi ro khoá tài khoản là có thật. Không thay bằng gì - hướng khác sẽ tính sau.
+- Các kết nối Facebook còn lại KHÔNG bị ảnh hưởng: `meta-ads-graph` (quảng cáo), `facebook-pages` (Trang), `facebook-monitor` (theo dõi Trang/Nhóm công khai qua Apify), `meta-ads`.
+### Kiểm thử
+- Xoá `test_fb_personal.py`; `test_canh_bao_rui_ro.py` bỏ `facebook-personal` khỏi danh sách connector bắt buộc có cảnh báo rủi ro.
+
 ## [0.9.206] - 2026-07-27
 Kết nối OAuth bỏ dở không còn hiện như tài khoản thật và không mọc lại sau khi xoá.
 ### Sửa lỗi
