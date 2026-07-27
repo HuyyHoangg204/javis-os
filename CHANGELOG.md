@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.196] - 2026-07-27
+Huỷ lịch nói tự nhiên cũng hiểu, huỷ nhầm khó hơn, và tin nhắc hẹn không còn lộ chỉ dẫn máy.
+### Sửa lỗi
+- **"Huỷ lịch Làm việc tại cafe" giờ vào đúng cổng huỷ**: trước đây phải nói kèm chữ cron, nhắc hẹn hay reminder thì cổng huỷ mới nhận, nói gọn kiểu tự nhiên là lọt ra ngoài để model tự đoán cách xoá (có thể sửa thẳng file reminders.json và huỷ nhầm). Giờ chữ "lịch" độc lập là đủ, nhưng lịch ngoài Javis (Google Calendar, cuộc họp, sự kiện) vẫn được nhường cho tool Calendar.
+- **Tin Telegram của nhắc hẹn dạng tự-làm chỉ gửi kết quả**: trước đây ghép cả prompt nội bộ (vai trò, quy trình, đường dẫn) vào tin nhắn - vừa rối vừa lộ chỉ dẫn máy như ca Coach Mục Tiêu & Kỷ Luật. Giờ chỉ gửi phần việc đã làm ra; lỗi thì báo ngắn gọn, cũng không lộ prompt.
+### Cải thiện
+- **Luật huỷ an toàn cho agent**: khi tool javis_schedule lỗi, hướng dẫn kênh nói rõ đường lui duy nhất là POST /reminders/cancel bằng form-data với id thật lấy từ danh sách; cấm gọi DELETE, cấm đoán body JSON, cấm sửa trực tiếp file reminders.json.
+### Kiểm thử
+- `test_reminder_delivery.py` mới: task chỉ gửi kết quả, lỗi không lộ prompt, notify thường giữ nguyên. `test_tool_reliability.py` và `test_channel_reminder_brain.py` thêm case câu huỷ tự nhiên, lịch Google không bị cướp, và recipe fallback đúng endpoint.
+
 ## [0.9.195] - 2026-07-27
 Đèn báo não: bộ não mất đăng nhập là dashboard báo ngay, kèm dọn gọn thanh trạng thái.
 ### Thêm mới

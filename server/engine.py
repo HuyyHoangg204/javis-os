@@ -668,16 +668,24 @@ def _schedule_read_request(messages):
 
 
 def _schedule_cancel_request(messages):
-    """Nhận diện yêu cầu huỷ/xoá lịch, không nhầm với câu chỉ hỏi hoặc tạo lịch."""
+    """Nhận diện yêu cầu huỷ/xoá lịch, không nhầm với câu chỉ hỏi hoặc lịch ngoài Javis."""
     last = next((m.get("content") or "" for m in reversed(messages or [])
                  if m.get("role") == "user"), "")
     q = _plain_vn(last)
     cancel = any(x in q for x in ("huy", "xoa", "go ", "tat", "dung", "bo lich", "bo nhac"))
-    schedule = any(x in q for x in (
+    explicit_schedule = any(x in q for x in (
         "cron", "nhac", "lich thuoc", "lich nhac", "viec dinh ky",
         "morning briefing", "reminder", "vua bao",
     )) or bool(re.search(r"\bhen\b", q))
-    return cancel and schedule
+    # Người dùng thường nói gọn "huỷ lịch Làm việc tại cafe", không nhắc lại chữ cron/reminder.
+    # Trước đây câu này lọt khỏi gateway, model tự đoán DELETE/JSON rồi có thể sửa thẳng
+    # reminders.json. Chỉ nhận chữ "lịch" độc lập và tránh lịch ngoài Javis (Google Calendar,
+    # cuộc họp/sự kiện) để không cướp yêu cầu của tool Calendar.
+    plain_schedule = bool(re.search(r"\blich\b", q))
+    external_calendar = any(x in q for x in (
+        "google calendar", "outlook calendar", "cuoc hop", "meeting", "su kien", "event",
+    ))
+    return cancel and (explicit_schedule or (plain_schedule and not external_calendar))
 
 
 def _schedule_candidates(result):

@@ -58,6 +58,15 @@ check("câu XÓA cron -> nhận đúng mutation cancel",
 check("câu follow-up 'xoá cái vừa báo' -> vẫn nhận là cancel lịch",
       engine._schedule_cancel_request(
           [{"role": "user", "content": "Xóa cái vừa báo đi em"}]))
+check("câu tự nhiên 'huỷ lịch Làm việc tại cafe' -> vào gateway huỷ",
+      engine._schedule_cancel_request(
+          [{"role": "user", "content": "Huỷ lịch Làm việc tại cafe sáng nay giúp anh"}]))
+check("câu 'tắt lịch' không cần nói cron/reminder -> vào gateway huỷ",
+      engine._schedule_cancel_request(
+          [{"role": "user", "content": "Tắt lịch Làm việc tại cafe đi em"}]))
+check("lịch Google Calendar -> không bị gateway reminder cướp",
+      not engine._schedule_cancel_request(
+          [{"role": "user", "content": "Huỷ lịch họp trên Google Calendar giúp anh"}]))
 
 
 class FakeResponse:
@@ -162,6 +171,19 @@ async def schedule_cancel_gateway_tests():
         check("gateway chọn đúng cron theo tên duy nhất",
               action.get("handled") and action.get("id") == "rem_b")
         check("gateway tự gọi list rồi cancel, không phụ thuộc function-calling",
+              calls == [
+                  ("javis_schedule", {"op": "list"}),
+                  ("javis_schedule", {"op": "cancel", "id": "rem_b"}),
+              ])
+
+        calls.clear()
+        natural = await engine.schedule_cancel_gateway(
+            [{"role": "user", "content": "Huỷ lịch Brainstorm cách làm việc quan trọng hôm nay"}],
+            schedule_tool, {"javis_schedule": {}},
+        )
+        check("gateway huỷ đúng lịch khi user chỉ nói 'huỷ lịch <tên>'",
+              natural.get("handled") and natural.get("id") == "rem_b")
+        check("câu huỷ lịch tự nhiên vẫn chỉ gọi list rồi cancel",
               calls == [
                   ("javis_schedule", {"op": "list"}),
                   ("javis_schedule", {"op": "cancel", "id": "rem_b"}),

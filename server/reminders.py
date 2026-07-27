@@ -352,11 +352,14 @@ class RemindersFeature:
             async with self.lock:
                 body, err = await self._run_task(brain, text)
             if body:
-                msg = "⏰ Nhắc hẹn (Javis đã làm):\n" + head + "\n\n" + body
+                # `text`/`head` là prompt nội bộ để agent làm việc, có thể dài và chứa đường dẫn,
+                # vai trò, quy trình. Telegram chỉ cần KẾT QUẢ cuối; ghép prompt vào đây vừa rối
+                # vừa làm lộ chỉ dẫn máy như ca Coach Mục Tiêu & Kỷ Luật.
+                msg = body.strip()
             elif err:
-                msg = "⏰ Nhắc hẹn: " + text + "\n\n⚠ Chưa chạy được nhiệm vụ: " + err[:300]
+                msg = "⚠ Nhắc hẹn chưa chạy được nhiệm vụ: " + err[:300]
             else:
-                msg = "⏰ Nhắc hẹn: " + text
+                msg = "⚠ Nhắc hẹn đã chạy nhưng không trả về nội dung."
         elif mode == "script":
             async with self.lock:
                 out, serr, code = await self._run_script(brain, rem.get("script", ""))

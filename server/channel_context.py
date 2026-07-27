@@ -55,7 +55,8 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
         "- Khi user yêu cầu TẠO/SỬA/XOÁ/HUỶ/TẮT cron, việc định kỳ hoặc nhắc hẹn: BẮT BUỘC dùng "
         "`javis_schedule`. Riêng xoá/huỷ mà chưa có id thì gọi `op=list`, khớp đúng mục rồi gọi "
         "`op=cancel`; không đẩy user sang trang Việc định kỳ để tự làm và chỉ xác nhận sau khi tool "
-        "trả thành công.",
+        "trả thành công. Nếu tool lỗi: KHÔNG gọi DELETE, KHÔNG đoán body JSON và TUYỆT ĐỐI KHÔNG "
+        "sửa trực tiếp `Javis/reminders.json` - làm vậy có thể huỷ nhầm job.",
         "- Với mọi dữ liệu đang chạy hoặc dữ liệu tài khoản ngoài (MCP/Google/POS...): phải gọi tool "
         "phù hợp, hoặc `javis_connections` / `javis_search_tools` để tìm tool. Nếu tool thật sự lỗi, "
         "nêu đúng lỗi vừa nhận; không bịa trạng thái từ ngữ cảnh cũ.",
@@ -121,6 +122,18 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
              "- (Không xác định được brain phiên → nhắc sẽ vào Brain Default.)"),
             "- Gọi curl xong, đọc JSON trả về: ok=true kèm due_human là đã đặt - xác nhận lại NGẮN bằng lời "
             "(vd \"Ok, 8h30 sáng mai em nhắc anh nhé\"). KHÔNG nói đã đặt nếu curl chưa trả ok=true.",
+            "",
+            "## Fallback HUỶ nhắc hẹn khi javis_schedule thật sự lỗi",
+            "- Chỉ dùng fallback này cho reminder có id dạng `r_...`; loop/file định kỳ phải dừng và báo đúng "
+            "lỗi tool, không tự sửa/xoá file.",
+            "- Chưa có id: đọc danh sách thật bằng "
+            f"`curl -sG http://127.0.0.1:{port}/reminders "
+            f"--data-urlencode \"brain={brain_root or 'brain'}\"`; chỉ chọn item `status=pending` khớp chắc chắn.",
+            "- Có đúng id: huỷ bằng form-data chuẩn "
+            f"`curl -s -X POST http://127.0.0.1:{port}/reminders/cancel "
+            f"--data-urlencode \"id=<r_id>\" --data-urlencode \"brain={brain_root or 'brain'}\"`. "
+            "Endpoint không có DELETE và không nhận JSON.",
+            "- Chỉ xác nhận đã huỷ khi JSON trả `ok:true`; `ok:false`, 401 hoặc lỗi khác thì báo nguyên lỗi và dừng.",
             "",
             "## Tạo Loop / Việc (Kanban) cho user qua chat - báo kết quả về ĐÚNG người",
             "Loop chạy nền (mỗi vòng) và việc Kanban (khi chạy xong) TỰ báo kết quả về Telegram của "
