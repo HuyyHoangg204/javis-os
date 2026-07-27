@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.210] - 2026-07-27
+Sửa bước sai trong hướng dẫn Meta Ads: bản chạy máy cá nhân KHÔNG phải điền URI chuyển hướng.
+### Sửa lỗi
+- **Hết bắt người dùng điền thứ Meta không cho điền**: hướng dẫn cũ bảo dán `http://localhost:7777/connect/oauth/callback` vào ô "URI chuyển hướng OAuth hợp lệ", nhưng khi app ở Chế độ phát triển thì Meta TỰ ĐỘNG cho phép chuyển hướng về localhost và cố tình chặn không cho thêm tay (có chú thích ngay cạnh ô). Người cài trên máy cá nhân làm theo hướng dẫn cũ sẽ mắc kẹt ở đúng bước này. Hướng dẫn trong hộp thoại Kết nối và tài liệu nay tách rõ: cài máy cá nhân thì BỎ QUA ô đó, cài trên VPS/tên miền riêng thì BẮT BUỘC điền địa chỉ https.
+- **Khắc phục sự cố nói đúng nguyên nhân**: mục "Facebook từ chối / redirect_uri" tách theo nơi cài, và nhấn rằng với bản chạy localhost thì chính việc GIỮ app ở Chế độ phát triển mới là thứ khiến localhost được chấp nhận. Thêm mục riêng cho tình huống "không điền được localhost vào ô đó".
+
 ## [0.9.209] - 2026-07-27
 Hướng dẫn đấu Meta Ads giờ đi được cả hai giao diện app của Meta, hết cảnh "không thấy mục Sản phẩm".
 ### Cải thiện
