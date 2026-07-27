@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.212] - 2026-07-28
+Sửa lại cho đúng: bảng "Invalid Scopes" KHÔNG chặn đăng nhập, đừng bắt người dùng đi vòng.
+### Sửa lỗi
+- **Hạ "Invalid Scopes" từ lỗi chặn xuống cảnh báo bỏ qua được**: bản 0.9.211 mô tả bảng này như lỗi bắt buộc phải đi thêm quyền mới kết nối được. Sai. Chính thông báo của Meta ghi "This message is only shown to developers" và luồng đăng nhập vẫn chạy tiếp; app ở Chế độ phát triển với người bấm là Quản trị viên thì Facebook vẫn cấp đủ quyền (kiểm chứng thực tế: token lấy về có đủ `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `pages_manage_engagement`, không quyền nào bị từ chối). Hướng dẫn hai connector Facebook Trang và Meta Ads nay bảo bấm OK đi tiếp, chỉ khi kết nối xong mà không thấy Trang/tài khoản quảng cáo nào mới quay lại thêm quyền.
+- **Thêm cách tự kiểm chứng** trong tài liệu: kết nối xong hỏi Javis "liệt kê các Trang của tôi", thấy đủ là xong, không phải mò cấu hình app.
+
 ## [0.9.211] - 2026-07-27
 Hướng dẫn đấu Trang và Quảng cáo thêm bước bật quyền cho app, hết lỗi "Invalid Scopes".
 ### Sửa lỗi
