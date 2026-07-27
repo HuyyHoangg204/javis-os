@@ -1,10 +1,13 @@
 #!/usr/bin/env python
-"""Updater tách rời của Javis cho bản GIT checkout (Windows + native Linux). Server spawn DETACHED:
+"""Updater tách rời của Javis cho bản GIT checkout (Windows + Linux systemd + Mac/nohup).
+Server spawn DETACHED:
 
-    python updater.py --old-sha <sha> --old-version <v> --target <v> --port <p>
+    python updater.py --old-sha <sha> --old-version <v> --target <v> --port <p> --server-pid <pid>
 
 Chuỗi: stop server -> git pull (stash nếu cây bẩn) -> pip install -> start -> chờ /health ~90s.
 /health không lên → git reset --hard <old-sha> -> pip -> start (rollback tự động).
+3 chế độ restart (service_mode): windows (bat/vbs), systemd (systemctl), nohup (Mac hoặc
+Linux không systemd: kill PID server cũ rồi tự chạy lại uvicorn nền như install.sh).
 Chỉ dùng stdlib (chạy được cả khi bản mới hỏng dependency)."""
 import argparse
 import datetime
@@ -55,19 +58,80 @@ def has_systemd():
         return False
 
 
-def stop_server():
-    if os.name == "nt":
+def service_mode(osname=None, systemd=None):
+    """windows | systemd | nohup - cách stop/start server theo nền tảng. Mac không có
+    systemctl (và Linux cài không systemd) chạy kiểu nohup: kill PID + tự chạy lại uvicorn."""
+    osname = osname or os.name
+    if osname == "nt":
+        return "windows"
+    if systemd is None:
+        systemd = has_systemd()
+    return "systemd" if systemd else "nohup"
+
+
+def _pid_alive(pid):
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _kill_pid(pid, timeout_s=15):
+    import signal
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        return
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if not _pid_alive(pid):
+            return
+        time.sleep(0.5)
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except OSError:
+        pass
+
+
+def _pids_on_port(port):
+    """PID đang giữ cổng (lsof có sẵn trên Mac lẫn đa số Linux). Fallback khi thiếu --server-pid."""
+    try:
+        r = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True)
+        return [int(x) for x in (r.stdout or "").split() if x.strip().isdigit()]
+    except Exception:
+        return []
+
+
+def stop_server(mode, server_pid=0, port=""):
+    if mode == "windows":
         run(["cmd", "/c", str(ROOT / "stop-javis.bat")])
-    else:
+    elif mode == "systemd":
         subprocess.run(["systemctl", "stop", "javis"], capture_output=True, text=True)
+    else:  # nohup: kill đúng PID server (mình là session riêng nên không chết theo)
+        pids = [server_pid] if server_pid else []
+        pids += [p for p in _pids_on_port(port) if p not in pids and p != os.getpid()]
+        if not pids:
+            log("Không tìm thấy tiến trình server để dừng (có thể đã tắt).")
+        for p in pids:
+            log(f"Dừng PID {p}…")
+            _kill_pid(p)
 
 
-def start_server():
-    if os.name == "nt":
+def start_server(mode, port=""):
+    if mode == "windows":
         subprocess.Popen(["wscript.exe", "//nologo", str(ROOT / "start-javis.vbs")],
                          cwd=str(ROOT), creationflags=0x00000008)  # DETACHED_PROCESS
-    else:
+    elif mode == "systemd":
         subprocess.run(["systemctl", "start", "javis"], capture_output=True, text=True)
+    else:  # nohup: chạy lại uvicorn nền y như install.sh (fallback không systemd)
+        host = os.getenv("JAVIS_HOST", "127.0.0.1")
+        logf = open(us.STATE_DIR / "javis.log", "a", encoding="utf-8")
+        subprocess.Popen(
+            [venv_python(), "-m", "uvicorn", "main:app", "--host", host, "--port", str(port or "7777")],
+            cwd=str(ROOT / "server"), stdout=logf, stderr=subprocess.STDOUT,
+            start_new_session=True,
+            env={**os.environ, "JAVIS_STATE_DIR": os.getenv("JAVIS_STATE_DIR", str(us.STATE_DIR))})
 
 
 def git_dirty():
@@ -106,6 +170,8 @@ def main():
     ap.add_argument("--old-version", default="")
     ap.add_argument("--target", default="")
     ap.add_argument("--port", default=os.getenv("JAVIS_PORT", "7777"))
+    ap.add_argument("--server-pid", type=int, default=0,
+                    help="PID server đang chạy (để chế độ nohup kill đúng tiến trình)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
@@ -119,15 +185,11 @@ def main():
                     "result": None, "error": None, "old_sha": a.old_sha,
                     "old_version": a.old_version, "target_version": target, "stashed": False})
 
-    if os.name != "nt" and not has_systemd():
-        log("Không thấy systemd service 'javis' → không tự khởi động lại được. Hãy restart tay.")
-        us.write_state({"phase": "error", "result": "error",
-                        "error": "Không có systemd service 'javis' để tự khởi động lại.",
-                        "finished_at": _now()})
-        return 1
+    mode = service_mode()
+    log(f"Chế độ restart: {mode}")
 
     log("Dừng server cũ…")
-    stop_server()
+    stop_server(mode, a.server_pid, a.port)
     time.sleep(2)
 
     us.write_state({"phase": "pulling"})
@@ -138,7 +200,7 @@ def main():
     pull = run(["git", "pull", "--ff-only"])
     if pull.returncode != 0:
         log("git pull LỖI:\n" + (pull.stderr or pull.stdout or ""))
-        start_server()
+        start_server(mode, a.port)
         us.write_state({"phase": "error", "result": "pull_failed",
                         "error": (pull.stderr or "git pull thất bại")[:500], "finished_at": _now()})
         return 1
@@ -149,7 +211,7 @@ def main():
 
     us.write_state({"phase": "restarting"})
     log("Khởi động bản mới…")
-    start_server()
+    start_server(mode, a.port)
 
     us.write_state({"phase": "health_check"})
     log("Kiểm tra sức khoẻ…")
@@ -177,7 +239,11 @@ def main():
         return 1
     run(["git", "reset", "--hard", a.old_sha])
     pip_install()
-    start_server()
+    # Bản mới có thể đang chạy dở (lên tiến trình nhưng /health đỏ) → dừng hẳn trước khi
+    # bật bản cũ, kẻo nohup bind trùng cổng. Windows/systemd dừng lại cũng vô hại.
+    stop_server(mode, 0, a.port)
+    time.sleep(2)
+    start_server(mode, a.port)
     if poll_health(a.port, 90):
         us.write_state({"phase": "done", "result": "rolled_back",
                         "error": "Bản mới lỗi, đã tự quay về bản cũ.", "finished_at": _now()})

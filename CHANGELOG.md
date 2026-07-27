@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.208] - 2026-07-27
+Nút "Cập nhật ngay" chạy được trên Mac (và Linux không có systemd).
+### Sửa lỗi
+- **Mac hết bị chặn cập nhật**: trước đây updater trên máy không phải Windows bắt buộc phải có systemd service 'javis', trong khi Mac không hề có systemd nên bấm cập nhật là dừng ngay với lỗi "Không có systemd service 'javis' để tự khởi động lại". Giờ updater có 3 chế độ restart: Windows (bat/vbs), Linux systemd (systemctl), và nohup cho Mac hoặc Linux cài không systemd - tự dừng đúng tiến trình server (server truyền PID của mình cho updater, kèm dò cổng dự phòng) rồi chạy lại uvicorn nền y như install.sh. Rollback tự động vẫn nguyên.
+- **Nhãn nền tảng nói thật**: máy Mac trước đây bị dán nhãn "Linux (systemd)" ở mục Cập nhật vì frontend hardcode theo mode. `/version` giờ báo thêm nền tảng thật (windows/mac/linux) và giao diện ghi đúng "macOS" hay "Linux".
+- **update.sh cũng tự restart khi không có systemd**: thay vì chỉ in "hãy khởi động lại thủ công", script giờ tự dừng tiến trình đang giữ cổng rồi chạy lại nền bằng nohup.
+### Kiểm thử
+- `test_update.py` thêm 8 case: 3 chế độ của service_mode, updater hết nhánh chặn systemd, dry-run nhận --server-pid, /version có platform, console.js hết hardcode nhãn và main.py truyền --server-pid.
+
 ## [0.9.207] - 2026-07-27
 Gỡ hẳn kết nối "Facebook cá nhân (cookie)" - đường mbasic đã chết, không cứu được.
 ### Gỡ bỏ

@@ -144,10 +144,28 @@ main._watchtower_reachable = _orig_wt
 # --- updater.py --dry-run (không thực thi git/pip) ---
 import subprocess as _sp  # noqa: E402
 _upd = os.path.join(os.path.dirname(os.path.abspath(__file__)), "updater.py")
-_p = _sp.run([sys.executable, _upd, "--dry-run", "--port", "7777"],
+_p = _sp.run([sys.executable, _upd, "--dry-run", "--port", "7777", "--server-pid", "123"],
              capture_output=True, text=True, env={**os.environ})
-check("updater --dry-run thoát 0", _p.returncode == 0)
+check("updater --dry-run (kèm --server-pid) thoát 0", _p.returncode == 0)
 check("updater --dry-run in PLAN", "PLAN:" in (_p.stdout or ""))
+
+# --- updater: 3 chế độ restart (bug thật: Mac không có systemd bị chặn cứng không update được) ---
+import updater as _updmod  # noqa: E402
+check("service_mode: Windows -> windows", _updmod.service_mode("nt") == "windows")
+check("service_mode: Linux có systemd -> systemd", _updmod.service_mode("posix", systemd=True) == "systemd")
+check("service_mode: Mac/không systemd -> nohup (KHÔNG bail lỗi)",
+      _updmod.service_mode("posix", systemd=False) == "nohup")
+check("updater không còn nhánh chặn 'Không có systemd service'",
+      "Không có systemd service" not in open(_upd, encoding="utf-8").read())
+
+# --- /version báo platform để UI ghi đúng nhãn (Mac từng bị dán 'Linux (systemd)') ---
+_v2 = asyncio.run(main.version_info())
+check("/version có khoá platform", _v2.get("platform") in ("windows", "mac", "linux"))
+_console_src = (main.DASHBOARD_PATH / "console.js").read_text(encoding="utf-8")
+check("console.js hết hardcode nhãn 'Linux (systemd)'", "Linux (systemd)" not in _console_src)
+check("console.js có nhãn macOS theo platform", "macOS" in _console_src)
+check("main.py truyền --server-pid cho updater",
+      "--server-pid" in open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py"), encoding="utf-8").read())
 
 # Khoá cache tĩnh phải gắn theo PHIÊN BẢN, không phải số gõ tay. Bug thật: console.js?v=72
 # đứng yên suốt hàng chục bản nên trình duyệt dùng bản CŨ trong cache, mọi sửa frontend vô

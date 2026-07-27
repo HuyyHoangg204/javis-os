@@ -36,7 +36,16 @@ else
     $SUDO systemctl restart javis
     echo "==> Đã restart. Theo dõi:  journalctl -u javis -f"
   else
-    echo "==> Không thấy systemd service 'javis'. Hãy khởi động lại tiến trình Javis thủ công"
-    echo "    (vd: kill tiến trình cũ rồi chạy lại uvicorn / start script)."
+    # Mac / Linux không systemd: kill tiến trình đang giữ cổng rồi chạy lại nền (như install.sh)
+    PORT="${JAVIS_PORT:-7777}"
+    PIDS="$(lsof -ti tcp:"$PORT" 2>/dev/null || true)"
+    if [ -n "$PIDS" ]; then
+      echo "==> Dừng tiến trình cũ (PID: $PIDS)..."
+      kill $PIDS 2>/dev/null || true
+      sleep 2
+    fi
+    ( cd server && JAVIS_STATE_DIR="$PWD" nohup ../.venv/bin/python -m uvicorn main:app \
+        --host "${JAVIS_HOST:-127.0.0.1}" --port "$PORT" > javis.log 2>&1 & )
+    echo "==> Đã khởi động lại (nohup). Logs: server/javis.log"
   fi
 fi

@@ -488,7 +488,10 @@
     ["preparing", "Chuẩn bị"], ["pulling", "Tải code"], ["installing", "Cài thư viện"],
     ["restarting", "Khởi động lại"], ["health_check", "Kiểm tra sức khoẻ"], ["done", "Xong"],
   ];
-  const UPDATE_MODE_LABEL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+  // mode "native" chạy trên cả Linux lẫn Mac - nhãn lấy theo platform server báo về
+  const updateModeLabel = (j) => j.mode === "docker" ? "Docker / VPS"
+    : j.mode === "windows" ? "Windows"
+    : (j.platform === "mac" ? "macOS" : "Linux");
 
   function wireUpdateManager(root) {
     const q = (id) => root.querySelector("#" + id);
@@ -523,7 +526,7 @@
       root.dataset.previousVersion = j.previous_version || "";
       root.dataset.updateMode = j.mode || "";
       if (changes) { changes.style.display = "none"; changes.innerHTML = ""; }
-      const mode = UPDATE_MODE_LABEL[j.mode] || j.mode || "";
+      const mode = updateModeLabel(j) || j.mode || "";
       if (j.update_available) {
         const base = `🆕 Có bản mới <b>v${esc(j.latest)}</b> (đang chạy v${esc(j.current)}) · ${esc(mode)}`;
         if (j.can_self_update) { meta.innerHTML = base; update.style.display = ""; }
@@ -2066,7 +2069,9 @@
         </div>
       </div>`;
     // ---- Phiên bản + cập nhật trong UI ----
-    const MODE_LBL = { docker: "Docker / VPS", native: "Linux (systemd)", windows: "Windows" };
+    const modeLbl = (j) => j.mode === "docker" ? "Docker / VPS"
+      : j.mode === "windows" ? "Windows"
+      : (j.platform === "mac" ? "macOS" : "Linux");
     const UPD_STEPS = [
       { key: "preparing", label: "Chuẩn bị" },
       { key: "pulling", label: "Tải code" },
@@ -2108,7 +2113,7 @@
       window._ovVerCur = j.current || "";
       window._ovVerPrev = j.previous_version || "";
       window._ovVerMode = j.mode || "";
-      const ml = MODE_LBL[j.mode] || j.mode || "";
+      const ml = modeLbl(j) || j.mode || "";
       if (cl) { cl.style.display = "none"; cl.innerHTML = ""; }
       if (j.update_available) {
         const base = "🆕 Có bản mới <b>v" + esc(j.latest) + "</b> (đang chạy v" + esc(j.current) + ") · " + esc(ml);

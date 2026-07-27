@@ -4054,6 +4054,15 @@ def _deploy_mode() -> str:
     return "native"
 
 
+def _host_platform() -> str:
+    """windows | mac | linux - nền tảng thật của máy (để UI ghi đúng nhãn, vd Mac
+    cũng là mode 'native' nhưng không có systemd)."""
+    import sys as _s
+    if os.name == "nt":
+        return "windows"
+    return "mac" if _s.platform == "darwin" else "linux"
+
+
 def _is_git_checkout(root: str) -> bool:
     try:
         import subprocess
@@ -4110,7 +4119,7 @@ async def version_info():
     can = mode in ("native", "windows") or (mode == "docker" and await _watchtower_reachable())
     st = _read_update_state()
     return {"current": cur, "latest": latest, "update_available": avail,
-            "mode": mode, "can_self_update": can, "error": err,
+            "mode": mode, "platform": _host_platform(), "can_self_update": can, "error": err,
             "previous_version": st.get("previous_version")}
 
 
@@ -4232,7 +4241,8 @@ async def do_update():
         updater = str(PROJECT_ROOT / "server" / "updater.py")
         port = os.getenv("JAVIS_PORT", "7777")
         args = [py, updater, "--old-sha", old_sha, "--old-version", cur,
-                "--target", latest or "", "--port", str(port)]
+                "--target", latest or "", "--port", str(port),
+                "--server-pid", str(os.getpid())]
         if mode == "windows":
             subprocess.Popen(args, cwd=root, creationflags=0x00000008 | 0x00000200)  # DETACHED|NEW_GROUP
         else:
