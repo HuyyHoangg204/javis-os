@@ -150,10 +150,16 @@ class ClaudeSDK:
 
     async def _permission_gate(self, tool_name, input_data, context):
         """can_use_tool: whitelist THẬT per-call khi chạy chế độ nền an toàn (allowed_tools).
-        Hỗ trợ pattern fnmatch (vd 'mcp__javis__pos_*')."""
+        Hỗ trợ pattern fnmatch (vd 'mcp__javis__pos_*') VÀ prefix kiểu --allowedTools của
+        Claude CLI: 'mcp__<server>' trần (không wildcard) = cho MỌI tool của server đó.
+        Thiếu nhánh prefix thì pattern 'mcp__javis' từ mcp_hub.allow_patterns() không khớp
+        tool nào → lane nền (kanban/loop) bị chặn sạch MCP dù connector sống."""
         from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
         allowed = self.allowed_tools or []
-        ok = any(tool_name == p or fnmatch.fnmatch(tool_name, p) for p in allowed)
+        ok = any(tool_name == p or fnmatch.fnmatch(tool_name, p)
+                 or (p.startswith("mcp__") and "*" not in p
+                     and tool_name.startswith(p + "__"))
+                 for p in allowed)
         _audit(self.tag, tool_name, ok, "" if ok else "ngoài whitelist chế độ nền an toàn")
         if ok:
             return PermissionResultAllow()

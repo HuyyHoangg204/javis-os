@@ -115,6 +115,28 @@ check("audit: ghi đủ 4 quyết định JSONL", len(lines) == 4
       and lines[0]["allowed"] is True and lines[1]["allowed"] is False
       and lines[1]["tool"] == "Write" and lines[0]["tag"] == "loop-test")
 
+
+# ---- 3b. _permission_gate: pattern PREFIX kiểu Claude CLI (mcp__<server> = mọi tool của server) ----
+# Bug thật ngoài đời: lane nền (kanban mcp-read, loop) nhận allow pattern "mcp__javis" từ
+# mcp_hub.allow_patterns() theo ngữ nghĩa --allowedTools của Claude CLI, nhưng gate so bằng
+# fnmatch nên "mcp__javis" KHÔNG khớp "mcp__javis__javis_search_tools" → mọi tool MCP nền bị
+# từ chối ("user cancelled MCP tool call"), task báo connector hỏng dù connector sống.
+
+
+async def gate_prefix_tests():
+    e = ClaudeSDK(tag="loop-prefix", allowed_tools=["Read", "mcp__javis"])
+    r1 = await e._permission_gate("mcp__javis__javis_search_tools", {}, None)
+    r2 = await e._permission_gate("mcp__javis__pos_statistics", {}, None)
+    r3 = await e._permission_gate("mcp__khac__tool_x", {}, None)
+    r4 = await e._permission_gate("mcp__javisfake__tool_x", {}, None)
+    check("gate: prefix mcp__javis khớp tool hub javis_search_tools", r1.behavior == "allow")
+    check("gate: prefix mcp__javis khớp tool hub pos_statistics", r2.behavior == "allow")
+    check("gate: prefix KHÔNG khớp server khác", r3.behavior == "deny")
+    check("gate: prefix KHÔNG khớp server tên gần giống (javisfake)", r4.behavior == "deny")
+
+
+asyncio.run(gate_prefix_tests())
+
 # ---- 4. Phase 3: plugin in-process + hub bỏ nhóm plugin ----
 import plugins_host                                       # noqa: E402
 

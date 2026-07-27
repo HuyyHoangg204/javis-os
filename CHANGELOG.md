@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.189] - 2026-07-27
+Việc nền dùng lại được các nguồn dữ liệu (MCP): sửa lỗi chặn nhầm khiến task và loop báo "connector hỏng" dù kết nối vẫn sống.
+### Sửa lỗi
+- **Task Kanban và loop nền gọi lại được tool MCP**: cổng quyền của phiên nền so tên tool bằng fnmatch, trong khi danh sách cho phép ghi `mcp__javis` theo kiểu tiền tố của Claude CLI, nên không khớp tool nào - mọi lời gọi qua hub đều bị từ chối ("user cancelled MCP tool call") và agent kết luận nhầm là connector chết, kéo theo hàng loạt việc nền bị treo ở trạng thái chặn. Cổng quyền giờ hiểu cả kiểu tiền tố: `mcp__<server>` trần cho phép mọi tool của server đó, và vẫn không khớp lố sang server tên gần giống. Kèm test tái hiện đúng ca lỗi.
+### Kiểm thử
+- `test_sdk_engine.py` thêm nhóm test prefix cho cổng quyền phiên nền: khớp tool hub, chặn server khác, chặn server tên gần giống.
+
 ## [0.9.188] - 2026-07-27
 Bỏ nút bấm không làm gì ở tin chỉ có ảnh.
 ### Sửa lỗi
