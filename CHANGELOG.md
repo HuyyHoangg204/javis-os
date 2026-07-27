@@ -4,6 +4,20 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.216] - 2026-07-28
+Task tick được ngay trên note + khối dataview chạy thật, lấy cảm hứng từ obsidian-tasks và obsidian-dataview.
+### Thêm mới
+- **Checkbox task bấm được**: mở note .md ở chế độ Sửa (bản render), bấm vào ô `- [ ]` là tick và **tự lưu ngay** như Obsidian, khỏi bấm nút Lưu. Trong chat thì checkbox vẫn chỉ để xem (tin nhắn không có file để ghi).
+- **Khối ```dataview chạy thật**: note nào chứa khối dataview nay hiện kết quả sống thay vì cục code chết. Hỗ trợ tập lệnh hay dùng nhất: `TASK` / `LIST` / `TABLE` (kèm `WITHOUT ID`, cột `AS "Tên"`), `FROM "thư mục"` hoặc `#tag` (AND/OR, phủ định `-`), `WHERE` (`!completed`, `due <= date(today)`, `status = "doing"`, `contains(...)`), `SORT`, `LIMIT`. Chưa hỗ trợ dataviewjs và FLATTEN - khối sẽ nói rõ thay vì im lặng.
+- **Tick task ngay trong kết quả dataview**: mỗi việc trong kết quả `TASK` có checkbox, tick là ghi thẳng vào file gốc qua API mới `/files/taskcheck` (có rào chống ghi đè khi file đã đổi - lệch thì báo tải lại, không ghi bừa).
+- **Hiểu ký hiệu obsidian-tasks**: 📅 hạn, ⏳ dự kiến, 🛫 bắt đầu, ✅ xong, độ ưu tiên 🔺⏫🔼🔽⏬. Việc quá hạn hiện badge đỏ; task kiểu Tasks khi tick xong tự gắn `✅ ngày`, untick thì gỡ - checklist thường giữ nguyên chữ.
+- API mới `GET /files/mdindex`: chỉ mục toàn bộ note .md của brain (frontmatter, tag, task) cho truy vấn dataview chạy phía trình duyệt.
+### Sửa lỗi
+- **Lưu note ở chế độ Sửa không còn phá khối code/dataview**: trước đây bản render đang sửa mà chứa code fence dài (thẻ artifact) hay khối dataview thì bấm Lưu là mất nội dung gốc; nay tất cả được trả về đúng fence ``` như cũ.
+### Kiểm thử
+- `server/test_dataview_tasks.py` (21 case): bóc ký hiệu ngày/độ ưu tiên, quét note (bỏ qua code fence, số dòng đúng file gốc), mdindex lọc thư mục + chặn `../`, taskcheck tick/untick + rào 409 + tìm lại dòng khi file bị chèn.
+- `dashboard/test_dataview.js` (27 case): parse truy vấn, FROM/WHERE/SORT/LIMIT, bảng, escape XSS. `test_chat_render.js` thêm case checkbox không disabled + fence dataview.
+
 ## [0.9.215] - 2026-07-28
 Thêm công tắc tự chọn: giữ hay gỡ dấu nguồn gốc AI trên ảnh Javis tạo.
 ### Thêm mới

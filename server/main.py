@@ -2868,6 +2868,190 @@ async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
 
+
+# ============================================================
+# Dataview lite + tick task (cảm hứng obsidian-dataview / obsidian-tasks).
+# /files/mdindex quét note .md trong GỐC BRAIN thành chỉ mục (frontmatter, tag, task
+# kèm ký hiệu ngày/độ ưu tiên kiểu obsidian-tasks) - dashboard tự chạy truy vấn client.
+# /files/taskcheck lật một dòng "- [ ]" <-> "- [x]" ghi thẳng vào file (tick là lưu).
+# ============================================================
+_MD_TASK_RE = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+\[( |x|X)\]\s+(.*)$")
+_MD_TAG_RE = re.compile(r"(?<![\w#])#([A-Za-zÀ-ỹ][\w\-/À-ỹ]*)")
+_TASK_DATE_KEYS = {"📅": "due", "⏳": "scheduled", "🛫": "start", "✅": "done", "➕": "created"}
+_TASK_PRIO = {"🔺": 0, "⏫": 1, "🔼": 2, "🔽": 4, "⏬": 5}
+_TASK_FIELD_RE = re.compile(r"(📅|⏳|🛫|✅|➕)\s*(\d{4}-\d{2}-\d{2})")
+
+
+def _md_task_fields(text):
+    """Bóc ký hiệu obsidian-tasks khỏi text task: ngày (📅 hạn, ⏳ dự kiến, 🛫 bắt đầu,
+    ✅ xong, ➕ tạo) + độ ưu tiên (🔺⏫🔼🔽⏬; không có = 3). Trả (text sạch, dict field)."""
+    fields = {"priority": 3}
+
+    def _take(m):
+        fields[_TASK_DATE_KEYS[m.group(1)]] = m.group(2)
+        return ""
+
+    clean = _TASK_FIELD_RE.sub(_take, text)
+    for emo, p in _TASK_PRIO.items():
+        if emo in clean:
+            fields["priority"] = p
+            clean = clean.replace(emo, "")
+    return " ".join(clean.split()), fields
+
+
+def _json_safe_fm(v):
+    """Đưa giá trị YAML frontmatter về dạng JSON-serializable (date -> chuỗi ISO)."""
+    import datetime as _dt
+    if isinstance(v, dict):
+        return {str(k): _json_safe_fm(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe_fm(x) for x in v]
+    if isinstance(v, (_dt.datetime, _dt.date)):
+        return v.isoformat()
+    if isinstance(v, (str, int, float, bool)) or v is None:
+        return v
+    return str(v)
+
+
+def _scan_note_md(text):
+    """Bóc (frontmatter, tags, tasks) từ nội dung MỘT file .md. Bỏ qua nội dung nằm
+    trong code fence ``` để không nhặt nhầm task/tag trong ví dụ code. Số dòng của task
+    tính theo FILE GỐC (1-based) để /files/taskcheck lật đúng dòng."""
+    fm, body = {}, text
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            try:
+                meta = yaml.safe_load(parts[1])
+                if isinstance(meta, dict):
+                    fm = _json_safe_fm(meta)
+            except Exception:
+                fm = {}
+            body = parts[2]
+    fm_lines = text[: len(text) - len(body)].count("\n") if body is not text else 0
+    tags = set()
+    fmt = fm.get("tags") or fm.get("tag")
+    if isinstance(fmt, str):
+        fmt = [t for t in re.split(r"[,\s]+", fmt) if t]
+    if isinstance(fmt, list):
+        for t in fmt:
+            tags.add("#" + str(t).lstrip("#"))
+    tasks = []
+    in_fence = False
+    for i, line in enumerate(body.split("\n")):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        for tg in _MD_TAG_RE.finditer(line):
+            tags.add("#" + tg.group(1))
+        tm = _MD_TASK_RE.match(line)
+        if tm:
+            raw_text = tm.group(4).rstrip("\r").strip()
+            clean, fields = _md_task_fields(raw_text)
+            task = {"line": fm_lines + i + 1, "raw": line.rstrip("\r"), "text": clean,
+                    "checked": tm.group(3).lower() == "x",
+                    "tags": ["#" + t.group(1) for t in _MD_TAG_RE.finditer(raw_text)]}
+            task.update(fields)
+            tasks.append(task)
+    return fm, sorted(tags), tasks
+
+
+@app.get("/files/mdindex")
+async def files_mdindex(brain: str = Query("brain"), path: str = Query("")):
+    """Chỉ mục note .md trong GỐC BRAIN cho khối ```dataview trên dashboard. `path` =
+    tiền tố thư mục (tương đối gốc brain) để thu hẹp phạm vi. Client tự lọc/sắp xếp."""
+    from starlette.concurrency import run_in_threadpool
+    broot = Path(_brain_root(brain)).resolve()
+    root = _files_root(brain)
+    prefix = (path or "").strip().replace("\\", "/").strip("/")
+    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv",
+                 ".pytest_cache", ".claude", ".agents"}
+    CAP = 3000
+
+    def _walk():
+        out = []
+        base = broot
+        if prefix:
+            cand = (broot / prefix).resolve()
+            if cand != broot and broot not in cand.parents:
+                return out
+            base = cand
+        if not base.is_dir():
+            return out
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [dn for dn in dirnames if not dn.startswith(".") and dn not in SKIP_DIRS]
+            for fn in sorted(filenames):
+                if not fn.lower().endswith(".md"):
+                    continue
+                if len(out) >= CAP:
+                    return out
+                p = Path(dirpath) / fn
+                try:
+                    st = p.stat()
+                    if st.st_size > 1_000_000:
+                        continue
+                    txt = p.read_text(encoding="utf-8", errors="ignore")
+                except (OSError, ValueError):
+                    continue
+                fm, tags, tasks = _scan_note_md(txt)
+                rel = str(p.relative_to(broot)).replace("\\", "/")
+                out.append({"path": rel, "name": fn,
+                            "folder": rel.rsplit("/", 1)[0] if "/" in rel else "",
+                            "mtime": st.st_mtime, "fm": fm, "tags": tags, "tasks": tasks})
+        return out
+
+    files = await run_in_threadpool(_walk)
+    return {"home": _files_rel(root, broot), "files": files, "capped": len(files) >= CAP}
+
+
+@app.post("/files/taskcheck")
+async def files_taskcheck(brain: str = Form("brain"), path: str = Form(...),
+                          line: int = Form(...), checked: int = Form(...),
+                          expect: str = Form("")):
+    """Tick/untick MỘT dòng task trong file: lật "[ ]" <-> "[x]" rồi lưu ngay. Rào an
+    toàn: dòng đích phải đúng là dòng task và khớp `expect`; file đã đổi thì tìm lại
+    dòng theo nội dung, không thấy DUY NHẤT thì trả 409 để client tải lại. Task kiểu
+    obsidian-tasks (có 📅/⏳/🛫/🔁) khi tick xong tự gắn "✅ YYYY-MM-DD", untick thì gỡ
+    - giống plugin Tasks; checklist thường thì giữ nguyên chữ."""
+    try:
+        f = _safe_serve_path(brain, path)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    if not f.is_file() or f.suffix.lower() not in (".md", ".txt"):
+        return JSONResponse({"error": "Không tìm thấy file task"}, status_code=404)
+    try:
+        text = f.read_text(encoding="utf-8")
+    except Exception:
+        return JSONResponse({"error": "Không đọc được file"}, status_code=415)
+    lines = text.split("\n")
+    exp = (expect or "").strip()
+    idx = None
+    if 1 <= line <= len(lines) and _MD_TASK_RE.match(lines[line - 1]) and \
+            (not exp or lines[line - 1].strip() == exp):
+        idx = line - 1
+    elif exp:
+        hits = [i for i, ln in enumerate(lines) if _MD_TASK_RE.match(ln) and ln.strip() == exp]
+        if len(hits) == 1:
+            idx = hits[0]
+    if idx is None:
+        return JSONResponse({"error": "File đã thay đổi - tải lại rồi tick lại giúp nhé"},
+                            status_code=409)
+    m = _MD_TASK_RE.match(lines[idx])
+    want = bool(int(checked))
+    cr = "\r" if lines[idx].endswith("\r") else ""
+    body = m.group(4).rstrip("\r")
+    if want:
+        if re.search(r"[📅⏳🛫🔁]", body) and "✅" not in body:
+            body = body.rstrip() + " ✅ " + _today()
+    else:
+        body = re.sub(r"\s*✅\s*\d{4}-\d{2}-\d{2}", "", body).rstrip()
+    lines[idx] = m.group(1) + m.group(2) + " [" + ("x" if want else " ") + "] " + body + cr
+    _atomic_write_text(f, "\n".join(lines))
+    return {"ok": True, "line": idx + 1, "raw": lines[idx].rstrip("\r"), "checked": want}
+
+
 # ---- Workflows ----
 @app.get("/workflows")
 async def list_workflows(brain: str = Query("brain")):

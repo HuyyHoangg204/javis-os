@@ -114,6 +114,19 @@ h = mdToHtml("Ho so o `07 - Wiki/_entities/Chi Nga - Khach Coaching.md` nhe");
 check("code path co space: bat dung ca duong dan",
   has(h, 'data-vault-path="07 - Wiki/_entities/Chi Nga - Khach Coaching.md"'));
 
+// ---- 21. Checkbox task "- [ ]": tick duoc (khong disabled), giu trang thai checked ----
+h = mdToHtml("- [ ] viec chua xong\n- [x] viec da xong");
+check("task: input md-cb khong disabled", has(h, 'class="md-cb"') && !has(h, "disabled"));
+check("task: giu checked cho [x]", has(h, "checked"));
+
+// ---- 22. Fence ```dataview -> khoi jv-dataview mang truy van (dataview.js tu chay) ----
+h = mdToHtml('```dataview\nTASK FROM "05 - Viec"\n```');
+check("dataview: co khoi jv-dataview", has(h, 'class="jv-dataview"'));
+check("dataview: truy van nam trong data-dv-q",
+  has(h, encodeURIComponent('TASK FROM "05 - Viec"')));
+h = mdToHtml("```dataviewjs\ndv.pages()\n```");
+check("dataviewjs: cung vao khoi dataview (bao chua ho tro khi chay)", has(h, "jv-dataview"));
+
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));
   process.exit(1);

@@ -4506,6 +4506,27 @@
         } });
       _td.addRule("wikiimg", { filter: (n) => n.nodeName === "IMG" && n.getAttribute("data-vault-path") != null,
         replacement: (c, n) => "![[" + n.getAttribute("data-vault-path") + "]]" });
+      // Các khối render đặc biệt của mdToHtml phải TRẢ VỀ đúng fence gốc khi lưu bản WYSIWYG,
+      // nếu không nội dung note bị phá (mất truy vấn dataview, mất code). Round-trip:
+      _td.addRule("jvdataview", { filter: (n) => n.nodeName === "DIV" && n.classList.contains("jv-dataview"),
+        replacement: (c, n) => {
+          let q = n.getAttribute("data-dv-q") || "";
+          try { q = decodeURIComponent(q); } catch (e) {}
+          return "\n\n```" + (n.getAttribute("data-dv-lang") || "dataview") + "\n" + q + "\n```\n\n";
+        } });
+      _td.addRule("jvcodewrap", { filter: (n) => n.nodeName === "DIV" && n.classList.contains("code-wrap"),
+        replacement: (c, n) => {
+          const pre = n.querySelector("pre.code-block");
+          let lang = (n.querySelector(".code-lang") || { textContent: "" }).textContent.trim();
+          if (lang === "text") lang = "";
+          return "\n\n```" + lang + "\n" + (pre ? pre.textContent : "") + "\n```\n\n";
+        } });
+      _td.addRule("jvartifact", { filter: (n) => n.nodeName === "DIV" && n.classList.contains("jv-art"),
+        replacement: (c, n) => {
+          const art = window.JavisArtifacts && window.JavisArtifacts.get && window.JavisArtifacts.get(n.getAttribute("data-art"));
+          if (!art) return c;   // registry mất (hiếm): giữ chữ, còn hơn mất trắng
+          return "\n\n```" + (art.lang || (art.type === "code" ? "" : art.type)) + "\n" + art.code + "\n```\n\n";
+        } });
     }
     try { return _td.turndown(html); } catch (e) { return null; }
   }
@@ -4594,6 +4615,8 @@
         const wys = document.getElementById("neWys");
         wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value);
         let curMode = wysOk ? "wys" : "source";
+        // Tick checkbox task trong bản render -> tự lưu ngay (như Obsidian), khỏi bấm 💾
+        wys.addEventListener("jv-task-toggle", () => { if (_neSaveFn) _neSaveFn(); });
         const wysToSrc = () => { const md = _mdFromHtml(wys.innerHTML); if (md != null) ta.value = md; };
         const srcToWys = () => { wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value); };
         _neBuildToolbar(body.querySelector(".ne-fmt"), { mode: () => curMode, ta, wys });   // thanh công cụ chạy cả 2 chế độ

@@ -453,6 +453,37 @@ body {
   font-family: ui-monospace, monospace; color: #d6c9ff;
 }
 
+/* Checkbox task "- [ ]" (kiểu obsidian-tasks) + khối Dataview lite */
+input.md-cb { cursor: pointer; accent-color: var(--accent); margin-right: 6px; vertical-align: middle; }
+li.task-item { list-style: none; margin-left: -16px; }
+li.task-done > .dv-ttext, li.task-done { color: var(--text3); }
+li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color: var(--text3); }
+.jv-dataview {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--bg2);
+  margin: 10px 0; overflow: hidden;
+}
+.jv-dataview .jv-dv-head {
+  font-size: 12px; letter-spacing: .4px; color: var(--text3); padding: 6px 12px 4px;
+  border-bottom: 1px solid var(--border); user-select: none;
+}
+.jv-dataview .jv-dv-body { padding: 8px 12px 10px; font-size: 14px; }
+.jv-dataview .jv-dv-wait { color: var(--text3); font-size: 13px; }
+.jv-dataview .dv-count { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
+.jv-dataview .dv-warn { font-size: 12px; color: var(--yellow, #e5c04b); margin-bottom: 6px; }
+.jv-dataview .dv-empty { color: var(--text3); font-size: 13px; padding: 4px 0; }
+.jv-dataview .dv-err { color: var(--red, #ff6b6b); font-size: 13px; margin-bottom: 6px; }
+.jv-dataview .dv-src { font-size: 12.5px; color: var(--text3); background: var(--bg); border-radius: 6px; padding: 8px 10px; overflow-x: auto; }
+.jv-dataview .dv-group { margin: 6px 0 10px; }
+.jv-dataview .dv-ghead { font-weight: 600; margin-bottom: 3px; }
+.jv-dataview .dv-ghead a, .jv-dataview .dv-list a { color: var(--accent); text-decoration: none; }
+.jv-dataview .dv-ghead a:hover, .jv-dataview .dv-list a:hover { text-decoration: underline; }
+.jv-dataview ul.dv-tasks, .jv-dataview ul.dv-list { margin: 2px 0 2px 6px; padding-left: 12px; }
+.jv-dataview li.dv-task { list-style: none; margin: 3px 0; line-height: 1.5; }
+.jv-dataview li.dv-failed { outline: 1px solid var(--red, #ff6b6b); border-radius: 5px; }
+.jv-dataview .dv-badge { font-size: 12px; color: var(--text3); background: var(--bg3); border-radius: 5px; padding: 0 5px; margin-left: 4px; white-space: nowrap; }
+.jv-dataview .dv-badge.dv-over { color: #fff; background: var(--red, #c04545); }
+.jv-dataview .dv-tablewrap { overflow-x: auto; }
+
 /* Run drawer - trạng thái kiểm chứng */
 .rs-verify { font-size: 13px; color: var(--text3); margin-left: 6px; }
 .rs-verify.ok { color: var(--green); }

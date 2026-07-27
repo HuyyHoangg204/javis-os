@@ -147,10 +147,20 @@
       '<button class="code-copy" type="button">⧉ Copy</button></div>' +
       '<pre class="code-block">' + highlight(code, lang) + "</pre></div>";
   }
+  // Khoi ```dataview (cam hung obsidian-dataview): giu truy van trong data-dv-q (encode de an toan
+  // attribute), dataview.js tu phat hien va chay. contenteditable=false de trong WYSIWYG khong sua
+  // nham ket qua; turndown rule (console.js) tra lai dung fence goc khi luu.
+  function dataviewHtml(lang, code) {
+    return '<div class="jv-dataview" contenteditable="false" data-dv-lang="' + esc(lang) +
+      '" data-dv-q="' + esc(encodeURIComponent(code)) + '">' +
+      '<div class="jv-dv-head">▦ Dataview</div>' +
+      '<div class="jv-dv-body"><span class="jv-dv-wait">Đang chạy truy vấn…</span></div></div>';
+  }
   function renderFence(info, code, streaming) {
     var lang = (info || "").trim().split(/\s+/)[0] || "";
     code = code.replace(/\n$/, "");
     if (streaming) return codeBlockHtml(lang, code, true);   // fence chua dong: khoi code song, chua thanh artifact
+    if (/^dataview(js)?$/i.test(lang)) return dataviewHtml(lang.toLowerCase(), code);
     var type = fenceType(lang, code);
     if (type) return artifactCard(type, lang, code);
     return codeBlockHtml(lang, code, false);
@@ -218,7 +228,7 @@
     var html = "<" + tag + ">";
     items.forEach(function (it) {
       var box = it.checked == null ? "" :
-        '<input type="checkbox" disabled' + (it.checked ? " checked" : "") + "> ";
+        '<input type="checkbox" class="md-cb" contenteditable="false"' + (it.checked ? " checked" : "") + "> ";
       var cls = it.checked == null ? "" : ' class="task-item"';
       html += "<li" + cls + ">" + box + inline(it.lines.join(" ")) +
         (it.children.length ? renderList(it.children) : "") + "</li>";
@@ -575,6 +585,21 @@
 
   // ---------------------------------------------------------------- wiring (chi khi co DOM)
   if (typeof document !== "undefined") {
+    // Checkbox task "- [ ]" (cam hung obsidian-tasks): trong editor (.ne-wys) tick duoc va tu luu
+    // (editor nghe event jv-task-toggle); trong chat/khung chi-doc thi khoa lai (khong co file de ghi).
+    // Task trong ket qua dataview co handler rieng (dataview.js) ghi thang vao file goc.
+    document.addEventListener("click", function (e) {
+      var cb = e.target;
+      if (!cb || cb.tagName !== "INPUT" || cb.type !== "checkbox" ||
+          !(cb.classList && cb.classList.contains("md-cb"))) return;
+      if (cb.closest(".jv-dataview")) return;                     // dataview.js lo
+      var wys = cb.closest(".ne-wys");
+      if (!wys) { e.preventDefault(); return; }                   // chat / preview: chi doc
+      // dong bo ATTRIBUTE theo property de innerHTML -> turndown ra dung [x]/[ ]
+      if (cb.checked) cb.setAttribute("checked", ""); else cb.removeAttribute("checked");
+      var li = cb.closest("li"); if (li) li.classList.toggle("task-done", cb.checked);
+      try { wys.dispatchEvent(new CustomEvent("jv-task-toggle", { bubbles: true })); } catch (err) {}
+    });
     document.addEventListener("click", function (e) {
       // Wikilink [[..]]: bam la DI CHUYEN toi note dich - chay CA trong ban render dang sua (ne-wys/.jvfe-modal),
       // vi y nghia cua wikilink la dieu huong; muon sua chu cua link thi dung che do Nguon.
@@ -624,7 +649,9 @@
 
   if (typeof window !== "undefined") {
     window.mdToHtml = mdToHtml;
-    window.JavisArtifacts = { open: openArtifact, close: closePanel };
+    // get(id): cho turndown (console.js) tra artifact card ve lai dung fence ``` khi luu note WYSIWYG
+    window.JavisArtifacts = { open: openArtifact, close: closePanel,
+      get: function (id) { return registry[id] || null; } };
   }
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { mdToHtml: mdToHtml, highlight: highlight, wkResolve: wkResolve };

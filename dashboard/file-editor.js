@@ -243,6 +243,8 @@
     var ta = neBody.querySelector(".ne-src textarea");
     ta.value = d.content || "";
     wys.innerHTML = window.mdToHtml(ta.value);
+    // Tick checkbox task trong ban render -> tu luu ngay (nhu Obsidian)
+    wys.addEventListener("jv-task-toggle", function () { if (curSave) curSave(); });
 
     var curMode = "source";
     function srcToWys() { wys.innerHTML = window.mdToHtml(ta.value); }
