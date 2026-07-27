@@ -3280,7 +3280,9 @@
     return ks.includes("client_id") && ks.includes("client_secret");
   }
   function jsonDropHtml(con) {
-    if (!hasClientFields(con)) return "";
+    // CHỈ nhóm Google: Facebook/Meta cũng đặt tên field client_id/client_secret (nhãn App ID)
+    // nhưng không hề có file JSON để tải - từng mọc nhầm ô "tải từ Google" sang form Facebook.
+    if (!hasClientFields(con) || con.group !== "google") return "";
     return '<div class="json-drop" id="jsonDrop"><span id="jdMsg">📄 Kéo thả file JSON client tải từ Google vào đây (hoặc bấm chọn file) - tự điền Client ID + Secret</span>'
       + '<input type="file" accept=".json,application/json" style="display:none"></div>';
   }

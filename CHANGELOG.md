@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.199] - 2026-07-27
+Ô kéo thả file JSON key không mọc nhầm sang form Facebook nữa.
+### Sửa lỗi
+- **Ô "kéo thả file JSON tải từ Google" chỉ hiện ở connector nhóm Google**: connector Facebook tự tạo app dùng chung tên trường client_id/client_secret nên ô này từng mọc nhầm sang form Kết nối Facebook Trang, trong khi Facebook không có file JSON nào để tải.
+
 ## [0.9.198] - 2026-07-27
 Nút Thông báo trên tablet gọn như bản mobile.
 ### Cải thiện
