@@ -168,10 +168,18 @@ TASK FROM "01 - Daily" WHERE !completed LIMIT 20
 
 Gặp cú pháp chưa hỗ trợ, khối hiện thông báo lỗi kèm nguyên văn truy vấn để bạn sửa, không bao giờ vỡ trang.
 
-### Giới hạn kỹ thuật cần biết
+### Hiệu năng và giới hạn kỹ thuật
 
-- Chỉ mục quét tối đa **3000 note** mỗi brain, bỏ qua file `.md` nặng hơn 1MB và các thư mục ẩn (`.git`, `.obsidian`, `.trash`...).
-- Kết quả được cache khoảng **15 giây**: vừa sửa note xong mà khối chưa cập nhật thì đợi vài giây rồi mở lại note chứa khối.
+Dataview được thiết kế để vault lớn vẫn mượt, ba tầng tiết kiệm tự động:
+
+- **Cache tăng dần ở server**: chỉ mục note được giữ trong RAM, mỗi lần gọi chỉ đọc và parse lại đúng những file vừa sửa (so theo thời gian sửa + dung lượng), phần còn lại dùng bản đã có. Vault hàng nghìn note: lần đầu sau khi khởi động server hơi chậm, từ lần hai chỉ còn vài chục ms.
+- **ETag / 304**: không có note nào đổi thì server trả gói rỗng thay vì gửi lại cả cục chỉ mục, trình duyệt dùng lại bản cũ.
+- **Khoanh vùng theo FROM**: truy vấn dùng `FROM "thư mục"` thì chỉ quét đúng nhánh đó thay vì cả brain. Vì vậy **nên viết FROM thư mục cụ thể** khi có thể, ví dụ chỉ quan tâm nhật ký thì `FROM "01 - Daily Log" OR "02 - Weekly Log" OR "03 - Monthly Log" OR "04 - Future Log"` nhanh hơn hẳn quét cả vault. Nhánh `FROM` chỉ có `#tag` thì vẫn phải quét cả brain (tag nằm rải rác mọi nơi).
+
+Giới hạn còn lại:
+
+- Chỉ mục tối đa **20.000 note** mỗi brain, bỏ qua file `.md` nặng hơn 1MB và các thư mục ẩn (`.git`, `.obsidian`, `.trash`...).
+- Trình duyệt giữ kết quả khoảng **15 giây** rồi mới hỏi lại server: vừa sửa note xong mà khối chưa cập nhật thì đợi vài giây rồi mở lại note chứa khối. Tick task thì cập nhật ngay, không phải đợi.
 - Task nằm **trong khối code** của note khác không bị nhặt nhầm (ví dụ code mẫu có chứa `- [ ]`).
 
 ## Khắc phục sự cố

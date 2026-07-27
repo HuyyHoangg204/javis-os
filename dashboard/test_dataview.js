@@ -1,7 +1,7 @@
 /* Test engine Dataview lite (parse + chạy truy vấn trên chỉ mục giả). Chạy tay / CI:
      node dashboard/test_dataview.js
    KHÔNG cần trình duyệt: chỉ test hàm thuần parseQuery/execQuery/compile. */
-const { parseQuery, execQuery, compile, matchFrom } = require("./dataview.js");
+const { parseQuery, execQuery, compile, matchFrom, fromScope } = require("./dataview.js");
 
 let fails = 0;
 function check(name, cond) {
@@ -42,6 +42,16 @@ q = parseQuery("LIST FROM #duan OR #ban-hang");
 check("from: tag OR", matchFrom(q.from, FILES[0]) && matchFrom(q.from, FILES[1]) && !matchFrom(q.from, FILES[2]));
 q = parseQuery('LIST FROM "notes" AND -#ban-hang');
 check("from: AND + phủ định", !matchFrom(q.from, FILES[1]) && matchFrom(q.from, FILES[2]));
+
+// ---- fromScope: suy phạm vi quét gửi server ----
+q = parseQuery('TASK FROM "01 - Daily Log" OR "02 - Weekly Log"');
+check("scope: gộp các thư mục", JSON.stringify(fromScope(q.from)) === JSON.stringify(["01 - Daily Log", "02 - Weekly Log"]));
+q = parseQuery('TASK FROM "01 - Daily Log" OR #tag');
+check("scope: nhánh OR chỉ có tag -> null (phải quét cả brain)", fromScope(q.from) === null);
+q = parseQuery('TASK FROM "A" AND -"B"');
+check("scope: bỏ qua phủ định, giữ thư mục dương", JSON.stringify(fromScope(q.from)) === JSON.stringify(["A"]));
+q = parseQuery("TASK");
+check("scope: không FROM -> null", fromScope(q.from) == null);
 
 // ---- compile / WHERE ----
 let f = compile("!completed");

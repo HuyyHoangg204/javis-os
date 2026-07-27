@@ -35,19 +35,53 @@
     return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
   }
 
-  // ---------------------------------------------------------------- chi muc note (cache ngan)
-  var idxCache = {};   // brain -> { t, p }
+  // ---------------------------------------------------------------- chi muc note
+  // 2 tang tiet kiem: (1) trong IDX_TTL dung lai ket qua khong hoi server; (2) het TTL
+  // van hoi nhung kem If-None-Match - khong note nao doi thi server tra 304 rong (khoi
+  // gui lai ca cuc JSON), minh dung lai ban da giu. Cache tach theo brain + pham vi scope.
+  var idxCache = {};   // key -> { t, p, etag, data }
   var IDX_TTL = 15000;
-  function loadIndex() {
-    var b = brainPath(), now = Date.now(), c = idxCache[b];
-    if (c && now - c.t < IDX_TTL) return c.p;
-    var p = fetch("/files/mdindex?brain=" + encodeURIComponent(b))
-      .then(function (r) { return r.ok ? r.json() : { files: [] }; })
-      .catch(function () { return { files: [] }; });
-    idxCache[b] = { t: now, p: p };
-    return p;
+  function loadIndex(scope) {
+    var b = brainPath(), now = Date.now();
+    var key = b + "||" + (scope && scope.length ? scope.slice().sort().join("|") : "*");
+    var c = idxCache[key];
+    if (c && c.p && now - c.t < IDX_TTL) return c.p;
+    var url = "/files/mdindex?brain=" + encodeURIComponent(b) +
+      (scope || []).map(function (s) { return "&path=" + encodeURIComponent(s); }).join("");
+    var headers = {};
+    if (c && c.etag) headers["If-None-Match"] = c.etag;
+    var entry = { t: now, p: null, etag: c && c.etag, data: c && c.data };
+    entry.p = fetch(url, { headers: headers, cache: "no-store" })
+      .then(function (r) {
+        if (r.status === 304 && entry.data) return entry.data;   // khong doi: dung ban cu
+        if (!r.ok) return entry.data || { files: [] };
+        return r.json().then(function (d) {
+          entry.etag = (d && d.etag) || r.headers.get("ETag") || "";
+          entry.data = d;
+          return d;
+        });
+      })
+      .catch(function () { return entry.data || { files: [] }; });
+    idxCache[key] = entry;
+    return entry.p;
   }
-  function dropCache() { idxCache = {}; }
+  // Du lieu vua doi (vd tick task): giu etag/data nhung ep lan render sau HOI LAI server
+  function dropCache() {
+    for (var k in idxCache) if (idxCache[k]) idxCache[k].t = 0;
+  }
+  // Suy pham vi quet tu FROM: moi nhanh OR deu phai co it nhat 1 thu muc DUONG thi moi
+  // khoanh vung duoc (nhanh chi co #tag phai quet ca brain). Ket qua la TAP CHA du dung:
+  // matchFrom van loc chinh xac tren client sau do.
+  function fromScope(from) {
+    if (!from || !from.or) return null;
+    var out = [], seenF = {};
+    for (var g = 0; g < from.or.length; g++) {
+      var pos = from.or[g].filter(function (a) { return a.kind === "folder" && !a.neg && a.v; });
+      if (!pos.length) return null;
+      pos.forEach(function (a) { if (!seenF[a.v]) { seenF[a.v] = 1; out.push(a.v); } });
+    }
+    return out.length ? out : null;
+  }
 
   // ---------------------------------------------------------------- parse truy van
   function splitTop(s, sep) {
@@ -377,7 +411,7 @@
     }
     var pq = parseQuery(q);
     if (pq.error) { body.innerHTML = errHtml(pq.error, q); return; }
-    loadIndex().then(function (idx) {
+    loadIndex(fromScope(pq.from)).then(function (idx) {
       if (!el.isConnected) return;
       try {
         var html = execQuery(pq, (idx && idx.files) || []);
@@ -465,6 +499,6 @@
   }
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { parseQuery: parseQuery, execQuery: execQuery, compile: compile,
-                       matchFrom: matchFrom, tokenize: tokenize };
+                       matchFrom: matchFrom, tokenize: tokenize, fromScope: fromScope };
   }
 })();

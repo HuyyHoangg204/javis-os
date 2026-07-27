@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.218] - 2026-07-28
+Dataview nhanh hơn hẳn với vault lớn: cache tăng dần, ETag 304, khoanh vùng theo FROM.
+### Cải thiện
+- **Cache chỉ mục tăng dần theo mtime ở server**: `/files/mdindex` không còn đọc + parse lại toàn bộ note mỗi lần gọi; chỉ file nào đổi (mtime/dung lượng khác lần trước) mới bị parse lại, còn lại lấy từ RAM. Vault vài nghìn note giảm từ cỡ giây xuống cỡ vài chục ms từ lần gọi thứ hai. File xoá được dọn khỏi cache khi quét toàn brain.
+- **ETag / If-None-Match**: không note nào đổi thì server trả 304 rỗng thay vì gửi lại cả cục JSON chỉ mục; dataview.js giữ bản cũ trong RAM và dùng lại. Hết 15 giây TTL chỉ tốn một request "có gì mới không" gần như miễn phí.
+- **Khoanh vùng quét theo FROM**: truy vấn mà mọi nhánh OR đều có thư mục dương (vd `FROM "01 - Daily Log" OR "02 - Weekly Log"`) thì client chỉ xin chỉ mục đúng các nhánh đó (`?path=A&path=B`, endpoint nhận nhiều path), server chỉ walk đúng thư mục đó. Nhánh chỉ có #tag vẫn quét cả brain vì tag nằm rải rác. Kết quả là tập cha, matchFrom vẫn lọc chính xác phía client.
+- Trần chỉ mục nâng từ 3.000 lên **20.000 note** (an toàn nhờ cache tăng dần).
+### Kiểm thử
+- `test_dataview_tasks.py` thêm 9 case: đếm số lần parse (lần 2 = 0, sửa 1 file chỉ parse 1), 304 đúng scope, nhận list path + tương thích path chuỗi, file mới/xoá vào ra chỉ mục đúng. Thêm kiểm chứng HTTP thật qua TestClient: nhiều `?path=` gom đúng list, 304 theo đúng scope.
+- `test_dataview.js` thêm 4 case fromScope: gộp thư mục, nhánh chỉ có tag thì trả null, bỏ qua phủ định, không FROM thì null.
+
 ## [0.9.217] - 2026-07-28
 Tài liệu hướng dẫn cho Task & Dataview.
 ### Thêm mới

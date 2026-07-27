@@ -9,13 +9,14 @@ import os
 import json
 import asyncio
 import glob
+import hashlib
 import uuid
 from pathlib import Path
 import re
 import shutil
 import time
 import yaml
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request, Body, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse, Response
@@ -2958,52 +2959,98 @@ def _scan_note_md(text):
     return fm, sorted(tags), tasks
 
 
+# Cache chỉ mục TĂNG DẦN theo mtime: giữa 2 lần gọi thường chỉ 1-2 note đổi, nên chỉ
+# parse lại file có (mtime, size) khác lần trước; còn lại dùng bản đã parse trong RAM.
+# Vault vài nghìn note: lần đầu tốn như cũ, từ lần hai chỉ còn chi phí walk + stat.
+_MDINDEX_CACHE = {}   # str(broot) -> { rel: {"mtime","size","entry"} }
+_MDINDEX_SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash",
+                      ".venv", ".pytest_cache", ".claude", ".agents"}
+_MDINDEX_CAP = 20000
+
+
+from typing import List as _List, Optional as _Optional
+
+
 @app.get("/files/mdindex")
-async def files_mdindex(brain: str = Query("brain"), path: str = Query("")):
+async def files_mdindex(brain: str = Query("brain"),
+                        path: _Optional[_List[str]] = Query(None),
+                        if_none_match: _Optional[str] = Header(None)):
     """Chỉ mục note .md trong GỐC BRAIN cho khối ```dataview trên dashboard. `path` =
-    tiền tố thư mục (tương đối gốc brain) để thu hẹp phạm vi. Client tự lọc/sắp xếp."""
+    tiền tố thư mục (tương đối gốc brain) để thu hẹp phạm vi quét, truyền được NHIỀU
+    lần (?path=A&path=B) - dataview.js tự suy từ mệnh đề FROM. Trả kèm `etag` (đặt cả
+    header ETag); client gửi lại qua If-None-Match, không có gì đổi thì nhận 304 rỗng
+    thay vì cả cục JSON. Client tự lọc/sắp xếp trên chỉ mục."""
     from starlette.concurrency import run_in_threadpool
     broot = Path(_brain_root(brain)).resolve()
     root = _files_root(brain)
-    prefix = (path or "").strip().replace("\\", "/").strip("/")
-    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv",
-                 ".pytest_cache", ".claude", ".agents"}
-    CAP = 3000
+    if path is None:
+        prefixes = []
+    elif isinstance(path, str):
+        prefixes = [path]
+    else:
+        prefixes = list(path)
+    prefixes = [p.strip().replace("\\", "/").strip("/") for p in prefixes if p and p.strip("/ ")]
 
     def _walk():
-        out = []
-        base = broot
-        if prefix:
-            cand = (broot / prefix).resolve()
-            if cand != broot and broot not in cand.parents:
-                return out
-            base = cand
-        if not base.is_dir():
-            return out
-        for dirpath, dirnames, filenames in os.walk(base):
-            dirnames[:] = [dn for dn in dirnames if not dn.startswith(".") and dn not in SKIP_DIRS]
-            for fn in sorted(filenames):
-                if not fn.lower().endswith(".md"):
-                    continue
-                if len(out) >= CAP:
-                    return out
-                p = Path(dirpath) / fn
-                try:
-                    st = p.stat()
+        cache = _MDINDEX_CACHE.setdefault(str(broot), {})
+        bases = []
+        if prefixes:
+            for pre in prefixes:
+                cand = (broot / pre).resolve()
+                if (cand == broot or broot in cand.parents) and cand.is_dir():
+                    bases.append(cand)
+            if not bases:
+                return [], "empty"
+        else:
+            bases = [broot]
+        seen = {}                       # rel -> (mtime, size), cũng là dedupe khi base lồng nhau
+        for base in bases:
+            for dirpath, dirnames, filenames in os.walk(base):
+                dirnames[:] = [dn for dn in dirnames
+                               if not dn.startswith(".") and dn not in _MDINDEX_SKIP_DIRS]
+                for fn in filenames:
+                    if not fn.lower().endswith(".md") or len(seen) >= _MDINDEX_CAP:
+                        continue
+                    p = Path(dirpath) / fn
+                    try:
+                        st = p.stat()
+                    except OSError:
+                        continue
                     if st.st_size > 1_000_000:
                         continue
-                    txt = p.read_text(encoding="utf-8", errors="ignore")
+                    rel = str(p.relative_to(broot)).replace("\\", "/")
+                    seen[rel] = (st.st_mtime, st.st_size)
+        etag = '"' + hashlib.md5(
+            ("|".join(sorted(prefixes)) + "\n" +
+             "\n".join(sorted(r + "\x00" + repr(ms) for r, ms in seen.items()))
+             ).encode("utf-8", "ignore")).hexdigest() + '"'
+        out = []
+        for rel in sorted(seen):
+            mtime, size = seen[rel]
+            c = cache.get(rel)
+            if c is None or c["mtime"] != mtime or c["size"] != size:
+                try:
+                    txt = (broot / rel).read_text(encoding="utf-8", errors="ignore")
                 except (OSError, ValueError):
                     continue
                 fm, tags, tasks = _scan_note_md(txt)
-                rel = str(p.relative_to(broot)).replace("\\", "/")
-                out.append({"path": rel, "name": fn,
-                            "folder": rel.rsplit("/", 1)[0] if "/" in rel else "",
-                            "mtime": st.st_mtime, "fm": fm, "tags": tags, "tasks": tasks})
-        return out
+                c = {"mtime": mtime, "size": size,
+                     "entry": {"path": rel, "name": rel.rsplit("/", 1)[-1],
+                               "folder": rel.rsplit("/", 1)[0] if "/" in rel else "",
+                               "mtime": mtime, "fm": fm, "tags": tags, "tasks": tasks}}
+                cache[rel] = c
+            out.append(c["entry"])
+        if not prefixes:                # walk toàn brain mới biết chắc file nào đã xoá
+            for rel in [r for r in cache if r not in seen]:
+                cache.pop(rel, None)
+        return out, etag
 
-    files = await run_in_threadpool(_walk)
-    return {"home": _files_rel(root, broot), "files": files, "capped": len(files) >= CAP}
+    files, etag = await run_in_threadpool(_walk)
+    if if_none_match and if_none_match == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return JSONResponse({"home": _files_rel(root, broot), "files": files, "etag": etag,
+                         "capped": len(files) >= _MDINDEX_CAP},
+                        headers={"ETag": etag})
 
 
 @app.post("/files/taskcheck")

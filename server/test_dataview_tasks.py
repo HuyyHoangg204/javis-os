@@ -77,14 +77,64 @@ try:
     check("scan: line đúng file gốc",
           all(main._MD_TASK_RE.match(lines[t["line"] - 1]) for t in tasks))
 
-    # ---- 3. /files/mdindex ----
-    d = asyncio.run(main.files_mdindex(brain="brain", path=""))
-    paths = [x["path"] for x in d["files"]]
-    check("mdindex: thấy cả 2 note", "05 - Việc/du-an.md" in paths and "note-khac.md" in paths)
-    d2 = asyncio.run(main.files_mdindex(brain="brain", path="05 - Việc"))
-    check("mdindex: lọc theo thư mục", [x["path"] for x in d2["files"]] == ["05 - Việc/du-an.md"])
-    check("mdindex: path ngoài brain bị chặn",
-          asyncio.run(main.files_mdindex(brain="brain", path="../.."))["files"] == [])
+    # ---- 3. /files/mdindex: chỉ mục + cache mtime tăng dần + ETag + đa thư mục ----
+    import json as _json
+    import time as _time
+
+    def _jbody(r):
+        return _json.loads(r.body)
+
+    calls = {"n": 0}
+    _orig_scan = main._scan_note_md
+
+    def _counting_scan(text):
+        calls["n"] += 1
+        return _orig_scan(text)
+
+    main._scan_note_md = _counting_scan
+    try:
+        r = asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=None))
+        d = _jbody(r)
+        paths = [x["path"] for x in d["files"]]
+        check("mdindex: thấy cả 2 note", "05 - Việc/du-an.md" in paths and "note-khac.md" in paths)
+        check("mdindex: lần đầu parse đủ 2 file", calls["n"] == 2)
+        etag = d.get("etag")
+        check("mdindex: có etag (body + header)", bool(etag) and r.headers.get("ETag") == etag)
+
+        calls["n"] = 0
+        r2 = asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=None))
+        check("mdindex: lần 2 KHÔNG parse lại (cache mtime)",
+              calls["n"] == 0 and _jbody(r2)["etag"] == etag)
+
+        r3 = asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=etag))
+        check("mdindex: If-None-Match trúng -> 304 rỗng", r3.status_code == 304)
+
+        calls["n"] = 0
+        p2 = BRAIN / "note-khac.md"
+        p2.write_text("- [ ] việc lẻ ngoài thư mục\n- [ ] việc mới thêm", encoding="utf-8")
+        os.utime(p2, (_time.time() + 5, _time.time() + 5))   # ép mtime đổi dù fs làm tròn giây
+        r4 = asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=etag))
+        d4 = _jbody(r4)
+        check("mdindex: file đổi -> 200 + etag mới", r4.status_code == 200 and d4["etag"] != etag)
+        check("mdindex: chỉ parse lại đúng file đổi", calls["n"] == 1)
+
+        d5 = _jbody(asyncio.run(main.files_mdindex(brain="brain", path=["05 - Việc"], if_none_match=None)))
+        check("mdindex: lọc theo list thư mục", [x["path"] for x in d5["files"]] == ["05 - Việc/du-an.md"])
+        d6 = _jbody(asyncio.run(main.files_mdindex(brain="brain", path="05 - Việc", if_none_match=None)))
+        check("mdindex: path chuỗi (tương thích cũ) vẫn chạy",
+              [x["path"] for x in d6["files"]] == ["05 - Việc/du-an.md"])
+        check("mdindex: path ngoài brain bị chặn",
+              _jbody(asyncio.run(main.files_mdindex(brain="brain", path=["../.."], if_none_match=None)))["files"] == [])
+
+        extra = BRAIN / "tam.md"
+        extra.write_text("- [ ] tạm", encoding="utf-8")
+        d7 = _jbody(asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=None)))
+        check("mdindex: thấy file mới tạo", any(x["path"] == "tam.md" for x in d7["files"]))
+        extra.unlink()
+        d8 = _jbody(asyncio.run(main.files_mdindex(brain="brain", path=None, if_none_match=None)))
+        check("mdindex: file xoá biến khỏi chỉ mục", not any(x["path"] == "tam.md" for x in d8["files"]))
+    finally:
+        main._scan_note_md = _orig_scan
 
     # ---- 4. /files/taskcheck ----
     t0 = tasks[0]
