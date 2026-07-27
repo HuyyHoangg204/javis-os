@@ -567,6 +567,28 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .conn-chip.conn-fix { border-color: #e0664a88; color: #f0a08c; background: rgba(224,102,74,.08); }
 .conn-chip.conn-fix:hover { background: rgba(224,102,74,.16); }
 .conn-chip .cstar { color: #d9a521; }
+/* Khối B: nhóm Google một cửa + wizard từng bước + kéo thả JSON + dùng lại key */
+.gico { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px;
+  border-radius: 9px; background: #fff; color: #4285f4; font-weight: 800; font-size: 21px;
+  font-family: Arial, sans-serif; }
+.conn-steps { margin: 4px 0 10px; padding-left: 22px; display: flex; flex-direction: column; gap: 9px;
+  font-size: 13.5px; line-height: 1.5; }
+.conn-steps li::marker { color: var(--accent, #4da3ff); font-weight: 700; }
+.conn-steps .step-link { margin-left: 6px; padding: 2px 9px; font-size: 12px; vertical-align: 1px; }
+.conn-steps .wiz-copy { margin-top: 6px; }
+.gp-row { display: flex; align-items: center; gap: 10px; text-align: left; }
+.gp-ico { flex: 0 0 auto; width: 30px; display: inline-flex; justify-content: center; font-size: 20px; }
+.gp-ico .ico-img { width: 24px; height: 24px; object-fit: contain; }
+.gp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gp-name { font-weight: 600; }
+.json-drop { border: 1.5px dashed var(--border, #444); border-radius: 10px; padding: 12px 14px;
+  font-size: 13px; opacity: .85; cursor: pointer; margin: 2px 0 6px; transition: border-color .15s, background .15s; }
+.json-drop:hover, .json-drop.over { border-color: var(--accent, #4da3ff); background: rgba(77,163,255,.06); opacity: 1; }
+.json-drop.ok { border-color: #3fb96a; color: #7ed6a0; opacity: 1; }
+.json-drop.bad { border-color: #e0664a; color: #f0a08c; opacity: 1; }
+.reuse-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 6px;
+  padding: 9px 12px; border: 1px solid rgba(63,185,106,.35); border-radius: 10px; background: rgba(63,185,106,.06); }
+.reuse-row select { max-width: 200px; }
 .perm-chip { font-size: 11px; border: 1px solid; border-radius: 10px; padding: 1px 7px; opacity: .9; }
 .cat-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 4px; }
 .cat-filter { display: flex; flex-wrap: wrap; gap: 6px; }

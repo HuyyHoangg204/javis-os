@@ -3076,6 +3076,54 @@
       try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
     }, 5000);
   }
+  // ── Nhóm connector (khối B): mọi dịch vụ Google gom về MỘT card, bấm vào chọn dịch vụ ──
+  const GROUP_META = {
+    google: { name: "Google", icon: '<span class="gico">G</span>', category: "Văn phòng",
+              desc: "Lịch, Gmail, Tasks, Drive/Docs, Sheets, Keep - chọn dịch vụ cần đấu, các dịch vụ dùng chung được một key đăng nhập." },
+  };
+  function catSolo(cat) { return cat.filter(c => !c.group); }
+  function groupCards(cat, conns) {
+    const byGroup = {};
+    cat.forEach(c => { if (c.group) (byGroup[c.group] = byGroup[c.group] || []).push(c); });
+    return Object.keys(byGroup).map(g => {
+      const meta = GROUP_META[g] || { name: g, icon: "🔌", category: "Khác", desc: "" };
+      const ids = byGroup[g].map(c => c.id);
+      const nConn = (conns || []).filter(x => ids.includes(x.connector_id)).length;
+      return '<div class="cat-card" data-cat="' + esc(meta.category) + '">'
+        + '<div class="cat-ico">' + meta.icon + '</div>'
+        + '<div class="cat-name">' + esc(meta.name) + ' <span class="prov-kind">' + byGroup[g].length + ' dịch vụ</span>'
+        + (nConn ? ' <span class="prov-kind" style="color:#3fb96a">đã nối ' + nConn + '</span>' : "") + '</div>'
+        + '<div class="cat-desc">' + esc(meta.desc) + '</div>'
+        + '<button class="gcard-btn" data-groupopen="' + esc(g) + '">Chọn dịch vụ</button>'
+        + '</div>';
+    }).join("");
+  }
+  function openGroupPicker(el, g, items, ctx, isFirst) {
+    const meta = GROUP_META[g] || { name: g };
+    const rows = items.map(c => {
+      const acc = (ctx.conns || []).filter(x => x.connector_id === c.id);
+      const badge = c.auth_type === "oauth" ? "Đăng nhập " + esc(meta.name)
+        : (c.auth_type === "qr" ? "Quét QR" : "Dán key");
+      const short = (c.name || c.id).replace(/^Google\s+/, "");
+      return '<button class="conn-menu-btn gp-row" data-gp="' + esc(c.id) + '">'
+        + '<span class="gp-ico">' + iconInner(c) + '</span>'
+        + '<span class="gp-main"><span class="gp-name">' + esc(short)
+        + (c.status === "beta" ? ' <span class="prov-kind" style="color:#d9a521">beta</span>' : "")
+        + (acc.length ? ' <span class="prov-kind" style="color:#3fb96a">đã nối ' + acc.length + '</span>' : "")
+        + '</span><span class="mp-note">' + esc(c.group_line || c.description || "") + '</span></span>'
+        + '<span class="prov-kind">' + badge + '</span></button>';
+    }).join("");
+    const m = connModal(mHead(esc(meta.name.toUpperCase()) + " - CHỌN DỊCH VỤ")
+      + '<div class="conn-menu">' + rows + '</div>'
+      + '<div class="mp-foot"><span class="mp-note">Tạo key một lần, các dịch vụ sau bấm "Dùng lại key" là xong.</span>'
+      + '<button class="mp-btn" data-act="close">Đóng</button></div>', 560);
+    m.querySelectorAll("[data-gp]").forEach(b => b.onclick = () => {
+      const con = items.find(x => x.id === b.dataset.gp);
+      closeConnModal();
+      openAddFlow(el, con, isFirst, ctx);
+    });
+  }
+
   function catalogCard(con) {
     const soon = con.status === "soon";
     const badge = '<span class="prov-kind">' + (AUTH_BADGE[con.auth_type] || con.auth_type || "") + '</span>'
@@ -3092,15 +3140,16 @@
       + '</div>';
   }
 
-  function openAddFlow(el, con, isFirst) {
+  function openAddFlow(el, con, isFirst, ctx) {
     if (!con) return;
     if (con.id === "custom") return openMcpForm(el);
     if (con.auth_type === "qr") return openQrFlow(el, con, isFirst);
-    if (con.auth_type === "oauth") return openOauthFlow(el, con);
-    openApikeyFlow(el, con, isFirst);
+    if (con.auth_type === "oauth") return openOauthFlow(el, con, ctx);
+    openApikeyFlow(el, con, isFirst, ctx);
   }
 
-  function openApikeyFlow(el, con, isFirst) {
+  function openApikeyFlow(el, con, isFirst, ctx) {
+    const hasSteps = con.steps && con.steps.length;
     const fields = (con.fields || []).map(f =>
       '<label class="mcp-lb">' + esc(f.label || f.key)
       + (f.multiline
@@ -3111,26 +3160,26 @@
       + '<div class="conn-form">'
       // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
       + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
-      + (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : "")
+      // Có steps thì wizard từng bước THAY guide tường chữ (guide giữ làm fallback catalog cũ)
+      + (hasSteps ? stepsHtml(con)
+        : (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : ""))
       + oauthWizard(con)   // nút mở trang ngoài (vd "Tạo App Password") khi catalog khai auth.setup.links
+      + reuseHtml(reuseDonors(con, ctx))
+      + jsonDropHtml(con)
       + fields
       + '<label class="mcp-lb">Tên gợi nhớ (tuỳ chọn - bỏ trống sẽ tự lấy tên tài khoản/shop)<input class="js-input" id="cLabel"></label>'
       + '</div>'
       + '<div class="mp-foot"><span class="mp-note" id="cErr"></span><div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="cGo">Kết nối</button></div></div>');
-    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
+    wireWizCommon(m); wireJsonDrop(m); wireReuse(m);
     m.querySelector("#cGo").onclick = async () => {
       const fieldsVal = {};
-      let missing = "";
-      m.querySelectorAll("[data-f]").forEach(inp => {
-        const k = inp.dataset.f, v = inp.value.trim();
-        fieldsVal[k] = v;
-        const fd = (con.fields || []).find(x => x.key === k) || {};
-        if (!v && !fd.optional) missing = fd.label || k;
-      });
+      m.querySelectorAll("[data-f]").forEach(inp => { fieldsVal[inp.dataset.f] = inp.value.trim(); });
+      const missing = missingField(m, con);
       const err = m.querySelector("#cErr"), go = m.querySelector("#cGo");
       if (missing) { err.textContent = "Thiếu: " + missing; return; }
       go.disabled = true; go.textContent = "Đang kiểm tra key…"; err.textContent = "";
-      const r = await postJson("/connect/add", { connector_id: con.id, fields: fieldsVal, label: m.querySelector("#cLabel").value.trim() });
+      const r = await postJson("/connect/add", { connector_id: con.id, fields: fieldsVal,
+        label: m.querySelector("#cLabel").value.trim(), reuse_from: m._reuseFrom || "" });
       if (!r.ok) { err.textContent = r.error || "Lỗi"; go.disabled = false; go.textContent = "Kết nối"; return; }
       m.querySelector(".conn-form").innerHTML = '<div class="conn-ok">✓ Đã kết nối: <b>' + esc(r.label || con.name) + '</b> (' + (r.tools || 0) + ' công cụ)'
         + (isFirst ? '<div class="conn-hint">Sang trang Javis hỏi thử: "Hôm nay bán được bao nhiêu?"</div>' : "") + '</div>';
@@ -3178,6 +3227,8 @@
   // Wizard cài đặt cho connector tự-tạo-app (Facebook/Meta): nút mở thẳng trang Developer
   // + ô Redirect URI kèm nút sao chép. Chỉ hiện khi connector khai auth.setup trong catalog.
   function oauthWizard(con) {
+    // Có steps (wizard từng bước) thì steps thay hẳn khối setup links cũ
+    if (con.steps && con.steps.length) return "";
     const s = con.setup || {};
     const hasLinks = Array.isArray(s.links) && s.links.length;
     if (!hasLinks && !s.redirect) return "";
@@ -3196,10 +3247,115 @@
     return h + '</div>';
   }
 
-  function openOauthFlow(el, con) {
+  // ── Khối B: wizard từng bước + kéo thả JSON + dùng lại key (nhóm Google) ──
+  function redirectCopyBox() {
+    // location.origin chạy đúng cả localhost lẫn VPS có domain (khỏi hardcode localhost)
+    const uri = location.origin + "/connect/oauth/callback";
+    return '<div class="wiz-copy"><input class="js-input" readonly value="' + esc(uri) + '">'
+      + '<button type="button" class="mp-btn wiz-copy-btn">Sao chép</button></div>';
+  }
+  function stepsHtml(con) {
+    const st = con.steps || [];
+    if (!st.length) return "";
+    return '<ol class="conn-steps">' + st.map(s =>
+      '<li>' + esc(s.text)
+      + (s.link ? ' <button type="button" class="mp-btn wiz-open step-link" data-url="' + esc(s.link) + '">' + esc(s.link_label || "Mở trang") + ' ↗</button>' : "")
+      + (s.copy === "redirect" ? redirectCopyBox() : "")
+      + '</li>').join("") + '</ol>';
+  }
+  function wireWizCommon(m) {
+    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
+    m.querySelectorAll(".wiz-copy-btn").forEach(btn => btn.onclick = async () => {
+      const inp = btn.parentElement.querySelector("input");
+      if (!inp) return;
+      try { await navigator.clipboard.writeText(inp.value); }
+      catch (e) { inp.select(); try { document.execCommand("copy"); } catch (_) {} }
+      btn.textContent = "Đã chép ✓";
+      setTimeout(() => { btn.textContent = "Sao chép"; }, 1400);
+    });
+  }
+  function hasClientFields(con) {
+    const ks = (con.fields || []).map(f => f.key);
+    return ks.includes("client_id") && ks.includes("client_secret");
+  }
+  function jsonDropHtml(con) {
+    if (!hasClientFields(con)) return "";
+    return '<div class="json-drop" id="jsonDrop"><span id="jdMsg">📄 Kéo thả file JSON client tải từ Google vào đây (hoặc bấm chọn file) - tự điền Client ID + Secret</span>'
+      + '<input type="file" accept=".json,application/json" style="display:none"></div>';
+  }
+  function wireJsonDrop(m) {
+    const z = m.querySelector("#jsonDrop");
+    if (!z) return;
+    const file = z.querySelector('input[type="file"]');
+    const msg = z.querySelector("#jdMsg");
+    const fill = (txt) => {
+      let c = null;
+      try { const d = JSON.parse(txt); c = d.web || d.installed || d; } catch (e) {}
+      if (!c || !c.client_id) {
+        z.classList.remove("ok"); z.classList.add("bad");
+        msg.textContent = "⚠ File này không phải JSON client của Google - tải đúng file từ trang Credentials.";
+        return;
+      }
+      const idI = m.querySelector('[data-f="client_id"]'), scI = m.querySelector('[data-f="client_secret"]');
+      if (idI) idI.value = c.client_id || "";
+      if (scI) scI.value = c.client_secret || "";
+      z.classList.remove("bad"); z.classList.add("ok");
+      msg.textContent = "✓ Đã điền key từ file (" + (c.client_id || "").slice(0, 28) + "…)"
+        + (c.client_secret ? "" : " - file thiếu client_secret, dán tay ô Secret");
+    };
+    z.onclick = () => file.click();
+    file.onchange = () => { if (file.files[0]) file.files[0].text().then(fill); };
+    z.ondragover = (e) => { e.preventDefault(); z.classList.add("over"); };
+    z.ondragleave = () => z.classList.remove("over");
+    z.ondrop = (e) => {
+      e.preventDefault(); z.classList.remove("over");
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) f.text().then(fill);
+    };
+  }
+  function reuseDonors(con, ctx) {
+    if (!ctx || !con.group || !hasClientFields(con)) return [];
+    return (ctx.conns || []).filter(x => {
+      const cc = (ctx.byId || {})[x.connector_id] || {};
+      return cc.group === con.group && hasClientFields(cc);
+    });
+  }
+  function reuseHtml(donors) {
+    if (!donors.length) return "";
+    return '<div class="reuse-row"><span class="mp-note">Đã có key Google ở tài khoản khác - dùng lại, khỏi tạo mới:</span>'
+      + '<select class="js-input" id="reuseSel">' + donors.map(d =>
+        '<option value="' + esc(d.id) + '">' + esc(d.label || d.id) + '</option>').join("") + '</select>'
+      + '<button type="button" class="mp-btn" id="reuseBtn">Dùng lại key này</button></div>';
+  }
+  function wireReuse(m) {
+    const btn = m.querySelector("#reuseBtn");
+    if (!btn) return;
+    btn.onclick = () => {
+      m._reuseFrom = m.querySelector("#reuseSel").value;
+      ["client_id", "client_secret"].forEach(k => {
+        const i = m.querySelector('[data-f="' + k + '"]');
+        if (i) { i.value = ""; i.placeholder = "Dùng lại key của tài khoản đã chọn"; i.disabled = true; }
+      });
+      btn.textContent = "✓ Sẽ dùng lại key"; btn.disabled = true;
+    };
+  }
+  // Field client_id/secret coi như ĐÃ CÓ khi user chọn dùng lại key
+  function missingField(m, con) {
+    let missing = "";
+    m.querySelectorAll("[data-f]").forEach(inp => {
+      const k = inp.dataset.f, v = inp.value.trim();
+      const fd = (con.fields || []).find(x => x.key === k) || {};
+      const reused = m._reuseFrom && (k === "client_id" || k === "client_secret");
+      if (!v && !fd.optional && !reused) missing = fd.label || k;
+    });
+    return missing;
+  }
+
+  function openOauthFlow(el, con, ctx) {
     // Provider không tự đăng ký client (vd Google) khai sẵn fields client_id/secret user tự tạo.
     // Có ô multiline (vd google-ads cho dán sẵn file ADC làm đường lui) nên render y như luồng
     // apikey, đừng ép hết thành input 1 dòng.
+    const hasSteps = con.steps && con.steps.length;
     const fields = (con.fields || []).map(f =>
       '<label class="mcp-lb">' + esc(f.label || f.key)
       + (f.multiline
@@ -3210,34 +3366,25 @@
       + '<div class="conn-form">'
       // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
       + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
-      + '<div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
-      + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>'
+      + (hasSteps ? stepsHtml(con)
+        : '<div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
+          + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>')
       + oauthWizard(con)
+      + reuseHtml(reuseDonors(con, ctx))
+      + jsonDropHtml(con)
       + fields
       + '<button class="mp-btn primary" id="oGo">' + (fields ? "Lưu & mở trang đăng nhập" : "Mở trang đăng nhập") + '</button></div>'
       + '<div class="mp-foot"><span class="mp-note" id="oErr"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
-    m.querySelectorAll(".wiz-open").forEach(b => { b.onclick = () => window.open(b.dataset.url, "_blank", "noopener"); });
-    const wizCopy = m.querySelector("#wizCopy");
-    if (wizCopy) wizCopy.onclick = async () => {
-      const inp = m.querySelector("#wizRedirect");
-      try { await navigator.clipboard.writeText(inp.value); }
-      catch (e) { inp.select(); try { document.execCommand("copy"); } catch (_) {} }
-      wizCopy.textContent = "Đã chép ✓";
-      setTimeout(() => { wizCopy.textContent = "Sao chép"; }, 1400);
-    };
+    wireWizCommon(m); wireJsonDrop(m); wireReuse(m);
     m.querySelector("#oGo").onclick = async () => {
       const err = m.querySelector("#oErr"), go = m.querySelector("#oGo");
       const fieldsVal = {};
-      let missing = "";
-      m.querySelectorAll("[data-f]").forEach(inp => {
-        const k = inp.dataset.f, v = inp.value.trim();
-        fieldsVal[k] = v;
-        const fd = (con.fields || []).find(x => x.key === k) || {};
-        if (!v && !fd.optional) missing = fd.label || k;
-      });
+      m.querySelectorAll("[data-f]").forEach(inp => { fieldsVal[inp.dataset.f] = inp.value.trim(); });
+      const missing = missingField(m, con);
       if (missing) { err.textContent = "Thiếu: " + missing; return; }
       go.disabled = true; err.textContent = "";
-      const r = await postJson("/connect/oauth/start", { connector_id: con.id, fields: fieldsVal });
+      const r = await postJson("/connect/oauth/start", { connector_id: con.id, fields: fieldsVal,
+        reuse_from: m._reuseFrom || "" });
       go.disabled = false;
       if (!r.ok) { err.textContent = r.error || "Lỗi"; return; }
       window.open(r.url, "_blank");
@@ -3377,7 +3524,7 @@
       + '<div class="cview-section"><h3>◆ Kho kết nối</h3>'
       + '<div class="cat-tools"><input class="js-input" id="catQ" placeholder="Tìm dịch vụ…" style="max-width:220px">'
       + '<span class="cat-filter"><button class="cat-chip on" data-catf="">Tất cả</button>' + cats.map(x => '<button class="cat-chip" data-catf="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</span></div>'
-      + '<div class="cat-grid" id="catGrid">' + catalogCard(byId.custom) + cat.map(catalogCard).join("") + '</div></div>'
+      + '<div class="cat-grid" id="catGrid">' + catalogCard(byId.custom) + groupCards(cat, conns) + catSolo(cat).map(catalogCard).join("") + '</div></div>'
       + '<div class="cview-section"><h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>'
       + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
       + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>'
@@ -3391,8 +3538,11 @@
     refreshConnHealth(el, conns, byId);
     _healthTimer = setInterval(() => refreshConnHealth(el, conns, byId), 60000);
     const isFirst = conns.length === 0;
-    el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst));
-    el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false));
+    const ctx = { conns: conns, byId: byId };   // cho flow biết tài khoản sẵn có (dùng lại key, đếm đã nối)
+    el.querySelectorAll("[data-connect]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.connect], isFirst, ctx));
+    el.querySelectorAll("[data-addacc]").forEach(b => b.onclick = () => openAddFlow(el, byId[b.dataset.addacc], false, ctx));
+    el.querySelectorAll("[data-groupopen]").forEach(b => b.onclick = () =>
+      openGroupPicker(el, b.dataset.groupopen, cat.filter(c => c.group === b.dataset.groupopen), ctx, isFirst));
     el.querySelectorAll("[data-conn]").forEach(b => b.onclick = () => {
       const c = conns.find(x => x.id === b.dataset.conn);
       if (c) openAccountMenu(el, c, byId[c.connector_id]);

@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.193] - 2026-07-27
+Mọi dịch vụ Google gom về một cửa, kèm wizard từng bước, kéo thả file key và nút dùng lại key.
+### Thêm mới
+- **Card Google một cửa trong Kho kết nối**: 6 dịch vụ Google (Lịch, Gmail, Tasks, Workspace, Sheets, Keep) gom về MỘT card. Bấm vào hiện màn chọn dịch vụ: mỗi dòng một câu nói rõ dịch vụ làm được gì và cách đăng nhập, kèm nhãn đã nối bao nhiêu tài khoản. Người dùng không còn phải hiểu sự khác nhau kỹ thuật giữa các đường kết nối.
+- **Wizard từng bước thay tường chữ**: hướng dẫn tạo key Google giờ là các bước đánh số, mỗi bước có nút mở thẳng đúng trang cần tới trên Google Cloud (tạo project, bật API, màn hình đồng ý, tạo client) và ô sao chép Redirect URI một chạm ngay tại bước cần dán. Redirect URI tự lấy theo địa chỉ đang mở nên chạy đúng cả trên VPS có tên miền.
+- **Kéo thả file JSON key**: tải file client từ Google xong kéo thả thẳng vào form (hoặc bấm chọn file), Javis tự bóc Client ID và Secret, nhận cả loại Ứng dụng web lẫn Desktop. Hết cảnh copy nhầm thiếu ký tự.
+- **Dùng lại key giữa các dịch vụ Google**: đã tạo key cho một dịch vụ thì dịch vụ sau chỉ cần bấm "Dùng lại key này" - server tự sao chép nội bộ, key không bao giờ đi qua trình duyệt.
+### Kiểm thử
+- `test_connect_group.py` mới: đủ thành viên nhóm, schema các bước wizard, bước Redirect URI, dùng lại key không đè giá trị tự nhập và không copy key ngoài danh sách connector đích.
+
 ## [0.9.192] - 2026-07-27
 Trang Kết nối biết tự khám sức khoẻ: chấm màu trên từng tài khoản và nút Kết nối lại một chạm.
 ### Thêm mới

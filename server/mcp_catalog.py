@@ -69,6 +69,13 @@ def public_catalog():
                        for f in (auth.get("fields") or [])],
             "guide": auth.get("guide", ""), "guide_url": auth.get("guide_url", ""),
             "setup": auth.get("setup") or {},
+            # Nhóm hiển thị (vd mọi dịch vụ Google gom về MỘT card) + wizard từng bước
+            # thay guide tường chữ. steps: [{text, link?, link_label?, copy?}] -
+            # copy="redirect" nghĩa là chèn ô sao chép Redirect URI ngay tại bước đó.
+            "group": c.get("group", ""), "group_line": c.get("group_line", ""),
+            "steps": [{"text": s.get("text", ""), "link": s.get("link", ""),
+                       "link_label": s.get("link_label", ""), "copy": s.get("copy", "")}
+                      for s in (auth.get("steps") or [])],
             "risk": c.get("risk", ""), "default_perm": c.get("default_perm", "readonly"),
         })
     return out

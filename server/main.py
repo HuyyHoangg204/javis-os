@@ -1069,10 +1069,14 @@ async def connect_add(request: Request):
     tự lấy tên shop làm label) → key sai thì xoá, không lưu rác."""
     data = await request.json()
     con_id = (data.get("connector_id") or "").strip()
+    # Dùng lại key OAuth client của connection khác (vd Gmail dùng lại key đã tạo cho
+    # Calendar) - copy server-side, secrets không bao giờ về browser.
+    fields_in = mcp_store.reuse_client_fields(
+        mcp_catalog.get(con_id), data.get("fields") or {}, (data.get("reuse_from") or "").strip())
     # Bước ĐỔI CREDENTIAL (nếu connector khai auth.exchange): vd Google Keep đổi App Password
     # thành master token ngay tại đây, để người dùng khỏi phải mở terminal. Hàm này LUÔN xoá các
     # field khai trong `drop` (như app_password) nên thứ đó không bao giờ xuống tới mcp_store.
-    fields, ex_err = cred_exchange.run(mcp_catalog.get(con_id), data.get("fields") or {})
+    fields, ex_err = cred_exchange.run(mcp_catalog.get(con_id), fields_in)
     if ex_err:
         return {"ok": False, "error": ex_err}
     cid, err = mcp_store.add_connection(con_id, {
@@ -1229,6 +1233,10 @@ async def connect_oauth_start(request: Request):
     conn_id = data.get("id")
     # fields: client_id/secret user tự khai (BYO) cho provider không DCR (vd Google). Rỗng với Meta.
     fields = {k: v for k, v in (data.get("fields") or {}).items() if v}
+    # Dùng lại key client từ connection Google khác (copy server-side, xem reuse_client_fields)
+    fields = mcp_store.reuse_client_fields(
+        mcp_catalog.get((data.get("connector_id") or "").strip()), fields,
+        (data.get("reuse_from") or "").strip())
     if not conn_id and data.get("connector_id"):
         # Tái dùng connection oauth dở dang (chưa có token) của connector này -
         # tránh mỗi lần bấm nút lại đẻ 1 connection mồ côi.

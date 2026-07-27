@@ -177,6 +177,25 @@ def connection_secrets(cid):
     return secrets_store.decrypt_map((c or {}).get("secrets") or {})
 
 
+def reuse_client_fields(target_con, fields, from_cid, keys=("client_id", "client_secret")):
+    """Dùng lại key OAuth client từ connection KHÁC, copy hoàn toàn SERVER-SIDE.
+
+    Các connector Google dùng chung được một OAuth client, nên user đã tạo key cho
+    Calendar thì Gmail chỉ cần "dùng lại key của Calendar" thay vì làm lại 10 phút.
+    Secrets không bao giờ đi qua browser: UI chỉ gửi `reuse_from=<conn_id>`, server
+    tự đọc và điền. Chỉ copy key nằm trong danh sách fields của connector ĐÍCH, và
+    KHÔNG đè giá trị user đã tự nhập."""
+    out = dict(fields or {})
+    if not from_cid:
+        return out
+    allowed = {f.get("key") for f in ((target_con or {}).get("auth") or {}).get("fields", [])}
+    src = connection_secrets(from_cid)
+    for k in keys:
+        if k in allowed and not out.get(k) and src.get(k):
+            out[k] = src[k]
+    return out
+
+
 @_locked
 def add_connection(connector_id, data):
     """Thêm 1 tài khoản. data: {label?, fields{}, headers{}, env{}, url?, command?, args?,
