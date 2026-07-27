@@ -484,10 +484,10 @@
       },
       "tool_meta": {
         "read": ["fb_pages_list", "fb_page_posts", "fb_page_comments"],
-        "danger": ["fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video", "fb_page_edit", "fb_page_reply"]
+        "danger": ["fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video", "fb_page_edit", "fb_page_reply", "fb_page_delete"]
       },
       "default_perm": "readonly",
-      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI và TRẢ LỜI BÌNH LUẬN công khai trên Trang của bạn. Hành động thật, khó rút lại.\n\nGiữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng hay trả lời gì.\n\nToken chỉ thao tác được trên Trang mà chính bạn là admin."
+      "risk": "Mức Toàn quyền cho phép Javis ĐĂNG BÀI, TRẢ LỜI BÌNH LUẬN và XOÁ BÀI trên Trang của bạn. Hành động thật, công khai.\n\nXoá bài là KHÔNG HOÀN TÁC ĐƯỢC - Trang không có thùng rác, bài xoá rồi là mất hẳn.\n\nGiữ mức Chỉ đọc thì Javis chỉ xem Trang, bài và bình luận, không đăng, không sửa, không xoá.\n\nToken chỉ thao tác được trên Trang mà chính bạn là admin."
     },
     {
       "id": "facebook-monitor",

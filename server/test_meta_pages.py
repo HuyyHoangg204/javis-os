@@ -38,7 +38,11 @@ check("catalog: default_perm readonly + guide dùng localhost",
       fp["default_perm"] == "readonly" and "localhost" in fp["auth"]["guide"])
 check("catalog: tool ghi khai ở danger", set(fp["tool_meta"].get("danger") or [])
       == {"fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video",
-          "fb_page_edit", "fb_page_reply"})
+          "fb_page_edit", "fb_page_reply", "fb_page_delete"})
+# Xoá bài là hành động KHÔNG hoàn tác được - cảnh báo phải nói ra, đừng để người dùng
+# bật Toàn quyền mà tưởng xấu nhất chỉ là đăng nhầm một bài.
+check("catalog: cảnh báo nói rõ xoá bài không hoàn tác",
+      "XOÁ BÀI" in fp["risk"] and "KHÔNG HOÀN TÁC" in fp["risk"])
 import mcp_catalog  # noqa: E402
 check("mcp_catalog.get load được", mcp_catalog.get("facebook-pages") is not None)
 
@@ -59,15 +63,16 @@ class _Ctx:
 ctx = _Ctx()
 plug.register(ctx)
 byname = {t["name"]: t for t in ctx.tools}
-check("plugin: đủ 9 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
+check("plugin: đủ 10 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
                                             "fb_page_post", "fb_page_photo", "fb_page_album",
-                                            "fb_page_video", "fb_page_edit", "fb_page_reply"})
+                                            "fb_page_video", "fb_page_edit", "fb_page_delete",
+                                            "fb_page_reply"})
 check("plugin: tool đọc = readonly",
       all(byname[n]["min_mode"] == "readonly" for n in ("fb_pages_list", "fb_page_posts", "fb_page_comments")))
-check("plugin: tool ghi (đăng/ảnh/album/video/sửa/trả lời) = full",
+check("plugin: tool ghi (đăng/ảnh/album/video/sửa/xoá/trả lời) = full",
       all(byname[n]["min_mode"] == "full"
           for n in ("fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video",
-                    "fb_page_edit", "fb_page_reply")))
+                    "fb_page_edit", "fb_page_delete", "fb_page_reply")))
 
 # chưa kết nối → _check chặn
 plug._connected_id = lambda: None
@@ -251,6 +256,39 @@ async def handler_tests():
     check("fb_page_edit: thiếu message → ERROR", r_ed_nomsg.startswith("ERROR"))
     r_ed_noid = await plug._edit_post({"message": "x"}, None)
     check("fb_page_edit: thiếu post_id → ERROR", r_ed_noid.startswith("ERROR"))
+
+    # fb_page_delete: DELETE {post_id} bằng token Trang, tự suy Trang từ post_id.
+    # Xoá không hoàn tác được nên phải đọc bài TRƯỚC, và bài không đọc được thì
+    # KHÔNG được gọi DELETE - tránh xoá mù vào id sai.
+    dels = []
+    async def _fake_delete(path, token):
+        dels.append((path, token))
+        return {"success": True}
+    plug._delete = _fake_delete
+
+    async def _get_with_post(path, params, token):
+        if path == "P1_10":
+            return {"id": "P1_10", "message": "Bài cũ cần xoá", "created_time": "2026-07-28T01:00:00+0000"}
+        if path == "P1_99":
+            return {"error": {"message": "Unsupported get request"}}
+        return await _fake_get(path, params, token)
+    plug._get = _get_with_post
+
+    r_del = await plug._delete_post({"post_id": "P1_10"}, None)
+    check("fb_page_delete: gọi DELETE đúng post_id + token Trang",
+          dels and dels[-1][0] == "P1_10" and dels[-1][1] == "PTOKA")
+    check("fb_page_delete: trả ok + kèm nội dung vừa xoá để đối chiếu",
+          '"ok": true' in r_del.lower() and "Bài cũ cần xoá" in r_del)
+    check("fb_page_delete: nói rõ không khôi phục được", "KHÔNG khôi phục" in r_del)
+
+    n_before = len(dels)
+    r_del_bad = await plug._delete_post({"post_id": "P1_99"}, None)
+    check("fb_page_delete: bài không đọc được → ERROR và KHÔNG gọi DELETE",
+          r_del_bad.startswith("ERROR") and len(dels) == n_before)
+
+    r_del_noid = await plug._delete_post({}, None)
+    check("fb_page_delete: thiếu post_id → ERROR", r_del_noid.startswith("ERROR"))
+    plug._get = _fake_get
 
     # Nhiều Trang: không chỉ rõ → lỗi kèm danh sách; chỉ rõ tên → chọn đúng
     pages_data["data"].append({"id": "P2", "name": "Shop B", "category": "Retail", "access_token": "PTOKB"})

@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.213] - 2026-07-28
+Javis xoá được bài trên Trang, nên đổi ảnh bài đã đăng giờ làm trọn được bằng lời.
+### Thêm mới
+- **Tool `fb_page_delete`**: xoá hẳn một bài đã đăng trên Trang bằng lời ("xoá bài này giúp anh"). Trước giờ Javis đăng và sửa chữ được nhưng không xoá được, nên tình huống hay gặp nhất là muốn ĐỔI ẢNH của bài đã đăng thì kẹt: Meta không cho thay ảnh bài cũ, phải đăng bài mới rồi xoá bài cũ, mà bước xoá lại phải tự làm tay. Giờ đi trọn được.
+- Tool chạy ở mức **Toàn quyền**, khai trong nhóm nguy hiểm. Trước khi xoá, Javis **đọc lại bài** để chắc đúng bài và giữ nội dung: bài không đọc được thì dừng, KHÔNG xoá mù theo id sai; xoá xong trả lại đoạn nội dung vừa xoá để đối chiếu (và có cái dán lại nếu lỡ tay).
+- **Cảnh báo rủi ro của connector Facebook Trang** viết lại cho đúng bán kính thiệt hại: nói thẳng Toàn quyền là xoá được bài và xoá thì KHÔNG hoàn tác được, Trang không có thùng rác.
+### Sửa lỗi
+- **Khai báo plugin Trang bị thiếu 4 tool**: `plugin.yaml` mới liệt kê 5 tool trong khi plugin đăng ký 9 (thiếu ảnh, album, video, sửa bài). Đã khai đủ 10.
+### Kiểm thử
+- `test_meta_pages.py` thêm 5 case cho `fb_page_delete`, trong đó có case chốt chặn "bài không đọc được thì KHÔNG được gọi DELETE", và case cảnh báo connector phải nói rõ xoá không hoàn tác.
+
 ## [0.9.212] - 2026-07-28
 Sửa lại cho đúng: bảng "Invalid Scopes" KHÔNG chặn đăng nhập, đừng bắt người dùng đi vòng.
 ### Sửa lỗi

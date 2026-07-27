@@ -80,6 +80,19 @@ async def _post(path, data, token):
         return {"error": {"message": f"{type(e).__name__}: {e}"}}
 
 
+async def _delete(path, token):
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30) as c:
+            r = await c.delete(f"{GRAPH}/{str(path).lstrip('/')}", params={"access_token": token})
+        try:
+            return r.json()
+        except Exception:
+            return {"error": {"message": f"HTTP {r.status_code}: {r.text[:200]}"}}
+    except Exception as e:
+        return {"error": {"message": f"{type(e).__name__}: {e}"}}
+
+
 def _fmt(d):
     if isinstance(d, dict) and d.get("error"):
         e = d["error"]
@@ -400,6 +413,39 @@ async def _edit_post(args, cctx):
                       ensure_ascii=False, default=str)
 
 
+async def _delete_post(args, cctx):
+    """XOÁ HẲN một bài đã đăng trên Trang. Meta không có thùng rác cho bài Trang nên
+    KHÔNG khôi phục được. Trước khi xoá có đọc lại bài, vừa để chắc đúng bài vừa giữ
+    lại nội dung trả về cho người dùng đối chiếu (và có cái dán lại nếu lỡ tay)."""
+    token = await _token()
+    if not token:
+        return "ERROR: " + (_check() or "chưa kết nối")
+    args = args or {}
+    post_id = str(args.get("post_id") or "").strip()
+    if not post_id:
+        return "ERROR: thiếu 'post_id' (id bài cần xoá, lấy từ fb_page_posts)."
+    # post_id dạng {pageid}_{postid}: tự suy Trang như fb_page_edit
+    if not (args.get("page_id") or args.get("page")) and "_" in post_id:
+        args = {**args, "page_id": post_id.split("_", 1)[0]}
+    pid, ptok, pname, err = await _resolve_page(args, token)
+    if err:
+        return err
+    snap = await _get(post_id, {"fields": "id,message,created_time,permalink_url"}, ptok)
+    if isinstance(snap, dict) and snap.get("error"):
+        return _fmt(snap)                      # bài không tồn tại / không thuộc Trang này → dừng, chưa xoá gì
+    d = await _delete(post_id, ptok)
+    if isinstance(d, dict) and d.get("error"):
+        return _fmt(d)
+    ok = bool(isinstance(d, dict) and d.get("success") is True)
+    cu = str((snap or {}).get("message") or "")
+    return json.dumps({"ok": ok, "page": pname, "post_id": post_id,
+                       "noi_dung_da_xoa": (cu[:300] + "…") if len(cu) > 300 else cu,
+                       "created_time": (snap or {}).get("created_time"),
+                       "note": "Đã xoá hẳn, KHÔNG khôi phục được." if ok
+                               else "Facebook trả về khác thường: " + str(d)[:120]},
+                      ensure_ascii=False, default=str)
+
+
 async def _reply(args, ctx):
     token = await _token()
     if not token:
@@ -488,7 +534,7 @@ def register(ctx):
         name="fb_page_edit", min_mode="full", check_fn=_check, handler=_edit_post,
         description=("SỬA nội dung chữ của một bài ĐÃ ĐĂNG trên Trang - hành động THẬT. Cần post_id (từ "
                      "fb_page_posts) và message MỚI thay toàn bộ nội dung cũ. Meta không cho đổi ảnh/video "
-                     "đã đính kèm, chỉ đổi được chữ."),
+                     "đã đính kèm, chỉ đổi được chữ - muốn đổi ảnh thì đăng bài mới rồi fb_page_delete bài cũ."),
         schema={"type": "object", "properties": {
             "post_id": {"type": "string", "description": "id bài cần sửa (từ fb_page_posts)"},
             "message": {"type": "string", "description": "Nội dung MỚI thay cho nội dung cũ"},
@@ -508,6 +554,17 @@ def register(ctx):
             "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
             "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}},
             "required": ["video"]},
+    )
+    ctx.register_tool(
+        name="fb_page_delete", min_mode="full", check_fn=_check, handler=_delete_post,
+        description=("XOÁ HẲN một bài đã đăng trên Trang - hành động THẬT, KHÔNG HOÀN TÁC ĐƯỢC (Trang không "
+                     "có thùng rác). Cần post_id từ fb_page_posts. CHỈ gọi khi người dùng nói rõ muốn xoá "
+                     "đúng bài đó; đừng tự xoá để 'dọn dẹp'. Xoá xong trả lại đoạn nội dung vừa xoá để đối chiếu."),
+        schema={"type": "object", "properties": {
+            "post_id": {"type": "string", "description": "id bài cần xoá (từ fb_page_posts)"},
+            "page_id": {"type": "string", "description": "id Trang (thường tự suy từ post_id)"},
+            "page": {"type": "string", "description": "tên Trang (tuỳ chọn)"}},
+            "required": ["post_id"]},
     )
     ctx.register_tool(
         name="fb_page_reply", min_mode="full", check_fn=_check, handler=_reply,
