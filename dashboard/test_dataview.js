@@ -1,7 +1,7 @@
 /* Test engine Dataview lite (parse + chạy truy vấn trên chỉ mục giả). Chạy tay / CI:
      node dashboard/test_dataview.js
    KHÔNG cần trình duyệt: chỉ test hàm thuần parseQuery/execQuery/compile. */
-const { parseQuery, execQuery, compile, matchFrom, fromScope } = require("./dataview.js");
+const { parseQuery, execQuery, compile, matchFrom, fromScope, parseTasksQuery } = require("./dataview.js");
 
 let fails = 0;
 function check(name, cond) {
@@ -93,6 +93,30 @@ check("table: WITHOUT ID bỏ cột File", !h.includes("<th>File</th>") && h.inc
 
 h = execQuery(parseQuery('LIST FROM "khong-ton-tai"'), FILES);
 check("rỗng: báo không có kết quả", h.includes("Không có kết quả"));
+
+// ---- ngôn ngữ obsidian-tasks (khối ```tasks) ----
+let tq = parseTasksQuery("not done\ndue before today\nsort by due\nlimit 20");
+check("tasks: dịch not done + due before today", tq.type === "TASK" &&
+  tq.where === "(!completed) AND (due < date(today))" && tq.sort && tq.sort.expr === "due" && !tq.sort.desc && tq.limit === 20);
+h = execQuery(tq, FILES);
+check("tasks: quá hạn ra đúng việc", h.includes("Gọi khách A") && !h.includes("Việc lẻ") && !h.includes("Chốt báo giá"));
+h = execQuery(parseTasksQuery("not done\nno due date"), FILES);
+check("tasks: no due date", h.includes("Soạn hợp đồng") && h.includes("Việc lẻ") && !h.includes("Gọi khách A"));
+h = execQuery(parseTasksQuery("done"), FILES);
+check("tasks: done", h.includes("Chốt báo giá") && !h.includes("Gọi khách A"));
+h = execQuery(parseTasksQuery("description includes khách"), FILES);
+check("tasks: description includes", h.includes("Gọi khách A") && !h.includes("Việc lẻ"));
+h = execQuery(parseTasksQuery("tag includes phap-ly"), FILES);
+check("tasks: tag includes (tự thêm #)", h.includes("Soạn hợp đồng") && !h.includes("Việc lẻ"));
+h = execQuery(parseTasksQuery("priority is high"), FILES);
+check("tasks: priority is high", h.includes("Gọi khách A") && !h.includes("Soạn hợp đồng"));
+h = execQuery(parseTasksQuery("not done\npath includes notes"), FILES);
+check("tasks: path includes", h.includes("Việc lẻ") && !h.includes("Gọi khách A"));
+tq = parseTasksQuery("not done\nfilter by function task.x\nhide backlink");
+check("tasks: dòng lạ -> cảnh báo, dòng hide -> bỏ qua im lặng",
+  tq.warn.length === 1 && tq.warn[0].includes("filter by function") && tq.where === "(!completed)");
+tq = parseTasksQuery("sort by priority reverse\nlimit to 5 tasks");
+check("tasks: sort reverse + limit to N tasks", tq.sort.expr === "priority" && tq.sort.desc && tq.limit === 5);
 
 // XSS: nội dung task/frontmatter phải được escape
 const XSS = [{ path: "x.md", name: "x.md", folder: "", mtime: 0, fm: { status: '<img src=x onerror=1>' }, tags: [],

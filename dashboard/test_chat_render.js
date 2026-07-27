@@ -126,6 +126,8 @@ check("dataview: truy van nam trong data-dv-q",
   has(h, encodeURIComponent('TASK FROM "05 - Viec"')));
 h = mdToHtml("```dataviewjs\ndv.pages()\n```");
 check("dataviewjs: cung vao khoi dataview (bao chua ho tro khi chay)", has(h, "jv-dataview"));
+h = mdToHtml("```tasks\nnot done\ndue before today\n```");
+check("tasks: fence obsidian-tasks cung thanh khoi song", has(h, 'data-dv-lang="tasks"'));
 
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));

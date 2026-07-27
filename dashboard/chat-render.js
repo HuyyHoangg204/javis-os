@@ -151,16 +151,17 @@
   // attribute), dataview.js tu phat hien va chay. contenteditable=false de trong WYSIWYG khong sua
   // nham ket qua; turndown rule (console.js) tra lai dung fence goc khi luu.
   function dataviewHtml(lang, code) {
+    var title = lang === "tasks" ? "☑ Việc (tasks)" : "▦ Dataview";
     return '<div class="jv-dataview" contenteditable="false" data-dv-lang="' + esc(lang) +
       '" data-dv-q="' + esc(encodeURIComponent(code)) + '">' +
-      '<div class="jv-dv-head">▦ Dataview</div>' +
+      '<div class="jv-dv-head"><span class="jv-dv-title">' + title + "</span></div>" +
       '<div class="jv-dv-body"><span class="jv-dv-wait">Đang chạy truy vấn…</span></div></div>';
   }
   function renderFence(info, code, streaming) {
     var lang = (info || "").trim().split(/\s+/)[0] || "";
     code = code.replace(/\n$/, "");
     if (streaming) return codeBlockHtml(lang, code, true);   // fence chua dong: khoi code song, chua thanh artifact
-    if (/^dataview(js)?$/i.test(lang)) return dataviewHtml(lang.toLowerCase(), code);
+    if (/^(dataview(js)?|tasks)$/i.test(lang)) return dataviewHtml(lang.toLowerCase(), code);
     var type = fenceType(lang, code);
     if (type) return artifactCard(type, lang, code);
     return codeBlockHtml(lang, code, false);

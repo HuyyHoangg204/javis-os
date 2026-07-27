@@ -61,6 +61,12 @@ try:
     check("init: các mục cũ vẫn được tạo (sources/agents/wiki...)",
           (v4 / "sources").is_dir() and (v4 / "agents").is_dir() and (v4 / "wiki").is_dir())
 
+    check("init: có thư mục Dashboard + seed Dashboard.md / Task Inbox.md",
+          (v4 / "00 - Dashboard" / "Dashboard.md").is_file()
+          and (v4 / "00 - Dashboard" / "Task Inbox.md").is_file())
+    check("init: seed Dashboard.md dùng khối ```tasks chạy thật",
+          "```tasks" in (v4 / "00 - Dashboard" / "Dashboard.md").read_text(encoding="utf-8"))
+
     r2 = asyncio.run(main.vault_init(brain="brain"))
     check("init: idempotent - lần 2 không báo tạo lại log",
           isinstance(r2, dict) and not any("log" in c for c in r2.get("created", [])))

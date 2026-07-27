@@ -150,6 +150,73 @@
           return { error: 'FROM chỉ hỗ trợ "thư mục" và #tag (AND/OR, phủ định -), gặp: ' + orGroups[g][a].v };
     return { or: orGroups };
   }
+  // ---------------------------------------------------------------- ngon ngu obsidian-tasks (khoi ```tasks)
+  // Dich TUNG DONG filter cua plugin Tasks sang bieu thuc WHERE noi bo (cac dong AND voi nhau,
+  // dung ngu nghia plugin goc) roi chay CHUNG engine voi dataview. Dong chua ho tro -> canh bao
+  // ro rang, cac dong con lai van chay. "happens" duoc xap xi bang "due".
+  var TASKS_PRIO = { highest: 0, high: 1, medium: 2, none: 3, low: 4, lowest: 5 };
+  var TASKS_FIELD = { due: "due", scheduled: "scheduled", starts: "start", start: "start",
+                      done: "done", created: "created", happens: "due" };
+  function tasksDateExpr(field, rel, when) {
+    var d = null;
+    if (/^today$/i.test(when)) d = "date(today)";
+    else if (/^tomorrow$/i.test(when)) d = "date(tomorrow)";
+    else if (/^yesterday$/i.test(when)) d = "date(yesterday)";
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(when)) d = 'date("' + when + '")';
+    if (!d) return null;
+    if (rel === "before") return field + " < " + d;
+    if (rel === "after") return field + " > " + d;
+    return field + " = " + d;
+  }
+  function parseTasksQuery(src) {
+    var q = { type: "TASK", columns: [], from: null, where: null, sort: null, limit: 0,
+              withoutId: false, warn: [] };
+    var conds = [];
+    var IGNORE = /^(group by |hide |show |short mode$|full mode$|explain$|is recurring$|is not recurring$)/i;
+    String(src == null ? "" : src).replace(/\r/g, "").split("\n").forEach(function (line) {
+      line = line.trim();
+      if (!line || line[0] === "#") return;
+      var low = line.toLowerCase(), m;
+      if (low === "done") { conds.push("completed"); return; }
+      if (low === "not done") { conds.push("!completed"); return; }
+      if ((m = /^(due|scheduled|starts|start|done|created|happens)\s+(before|after|on)?\s*(.+)$/i.exec(line))) {
+        var e = tasksDateExpr(TASKS_FIELD[m[1].toLowerCase()], (m[2] || "on").toLowerCase(), m[3].trim());
+        if (e) { conds.push(e); return; }
+      }
+      if ((m = /^has\s+(due|scheduled|start|done|created)\s+date$/.exec(low))) { conds.push(TASKS_FIELD[m[1]]); return; }
+      if ((m = /^no\s+(due|scheduled|start|done|created)\s+date$/.exec(low))) { conds.push("!" + TASKS_FIELD[m[1]]); return; }
+      if ((m = /^description\s+(does not include|includes?)\s+(.+)$/i.exec(line))) {
+        var e2 = 'contains(text, "' + m[2].trim().replace(/"/g, "") + '")';
+        conds.push(/not/i.test(m[1]) ? "!" + e2 : e2); return;
+      }
+      if ((m = /^path\s+(does not include|includes?)\s+(.+)$/i.exec(line))) {
+        var e3 = 'contains(file.path, "' + m[2].trim().replace(/"/g, "") + '")';
+        conds.push(/not/i.test(m[1]) ? "!" + e3 : e3); return;
+      }
+      if ((m = /^tags?\s+(do(?:es)? not include|includes?)\s+(.+)$/i.exec(line))) {
+        var tg = m[2].trim().replace(/"/g, "");
+        if (tg[0] !== "#") tg = "#" + tg;
+        var e4 = 'contains(tags, "' + tg + '")';
+        conds.push(/not/i.test(m[1]) ? "!" + e4 : e4); return;
+      }
+      if ((m = /^priority\s+is\s+(above|below)?\s*(highest|high|medium|none|low|lowest)$/.exec(low))) {
+        var p = TASKS_PRIO[m[2]];
+        conds.push(m[1] === "above" ? "priority < " + p : m[1] === "below" ? "priority > " + p : "priority = " + p);
+        return;
+      }
+      if ((m = /^sort by\s+(\S+)(\s+reverse)?$/.exec(low))) {
+        var f = { due: "due", priority: "priority", description: "text", path: "file.path",
+                  scheduled: "scheduled", start: "start", done: "done", created: "created" }[m[1]];
+        if (f) { q.sort = { expr: f, desc: !!m[2] }; return; }
+      }
+      if ((m = /^limit(?:\s+to)?\s+(\d+)(?:\s+tasks?)?$/.exec(low))) { q.limit = parseInt(m[1], 10) || 0; return; }
+      if (IGNORE.test(low)) return;
+      q.warn.push('Bỏ qua dòng chưa hỗ trợ: "' + line + '"');
+    });
+    if (conds.length) q.where = conds.map(function (c) { return "(" + c + ")"; }).join(" AND ");
+    return q;
+  }
+
   function parseSort(val) {
     var first = splitTop(val, ",")[0] || "";
     var m = /^([\s\S]+?)(?:\s+(ASC|DESC))?$/i.exec(first.trim());
@@ -409,8 +476,18 @@
       body.innerHTML = errHtml("Khối dataviewjs (chạy code JS) chưa được hỗ trợ - hãy dùng truy vấn dataview thường.", q);
       return;
     }
-    var pq = parseQuery(q);
+    var pq = lang === "tasks" ? parseTasksQuery(q) : parseQuery(q);
     if (pq.error) { body.innerHTML = errHtml(pq.error, q); return; }
+    // Khoi ra danh sach viec -> gan nut "+ Việc" (them nhanh vao Task Inbox) len dau khoi
+    if (pq.type === "TASK") {
+      var head = el.querySelector(".jv-dv-head");
+      if (head && !head.querySelector(".dv-add")) {
+        var ab = document.createElement("button");
+        ab.type = "button"; ab.className = "dv-add"; ab.textContent = "+ Việc";
+        ab.title = "Thêm việc mới vào Task Inbox";
+        head.appendChild(ab);
+      }
+    }
     loadIndex(fromScope(pq.from)).then(function (idx) {
       if (!el.isConnected) return;
       try {
@@ -423,6 +500,44 @@
       }
     });
   }
+  // Nut "+ Việc": form mini (noi dung + han) ngay tren khoi, POST /files/taskadd ->
+  // viec roi vao "<thu muc Dashboard>/Task Inbox.md", xong lam moi MOI khoi tren trang.
+  function submitAdd(el) {
+    if (!el) return;
+    var form = el.querySelector(".dv-addform");
+    if (!form) return;
+    var ti = form.querySelector(".dv-add-text"), di = form.querySelector(".dv-add-date");
+    var go = form.querySelector(".dv-add-go");
+    var text = (ti.value || "").trim();
+    if (!text) { ti.focus(); return; }
+    var fd = new FormData();
+    fd.append("brain", brainPath());
+    fd.append("text", text);
+    fd.append("due", di.value || "");
+    go.disabled = true; go.textContent = "…";
+    fetch("/files/taskadd", { method: "POST", body: fd })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        go.disabled = false; go.textContent = "Thêm";
+        if (d && d.ok) {
+          ti.value = ""; di.value = "";
+          form.classList.remove("open");
+          dropCache();
+          document.querySelectorAll(".jv-dataview[data-dv-done]").forEach(function (x) {
+            x.removeAttribute("data-dv-done");   // viec moi co the khop query cua khoi khac
+          });
+          scheduleScan();
+        } else {
+          go.textContent = "⚠"; go.title = (d && d.error) || "Không thêm được";
+          setTimeout(function () { go.textContent = "Thêm"; }, 1600);
+        }
+      })
+      .catch(function () {
+        go.disabled = false; go.textContent = "⚠";
+        setTimeout(function () { go.textContent = "Thêm"; }, 1600);
+      });
+  }
+
   var scanTimer = null;
   function scheduleScan() {
     if (scanTimer) return;
@@ -479,6 +594,37 @@
         });
     });
 
+    // Nut "+ Việc" tren dau khoi: bat/tat form mini roi gui
+    document.addEventListener("click", function (e) {
+      var add = e.target.closest ? e.target.closest(".jv-dataview .dv-add") : null;
+      if (add) {
+        var el = add.closest(".jv-dataview");
+        var form = el.querySelector(".dv-addform");
+        if (!form) {
+          form = document.createElement("div");
+          form.className = "dv-addform";
+          form.setAttribute("contenteditable", "false");
+          form.innerHTML = '<input type="text" class="dv-add-text" placeholder="Việc mới...">' +
+            '<input type="date" class="dv-add-date" title="Hạn (tuỳ chọn)">' +
+            '<button type="button" class="dv-add-go">Thêm</button>';
+          var head = el.querySelector(".jv-dv-head");
+          head.parentNode.insertBefore(form, head.nextSibling);
+        }
+        form.classList.toggle("open");
+        if (form.classList.contains("open")) { try { form.querySelector(".dv-add-text").focus(); } catch (err) {} }
+        return;
+      }
+      var go = e.target.closest ? e.target.closest(".jv-dataview .dv-add-go") : null;
+      if (go) { submitAdd(go.closest(".jv-dataview")); return; }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && e.target && e.target.classList &&
+          e.target.classList.contains("dv-add-text")) {
+        e.preventDefault(); e.stopPropagation();
+        submitAdd(e.target.closest(".jv-dataview"));
+      }
+    }, true);
+
     // Link file trong ket qua dataview: dieu huong duoc CA khi nam trong editor dang sua
     // (chat-render bo qua click trong contenteditable). Capture de chay truoc handler chung.
     document.addEventListener("click", function (e) {
@@ -499,6 +645,7 @@
   }
   if (typeof module !== "undefined" && module.exports) {
     module.exports = { parseQuery: parseQuery, execQuery: execQuery, compile: compile,
-                       matchFrom: matchFrom, tokenize: tokenize, fromScope: fromScope };
+                       matchFrom: matchFrom, tokenize: tokenize, fromScope: fromScope,
+                       parseTasksQuery: parseTasksQuery };
   }
 })();

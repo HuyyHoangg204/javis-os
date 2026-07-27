@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.220] - 2026-07-28
+Khối ```tasks chạy thật + nút "+ Việc" + thư mục Dashboard mặc định + hết chậm lượt đầu.
+### Thêm mới
+- **Khối ```tasks (ngôn ngữ plugin obsidian-tasks) chạy thật**: `not done`, `due before today`, `has/no due date`, `description/path includes`, `tag includes`, `priority is ...`, `sort by ... reverse`, `limit to N tasks`. Mỗi dòng AND với nhau đúng ngữ nghĩa plugin gốc; dòng chưa hỗ trợ hiện cảnh báo rõ ràng, các dòng còn lại vẫn chạy; `group by`/`hide`/`show`/`short mode` bỏ qua im lặng. Dashboard.md viết kiểu Obsidian giờ hiện việc thật thay vì cục code chết.
+- **Nút "+ Việc" trên mọi khối danh sách việc**: form mini nhập nội dung + hạn (tuỳ chọn), Enter là thêm. Việc rơi vào `00 - Dashboard/Task Inbox.md` (tự tạo nếu thiếu) qua API mới `POST /files/taskadd`, gắn `📅 hạn` kiểu obsidian-tasks, mọi khối trên trang tự làm mới.
+- **`00 - Dashboard` vào cấu trúc chuẩn vault**: brain mới có sẵn kèm seed `Dashboard.md` (4 khối tasks: quá hạn / hôm nay / sắp tới / chưa có hạn) + `Task Inbox.md`; brain cũ thiếu thì nút chuẩn hoá tạo đủ. Seed chỉ tạo khi chưa có, không ghi đè file user.
+### Cải thiện
+- **Hết chậm lượt mở đầu tiên**: server tự hâm nóng chỉ mục dataview cho MỌI brain ngay sau khi boot (thread nền) - khối trên dashboard hiện gần như tức thì thay vì ngồi chờ parse cả vault.
+### Kiểm thử
+- `test_dataview.js` thêm 12 case dịch ngôn ngữ tasks; `test_dataview_tasks.py` thêm 6 case taskadd (mặc định vào Task Inbox, gắn 📅, chặn `../`, line trả về tick được ngay); `test_vault_scaffold.py` thêm 2 case seed Dashboard; `test_chat_render.js` thêm case fence tasks.
+
 ## [0.9.219] - 2026-07-28
 Bộ sổ bullet journal (Daily/Weekly/Monthly/Future Log) vào cấu trúc chuẩn của vault.
 ### Thêm mới

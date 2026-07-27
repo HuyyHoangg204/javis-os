@@ -158,6 +158,41 @@ TASK FROM "01 - Daily" WHERE !completed LIMIT 20
 ```
 ````
 
+### Khối ```tasks - viết theo ngôn ngữ plugin Tasks
+
+Nếu anh quen cú pháp của plugin obsidian-tasks thì dùng thẳng, Javis hiểu luôn khối ` ```tasks `:
+
+````markdown
+```tasks
+not done
+due before today
+sort by due
+limit 20
+```
+````
+
+Mỗi dòng là một điều kiện, các dòng VÀ với nhau (đúng ngữ nghĩa plugin gốc). Các dòng được hỗ trợ:
+
+- `done` / `not done`
+- `due|scheduled|starts|done|created before|after|on <today|tomorrow|yesterday|YYYY-MM-DD>` (viết `due today` cũng được; `happens` được tính xấp xỉ bằng `due`)
+- `has due date` / `no due date` (tương tự cho scheduled/start/done/created)
+- `description includes <chữ>` / `description does not include <chữ>`
+- `path includes <chữ>` / `path does not include <chữ>`
+- `tag includes #x` / `tags do not include #x`
+- `priority is [above|below] high|medium|low|none|highest|lowest`
+- `sort by due|priority|description|path|... [reverse]`, `limit N` / `limit to N tasks`
+- `group by ...`, `hide ...`, `show ...`, `short mode`, `explain` - được bỏ qua im lặng (không ảnh hưởng kết quả)
+
+Dòng nào chưa hỗ trợ (vd `filter by function`) thì khối hiện cảnh báo ghi rõ dòng bị bỏ qua, các dòng còn lại vẫn chạy bình thường.
+
+### Nút "+ Việc" - thêm task chủ động
+
+Mọi khối ra danh sách việc (` ```tasks ` hoặc `TASK`) đều có nút **+ Việc** ở góc phải đầu khối. Bấm vào là hiện ô nhập nội dung + ô chọn hạn (tuỳ chọn), Enter hoặc bấm Thêm là xong. Việc mới được ghi vào **`00 - Dashboard/Task Inbox.md`** (tự tạo nếu chưa có) kèm `📅 hạn` nếu anh chọn ngày, và mọi khối trên trang tự làm mới ngay. Task Inbox là hộp thư việc: thêm nhanh ở đó, lúc rảnh kéo về đúng sổ Daily/Weekly.
+
+### Trang Dashboard mặc định
+
+Thư mục `00 - Dashboard` nằm trong cấu trúc chuẩn của vault: brain mới có sẵn kèm hai file seed là `Dashboard.md` (các khối tasks: quá hạn, hôm nay, sắp tới, chưa có hạn) và `Task Inbox.md`. Brain cũ thiếu thì banner cấu trúc vault có nút tạo bổ sung. File seed chỉ tạo khi chưa có - anh sửa gì Javis giữ nguyên.
+
 ### Chưa hỗ trợ gì
 
 Đây là bản "lite", cố tình chỉ phủ phần hay dùng nhất. Chưa có:
@@ -170,7 +205,9 @@ Gặp cú pháp chưa hỗ trợ, khối hiện thông báo lỗi kèm nguyên v
 
 ### Hiệu năng và giới hạn kỹ thuật
 
-Dataview được thiết kế để vault lớn vẫn mượt, ba tầng tiết kiệm tự động:
+Dataview được thiết kế để vault lớn vẫn mượt, các tầng tiết kiệm tự động:
+
+- **Hâm nóng lúc khởi động**: server tự dựng sẵn chỉ mục cho mọi brain ngay sau khi boot (chạy nền), nên lượt mở dashboard đầu tiên không phải ngồi chờ parse cả vault.
 
 - **Cache tăng dần ở server**: chỉ mục note được giữ trong RAM, mỗi lần gọi chỉ đọc và parse lại đúng những file vừa sửa (so theo thời gian sửa + dung lượng), phần còn lại dùng bản đã có. Vault hàng nghìn note: lần đầu sau khi khởi động server hơi chậm, từ lần hai chỉ còn vài chục ms.
 - **ETag / 304**: không có note nào đổi thì server trả gói rỗng thay vì gửi lại cả cục chỉ mục, trình duyệt dùng lại bản cũ.

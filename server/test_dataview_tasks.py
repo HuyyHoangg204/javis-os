@@ -170,6 +170,25 @@ try:
     r = asyncio.run(main.files_taskcheck(brain="brain", path="../../ngoai.md",
                                          line=1, checked=1, expect=""))
     check("taskcheck: chặn ../", getattr(r, "status_code", 0) in (400, 404))
+
+    # ---- 5. /files/taskadd (nút "+ Việc") ----
+    r = asyncio.run(main.files_taskadd(brain="brain", text="Việc thêm nhanh", due="2026-08-01", path=""))
+    check("taskadd: mặc định rơi vào Task Inbox trong thư mục Dashboard",
+          isinstance(r, dict) and r.get("ok") and r["path"].endswith("Task Inbox.md")
+          and "Dashboard" in r["path"])
+    inbox = BRAIN / r["path"]
+    body = inbox.read_text(encoding="utf-8")
+    check("taskadd: dòng task đúng + gắn 📅", "- [ ] Việc thêm nhanh 📅 2026-08-01" in body)
+    r2 = asyncio.run(main.files_taskadd(brain="brain", text="Việc 2", due="", path=r["path"]))
+    body = inbox.read_text(encoding="utf-8")
+    check("taskadd: append vào file chỉ định, không có hạn thì không 📅",
+          isinstance(r2, dict) and r2.get("ok") and body.rstrip().endswith("- [ ] Việc 2"))
+    check("taskadd: line trả về trỏ đúng dòng (tick được ngay)",
+          body.split("\n")[r2["line"] - 1].strip() == "- [ ] Việc 2")
+    r3 = asyncio.run(main.files_taskadd(brain="brain", text="x", due="", path="../../ngoai.md"))
+    check("taskadd: chặn ../", getattr(r3, "status_code", 0) == 400)
+    r4 = asyncio.run(main.files_taskadd(brain="brain", text="   ", due="", path=""))
+    check("taskadd: nội dung trống -> 400", getattr(r4, "status_code", 0) == 400)
 finally:
     pass
 

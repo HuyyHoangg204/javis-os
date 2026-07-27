@@ -2005,6 +2005,7 @@ STANDARD_STRUCTURE = [
     {"key": "attachments", "label": "attachments", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?attachments$", "create": "attachments", "essential": False},
     # Bộ sổ bullet journal - nơi ghi chép + task hằng ngày, dataview kéo từ đây.
     # detect linh hoạt: "01 - Daily Log" / "Daily Log" / "Daily" đều tính là có.
+    {"key": "dashboard", "label": "dashboard", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?dashboard$", "create": "00 - Dashboard", "essential": False},
     {"key": "daily", "label": "daily log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?daily(\s*log)?$", "create": "01 - Daily Log", "essential": False},
     {"key": "weekly", "label": "weekly log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?weekly(\s*log)?$", "create": "02 - Weekly Log", "essential": False},
     {"key": "monthly", "label": "monthly log", "kind": "dir", "detect": r"^(\d+\s*[-_.]\s*)?monthly(\s*log)?$", "create": "03 - Monthly Log", "essential": False},
@@ -2045,6 +2046,21 @@ JAVIS_README = (
     "- `workflows/` - quy trình nhiều agent (status active/off)\n"
     "- Skills dùng chung ở `skills/` (tự mirror sang `.claude/skills` cho Claude Code native)\n"
 )
+DASHBOARD_SEED = (
+    "# Dashboard\n\n"
+    "## 🔴 Nhiệm vụ quá hạn\n\n"
+    "```tasks\nnot done\ndue before today\nsort by due\nlimit 20\n```\n\n"
+    "## 🟡 Nhiệm vụ hôm nay\n\n"
+    "```tasks\nnot done\ndue today\n```\n\n"
+    "## 🟢 Sắp tới\n\n"
+    "```tasks\nnot done\ndue after today\nsort by due\nlimit 20\n```\n\n"
+    "## 📥 Chưa có hạn\n\n"
+    "```tasks\nnot done\nno due date\nlimit 20\n```\n"
+)
+TASKINBOX_SEED = (
+    "# Task Inbox\n\n"
+    "Việc thêm nhanh từ dashboard - kéo về đúng sổ khi rảnh.\n"
+)
 SCHEMA_SEED = (
     "# AGENTS.md - Vault Schema (Javis)\n\n"
     "> Vault này hoạt động với Javis OS. Cấu trúc:\n\n"
@@ -2076,6 +2092,16 @@ def _ensure_brain_scaffold(root):
     if not jr.exists():
         jr.parent.mkdir(parents=True, exist_ok=True)
         jr.write_text(JAVIS_README, encoding="utf-8")
+    try:
+        # Seed trang Dashboard + Task Inbox trong thư mục dashboard (create-if-missing,
+        # user sửa gì giữ nấy). Khối ```tasks trong seed chạy thật trên dashboard Javis.
+        dash = Path(_resolve_subfolder(str(root), r"^(\d+\s*[-_.]\s*)?dashboard$", "00 - Dashboard"))
+        if not (dash / "Dashboard.md").exists():
+            (dash / "Dashboard.md").write_text(DASHBOARD_SEED, encoding="utf-8")
+        if not (dash / "Task Inbox.md").exists():
+            (dash / "Task Inbox.md").write_text(TASKINBOX_SEED, encoding="utf-8")
+    except Exception as e:
+        print(f"[brain scaffold] dashboard seed: {e}", file=__import__('sys').stderr)
     try:
         _brain_memory_dir(str(root))   # memory/ + MEMORY.md seed
     except Exception:
@@ -2978,6 +3004,64 @@ _MDINDEX_CAP = 20000
 from typing import List as _List, Optional as _Optional
 
 
+def _mdindex_collect(broot: Path, prefixes):
+    """Quét (tăng dần) chỉ mục note .md của MỘT brain. Trả (files, etag). Dùng chung cho
+    endpoint /files/mdindex lẫn prewarm lúc khởi động (để lượt mở dashboard đầu tiên
+    không phải trả giá parse cả vault)."""
+    cache = _MDINDEX_CACHE.setdefault(str(broot), {})
+    bases = []
+    if prefixes:
+        for pre in prefixes:
+            cand = (broot / pre).resolve()
+            if (cand == broot or broot in cand.parents) and cand.is_dir():
+                bases.append(cand)
+        if not bases:
+            return [], "empty"
+    else:
+        bases = [broot]
+    seen = {}                       # rel -> (mtime, size), cũng là dedupe khi base lồng nhau
+    for base in bases:
+        for dirpath, dirnames, filenames in os.walk(base):
+            dirnames[:] = [dn for dn in dirnames
+                           if not dn.startswith(".") and dn not in _MDINDEX_SKIP_DIRS]
+            for fn in filenames:
+                if not fn.lower().endswith(".md") or len(seen) >= _MDINDEX_CAP:
+                    continue
+                p = Path(dirpath) / fn
+                try:
+                    st = p.stat()
+                except OSError:
+                    continue
+                if st.st_size > 1_000_000:
+                    continue
+                rel = str(p.relative_to(broot)).replace("\\", "/")
+                seen[rel] = (st.st_mtime, st.st_size)
+    etag = '"' + hashlib.md5(
+        ("|".join(sorted(prefixes)) + "\n" +
+         "\n".join(sorted(r + "\x00" + repr(ms) for r, ms in seen.items()))
+         ).encode("utf-8", "ignore")).hexdigest() + '"'
+    out = []
+    for rel in sorted(seen):
+        mtime, size = seen[rel]
+        c = cache.get(rel)
+        if c is None or c["mtime"] != mtime or c["size"] != size:
+            try:
+                txt = (broot / rel).read_text(encoding="utf-8", errors="ignore")
+            except (OSError, ValueError):
+                continue
+            fm, tags, tasks = _scan_note_md(txt)
+            c = {"mtime": mtime, "size": size,
+                 "entry": {"path": rel, "name": rel.rsplit("/", 1)[-1],
+                           "folder": rel.rsplit("/", 1)[0] if "/" in rel else "",
+                           "mtime": mtime, "fm": fm, "tags": tags, "tasks": tasks}}
+            cache[rel] = c
+        out.append(c["entry"])
+    if not prefixes:                # walk toàn brain mới biết chắc file nào đã xoá
+        for rel in [r for r in cache if r not in seen]:
+            cache.pop(rel, None)
+    return out, etag
+
+
 @app.get("/files/mdindex")
 async def files_mdindex(brain: str = Query("brain"),
                         path: _Optional[_List[str]] = Query(None),
@@ -2998,66 +3082,72 @@ async def files_mdindex(brain: str = Query("brain"),
         prefixes = list(path)
     prefixes = [p.strip().replace("\\", "/").strip("/") for p in prefixes if p and p.strip("/ ")]
 
-    def _walk():
-        cache = _MDINDEX_CACHE.setdefault(str(broot), {})
-        bases = []
-        if prefixes:
-            for pre in prefixes:
-                cand = (broot / pre).resolve()
-                if (cand == broot or broot in cand.parents) and cand.is_dir():
-                    bases.append(cand)
-            if not bases:
-                return [], "empty"
-        else:
-            bases = [broot]
-        seen = {}                       # rel -> (mtime, size), cũng là dedupe khi base lồng nhau
-        for base in bases:
-            for dirpath, dirnames, filenames in os.walk(base):
-                dirnames[:] = [dn for dn in dirnames
-                               if not dn.startswith(".") and dn not in _MDINDEX_SKIP_DIRS]
-                for fn in filenames:
-                    if not fn.lower().endswith(".md") or len(seen) >= _MDINDEX_CAP:
-                        continue
-                    p = Path(dirpath) / fn
-                    try:
-                        st = p.stat()
-                    except OSError:
-                        continue
-                    if st.st_size > 1_000_000:
-                        continue
-                    rel = str(p.relative_to(broot)).replace("\\", "/")
-                    seen[rel] = (st.st_mtime, st.st_size)
-        etag = '"' + hashlib.md5(
-            ("|".join(sorted(prefixes)) + "\n" +
-             "\n".join(sorted(r + "\x00" + repr(ms) for r, ms in seen.items()))
-             ).encode("utf-8", "ignore")).hexdigest() + '"'
-        out = []
-        for rel in sorted(seen):
-            mtime, size = seen[rel]
-            c = cache.get(rel)
-            if c is None or c["mtime"] != mtime or c["size"] != size:
-                try:
-                    txt = (broot / rel).read_text(encoding="utf-8", errors="ignore")
-                except (OSError, ValueError):
-                    continue
-                fm, tags, tasks = _scan_note_md(txt)
-                c = {"mtime": mtime, "size": size,
-                     "entry": {"path": rel, "name": rel.rsplit("/", 1)[-1],
-                               "folder": rel.rsplit("/", 1)[0] if "/" in rel else "",
-                               "mtime": mtime, "fm": fm, "tags": tags, "tasks": tasks}}
-                cache[rel] = c
-            out.append(c["entry"])
-        if not prefixes:                # walk toàn brain mới biết chắc file nào đã xoá
-            for rel in [r for r in cache if r not in seen]:
-                cache.pop(rel, None)
-        return out, etag
-
-    files, etag = await run_in_threadpool(_walk)
+    files, etag = await run_in_threadpool(_mdindex_collect, broot, prefixes)
     if if_none_match and if_none_match == etag:
         return Response(status_code=304, headers={"ETag": etag})
     return JSONResponse({"home": _files_rel(root, broot), "files": files, "etag": etag,
                          "capped": len(files) >= _MDINDEX_CAP},
                         headers={"ETag": etag})
+
+
+@app.on_event("startup")
+async def _prewarm_mdindex():
+    """Hâm nóng chỉ mục dataview cho MỌI brain ngay sau khi boot (thread nền, không chặn
+    startup): lượt mở dashboard/note đầu tiên khỏi phải ngồi chờ parse cả vault."""
+    import threading
+
+    def _warm():
+        try:
+            base = Path(BRAINS_DIR)
+            if not base.is_dir():
+                return
+            for p in sorted(base.iterdir()):
+                if p.is_dir() and not p.name.startswith("."):
+                    try:
+                        _mdindex_collect(p.resolve(), [])
+                    except Exception as e:
+                        print(f"[mdindex prewarm] {p.name}: {e}", file=__import__('sys').stderr)
+        except Exception as e:
+            print(f"[mdindex prewarm] {e}", file=__import__('sys').stderr)
+
+    threading.Thread(target=_warm, daemon=True, name="mdindex-prewarm").start()
+
+
+@app.post("/files/taskadd")
+async def files_taskadd(brain: str = Form("brain"), text: str = Form(...),
+                        due: str = Form(""), path: str = Form("")):
+    """Thêm MỘT dòng task "- [ ] ..." vào cuối file (nút "+ Việc" trên khối dataview/tasks).
+    `path` bỏ trống thì rơi về hộp thư việc mặc định: "<thư mục Dashboard>/Task Inbox.md"
+    (tự tạo nếu chưa có). `due` dạng YYYY-MM-DD thì gắn "📅 due" kiểu obsidian-tasks."""
+    text = " ".join((text or "").split())
+    if not text:
+        return JSONResponse({"error": "Nội dung việc trống"}, status_code=400)
+    broot = Path(_brain_root(brain)).resolve()
+    rel = (path or "").strip().replace("\\", "/").strip("/")
+    if rel:
+        target = (broot / rel).resolve()
+        if target != broot and broot not in target.parents:
+            return JSONResponse({"error": "Đường dẫn ngoài phạm vi cho phép"}, status_code=400)
+        if target.suffix.lower() not in (".md", ".txt"):
+            return JSONResponse({"error": "Chỉ thêm task vào file .md/.txt"}, status_code=400)
+    else:
+        dash = _resolve_subfolder(str(broot), r"^(\d+\s*[-_.]\s*)?dashboard$", "00 - Dashboard")
+        target = Path(dash) / "Task Inbox.md"
+    line = "- [ ] " + text
+    if re.match(r"^\d{4}-\d{2}-\d{2}$", (due or "").strip()) and "📅" not in text:
+        line += " 📅 " + due.strip()
+    try:
+        if target.exists():
+            old = target.read_text(encoding="utf-8")
+            body = old.rstrip("\n") + ("\n" if old.strip() else "") + line + "\n"
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            body = "# Task Inbox\n\nViệc thêm nhanh từ dashboard - kéo về đúng sổ khi rảnh.\n\n" + line + "\n"
+        _atomic_write_text(target, body)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    rel_out = str(target.relative_to(broot)).replace("\\", "/")
+    return {"ok": True, "path": rel_out, "line": len(body.split("\n")) - 1, "raw": line}
 
 
 @app.post("/files/taskcheck")

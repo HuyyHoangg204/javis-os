@@ -463,8 +463,29 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
   margin: 10px 0; overflow: hidden;
 }
 .jv-dataview .jv-dv-head {
-  font-size: 12px; letter-spacing: .4px; color: var(--text3); padding: 6px 12px 4px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12px; letter-spacing: .4px; color: var(--text3); padding: 5px 12px 4px;
   border-bottom: 1px solid var(--border); user-select: none;
+}
+.jv-dataview .dv-add {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  border-radius: 6px; font-size: 12px; padding: 1px 8px; cursor: pointer; font-family: inherit;
+}
+.jv-dataview .dv-add:hover { color: var(--accent); border-color: var(--accent); }
+.jv-dataview .dv-addform {
+  display: none; gap: 6px; align-items: center; padding: 7px 12px;
+  border-bottom: 1px solid var(--border); background: var(--bg3);
+}
+.jv-dataview .dv-addform.open { display: flex; }
+.jv-dataview .dv-addform input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 4px 8px; font-size: 13px; font-family: inherit;
+}
+.jv-dataview .dv-add-text { flex: 1; min-width: 0; }
+.jv-dataview .dv-add-date { color-scheme: dark; }
+.jv-dataview .dv-add-go {
+  background: var(--accent); border: none; color: #fff; border-radius: 6px;
+  padding: 4px 12px; font-size: 13px; cursor: pointer; font-family: inherit;
 }
 .jv-dataview .jv-dv-body { padding: 8px 12px 10px; font-size: 14px; }
 .jv-dataview .jv-dv-wait { color: var(--text3); font-size: 13px; }
