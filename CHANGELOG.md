@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.211] - 2026-07-27
+Hướng dẫn đấu Trang và Quảng cáo thêm bước bật quyền cho app, hết lỗi "Invalid Scopes".
+### Sửa lỗi
+- **Bổ sung bước bật quyền cho app - nguyên nhân thật của lỗi "Invalid Scopes"**: trong giao diện app mới của Meta, quyền bị khoá theo trường hợp sử dụng. App tạo bằng trường hợp "Xác thực và yêu cầu dữ liệu từ người dùng" chỉ có `email` + `public_profile`, nên bấm Kết nối là Facebook trả về "Invalid Scopes: pages_show_list, pages_read_engagement, pages_manage_posts, pages_manage_engagement" và dừng. Hướng dẫn connector **Facebook Trang** nay có hẳn một bước bật quyền (Thêm trường hợp sử dụng > "Quản lý mọi thứ trên Trang của bạn" > Tùy chỉnh > Quyền), kèm cảnh báo nhận diện đúng thông báo lỗi để người dùng không đi mò App ID với Secret.
+- **Connector Meta Ads (Graph API) thêm cảnh báo tương tự** cho `ads_read` và `business_management`, vì cùng một cơ chế.
+- **Hướng dẫn Facebook Trang cập nhật hai điểm còn sót**: nhận biết giao diện cũ/mới, và ô URI chuyển hướng chỉ phải điền khi chạy trên VPS/tên miền riêng (máy cá nhân bỏ qua).
+- **Khắc phục sự cố** thêm mục "Invalid Scopes" với cách sửa riêng cho quyền Trang, quyền quảng cáo và giao diện cũ.
+
 ## [0.9.210] - 2026-07-27
 Sửa bước sai trong hướng dẫn Meta Ads: bản chạy máy cá nhân KHÔNG phải điền URI chuyển hướng.
 ### Sửa lỗi
