@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.221] - 2026-07-28
+Gõ nhanh task trong editor với menu gợi ý kiểu Obsidian, bản gọn.
+### Thêm mới
+- **`task-suggest.js`**: trong chế độ Sửa của note, gõ `- [ ]` rồi ấn cách là dòng biến thành task thật có checkbox (trong danh sách bullet chỉ cần gõ `[ ]` + cách). Đứng cuối dòng task ấn cách là bung menu gợi ý 6 mục (📅 hạn, ⏳ dự kiến, 🛫 bắt đầu, ⏫🔼🔽 ưu tiên) - cố tình NGẮN hơn Obsidian cho đỡ ngợp. Chọn mục ngày bung tiếp Hôm nay / Ngày mai / Cuối tuần / Tuần sau / Chọn ngày (mở lịch), chèn thẳng `📅 YYYY-MM-DD` đúng chuẩn obsidian-tasks.
+- Điều khiển: mũi tên + Enter hoặc chuột; Esc đóng; gõ chữ tiếp thì menu tự tắt. Chạy ở CẢ editor cây (trang Bộ não/Tệp tin) lẫn khung sửa file bung từ chat.
+- Việc gõ `- [ ]` trong bản render trước đây khi lưu sẽ bị turndown escape thành `\- \[ \]` (hỏng cú pháp) - nay thành checkbox thật nên lưu ra markdown chuẩn.
+### Kiểm thử
+- `test_task_suggest.js` mới (15 case): nhận diện khung `- [ ]` (kể cả nbsp của contenteditable, `- []`, `* [ ]`, đã có chữ thì thôi), tính ngày Hôm nay/Ngày mai/Cuối tuần/Tuần sau kể cả khi đứng đúng thứ 7 / thứ 2.
+
 ## [0.9.220] - 2026-07-28
 Khối ```tasks chạy thật + nút "+ Việc" + thư mục Dashboard mặc định + hết chậm lượt đầu.
 ### Thêm mới

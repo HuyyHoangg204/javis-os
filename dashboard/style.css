@@ -505,6 +505,25 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 .jv-dataview .dv-badge.dv-over { color: #fff; background: var(--red, #c04545); }
 .jv-dataview .dv-tablewrap { overflow-x: auto; }
 
+/* Menu gợi ý task (task-suggest.js) - kiểu obsidian-tasks bản gọn */
+.ts-pop {
+  position: fixed; z-index: 4000; min-width: 230px; max-width: 300px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0,0,0,.5); padding: 4px; font-size: 13.5px;
+}
+.ts-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  border-radius: 7px; color: var(--text); cursor: pointer; user-select: none;
+}
+.ts-item.sel, .ts-item:hover { background: var(--bg3); }
+.ts-ic { width: 20px; text-align: center; flex: none; }
+.ts-date { margin-left: auto; color: var(--text3); font-size: 12px; }
+.ts-pop .ts-datein {
+  width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); border-radius: 7px; padding: 6px 8px; font-size: 13.5px;
+  font-family: inherit; color-scheme: dark;
+}
+
 /* Run drawer - trạng thái kiểm chứng */
 .rs-verify { font-size: 13px; color: var(--text3); margin-left: 6px; }
 .rs-verify.ok { color: var(--green); }

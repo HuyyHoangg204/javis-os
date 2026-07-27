@@ -22,6 +22,16 @@ Trước đây Javis chỉ hiển thị mấy ô này cho đẹp, muốn tick ph
 - **Trong tin nhắn chat**: checkbox chỉ để xem, không bấm được. Lý do: nội dung chat không gắn với file nào để ghi lại.
 - **Trong kết quả khối dataview**: bấm được, ghi thẳng vào file gốc chứa việc đó (xem phần 2).
 
+### Gõ nhanh task với menu gợi ý (kiểu Obsidian, bản gọn)
+
+Trong chế độ **Sửa** của note, Javis có bộ gợi ý giống plugin Tasks của Obsidian nhưng rút gọn cho đỡ ngợp:
+
+1. Gõ `- [ ]` ở đầu dòng rồi **ấn phím cách** - dòng đó biến ngay thành task thật có checkbox. Đang ở danh sách gạch đầu dòng thì chỉ cần gõ `[ ]` rồi ấn cách.
+2. Đứng ở **cuối dòng task**, ấn phím cách - bung menu 6 mục: 📅 hạn chót, ⏳ ngày dự kiến, 🛫 ngày bắt đầu, và 3 mức ưu tiên ⏫🔼🔽.
+3. Chọn mục ngày - bung tiếp: **Hôm nay / Ngày mai / Cuối tuần / Tuần sau / Chọn ngày…** (mở lịch). Chọn xong Javis chèn thẳng `📅 2026-07-28` vào dòng, đúng chuẩn obsidian-tasks nên mọi khối truy vấn đều hiểu.
+
+Điều khiển bằng mũi tên lên xuống + Enter, hoặc bấm chuột. Esc để đóng, gõ chữ tiếp thì menu tự tắt, không cản trở việc viết.
+
 ### Ký hiệu ngày và độ ưu tiên (kiểu plugin Tasks)
 
 Javis hiểu các ký hiệu emoji mà plugin obsidian-tasks dùng, viết ngay trong dòng việc:
