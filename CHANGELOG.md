@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.214] - 2026-07-28
+Ảnh Javis tạo ra tự mang nhãn tác giả javisos.com.
+### Thêm mới
+- **Gắn nhãn tác giả vào ảnh**: mọi ảnh sinh bằng `javis_generate_image` nay được ghi sẵn metadata `Software = Javis OS`, `Source = https://javisos.com` và thời điểm tạo, dưới dạng chunk tEXt chuẩn PNG. Ai mở file bằng công cụ xem metadata sẽ thấy ảnh do Javis tạo.
+- Việc gắn nhãn **chỉ THÊM chunk, không gỡ gì**: phần Content Credentials (C2PA) mà nhà cung cấp ảnh nhúng sẵn vẫn nằm nguyên trong file, pixel không bị đụng vào. File không phải PNG hợp lệ thì trả nguyên xi, không làm hỏng ảnh.
+### Kiểm thử
+- `test_image_gen.py` thêm 8 case, trong đó có case khoá hành vi "KHÔNG gỡ chunk C2PA có sẵn" để sau này không ai lặng lẽ đổi thành gỡ nguồn gốc rồi ghi đè tên mình.
+
 ## [0.9.213] - 2026-07-28
 Javis xoá được bài trên Trang, nên đổi ảnh bài đã đăng giờ làm trọn được bằng lời.
 ### Thêm mới

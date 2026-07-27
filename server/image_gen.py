@@ -111,6 +111,44 @@ def _attachments_dir(vault: Path) -> Path:
     return d
 
 
+BRAND_SOFTWARE = "Javis OS"
+BRAND_SOURCE = "https://javisos.com"
+
+
+def _png_text_chunk(key: str, value: str) -> bytes:
+    """Một chunk tEXt PNG: len + 'tEXt' + key\\0value + CRC32(type+data). tEXt là
+    Latin-1 nên chỉ truyền chuỗi ASCII vào đây."""
+    import zlib
+    data = key.encode("latin-1") + b"\x00" + value.encode("latin-1")
+    body = b"tEXt" + data
+    return len(data).to_bytes(4, "big") + body + zlib.crc32(body).to_bytes(4, "big")
+
+
+def brand_png(raw: bytes) -> bytes:
+    """Gắn thông tin tác giả (Javis OS / javisos.com) vào PNG, chèn ngay sau IHDR.
+
+    CHỈ THÊM, không gỡ chunk nào - phần Content Credentials (C2PA) mà nhà cung cấp
+    ảnh nhúng sẵn vẫn nằm nguyên trong file. Lưu ý: vì thêm chunk làm đổi byte của
+    file, chữ ký C2PA cũ có thể không còn khớp khi đem đi kiểm; đó là hệ quả kỹ
+    thuật của việc ghi metadata, không phải chủ đích gỡ nguồn gốc.
+
+    File không phải PNG hợp lệ thì trả nguyên xi, không làm hỏng ảnh.
+    """
+    try:
+        if raw[:8] != b"\x89PNG\r\n\x1a\n":
+            return raw
+        ihdr_len = int.from_bytes(raw[8:12], "big")
+        end = 8 + 12 + ihdr_len                      # hết chunk IHDR
+        if raw[12:16] != b"IHDR" or end > len(raw):
+            return raw
+        block = (_png_text_chunk("Software", BRAND_SOFTWARE)
+                 + _png_text_chunk("Source", BRAND_SOURCE)
+                 + _png_text_chunk("Creation Time", time.strftime("%Y-%m-%dT%H:%M:%S%z")))
+        return raw[:end] + block + raw[end:]
+    except Exception:
+        return raw                                    # gắn nhãn hỏng thì thà mất nhãn còn hơn mất ảnh
+
+
 def save_png_b64(b64: str, vault_root: Optional[str], prefix: str = "javis-img") -> dict:
     """Giải mã b64 → lưu PNG vào <vault>/attachments. Trả {ok, rel_path, abs_path, file}."""
     try:
@@ -119,6 +157,7 @@ def save_png_b64(b64: str, vault_root: Optional[str], prefix: str = "javis-img")
         return {"ok": False, "error": f"Ảnh base64 hỏng: {e}"}
     if not raw:
         return {"ok": False, "error": "Ảnh rỗng."}
+    raw = brand_png(raw)
     vault = _resolve_vault(vault_root)
     adir = _attachments_dir(vault)
     fname = f"{prefix}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}.png"

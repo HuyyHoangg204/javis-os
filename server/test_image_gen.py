@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import tempfile
+import zlib
 
 os.environ["JAVIS_STATE_DIR"] = tempfile.mkdtemp(prefix="javis-imgtest-")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -59,7 +60,31 @@ saved = image_gen.save_png_b64(_PNG_B64, vault)
 check("save ok", saved.get("ok") is True)
 check("rel_path vào attachments/", saved["rel_path"].startswith("attachments/") and saved["rel_path"].endswith(".png"))
 check("file thật tồn tại", os.path.isfile(saved["abs_path"]))
-check("byte ảnh khớp", open(saved["abs_path"], "rb").read() == base64.b64decode(_PNG_B64))
+_raw_goc = base64.b64decode(_PNG_B64)
+_raw_luu = open(saved["abs_path"], "rb").read()
+_IHDR_END = 8 + 12 + int.from_bytes(_raw_goc[8:12], "big")   # hết chunk IHDR
+
+check("ảnh lưu ra có gắn nhãn javisos.com", b"javisos.com" in _raw_luu and b"Javis OS" in _raw_luu)
+# Gắn nhãn = CHỈ CHÈN chunk giữa IHDR và phần còn lại. Đầu và đuôi file phải y nguyên,
+# tức pixel không bị đụng vào và không chunk nào bị gỡ.
+check("phần đầu (chữ ký PNG + IHDR) y nguyên", _raw_luu[:_IHDR_END] == _raw_goc[:_IHDR_END])
+check("toàn bộ phần sau IHDR (pixel + IEND) còn nguyên vẹn", _raw_goc[_IHDR_END:] in _raw_luu)
+check("nhãn chèn ngay sau IHDR, ở chunk tEXt", _raw_luu[_IHDR_END + 4:_IHDR_END + 8] == b"tEXt")
+
+
+# ---- 4b. brand_png: gắn nhãn tác giả, KHÔNG gỡ chunk sẵn có ----
+# Ảnh nhà cung cấp mang sẵn Content Credentials (C2PA, nằm ở chunk caBX). Javis CHỈ THÊM
+# nhãn của mình, KHÔNG gỡ chunk đó - test này khoá hành vi ấy lại để sau không ai lặng lẽ
+# đổi thành "gỡ nguồn gốc rồi ghi đè tên mình".
+_gia_c2pa = (len(b"FAKE").to_bytes(4, "big") + b"caBX" + b"FAKE"
+             + zlib.crc32(b"caBXFAKE").to_bytes(4, "big"))
+_co_c2pa = _raw_goc[:_IHDR_END] + _gia_c2pa + _raw_goc[_IHDR_END:]
+_sau = image_gen.brand_png(_co_c2pa)
+check("brand_png KHÔNG gỡ chunk Content Credentials (caBX) có sẵn",
+      b"caBX" in _sau and b"FAKE" in _sau)
+check("brand_png vẫn gắn được nhãn khi ảnh đã có caBX", b"javisos.com" in _sau)
+check("brand_png: không phải PNG → trả nguyên xi", image_gen.brand_png(b"khong-phai-png") == b"khong-phai-png")
+check("brand_png: rỗng → không nổ", image_gen.brand_png(b"") == b"")
 
 
 # ---- 5. generate_chatgpt end-to-end (mock mạng) ----
@@ -97,7 +122,7 @@ check("generate ok", res.get("ok") is True)
 check("generate rel_path attachments", res.get("rel_path", "").startswith("attachments/"))
 check("generate size landscape", res.get("size") == "1536x1024")
 check("generate lưu đúng ảnh cuối (không phải partial)",
-      res.get("ok") and open(res["abs_path"], "rb").read() == base64.b64decode(_PNG_B64))
+      res.get("ok") and base64.b64decode(_PNG_B64)[_IHDR_END:] in open(res["abs_path"], "rb").read())
 
 # ---- 6. lỗi HTTP surface rõ ----
 _install_fake(["ignored"], status=401)
