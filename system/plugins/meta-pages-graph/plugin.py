@@ -6,14 +6,18 @@ qua /me/accounts, mỗi Trang có access_token RIÊNG - mọi thao tác trên m�
 trả lời bình luận) đều dùng token của chính Trang đó, KHÔNG dùng token cá nhân.
 
 Tool đọc (fb_pages_list/fb_page_posts/fb_page_comments) = readonly. Tool ghi công khai
-(fb_page_post/fb_page_reply) = min_mode full → không bao giờ tự chạy ở chế độ suggest/auto,
-phải mức Toàn quyền + kết nối đã ở mức đó.
+(fb_page_post/fb_page_photo/fb_page_video/fb_page_reply) = min_mode full → không bao giờ tự
+chạy ở chế độ suggest/auto, phải mức Toàn quyền + kết nối đã ở mức đó.
+Ảnh/video nhận URL http(s) hoặc file TRONG vault (sandbox như tool file); video upload đi
+host graph-video riêng của Meta, Meta xử lý nền vài phút mới hiện bài.
 """
 from __future__ import annotations
 
 import json
 
 GRAPH = "https://graph.facebook.com/v25.0"
+# Upload video phải đi host riêng của Meta (graph thường từ chối file video)
+GRAPH_VIDEO = "https://graph-video.facebook.com/v25.0"
 CONNECTOR_ID = "facebook-pages"
 
 
@@ -195,6 +199,106 @@ async def _publish(args, ctx):
                       ensure_ascii=False, default=str)
 
 
+def _resolve_media(ref, cctx):
+    """'photo'/'video' nhận URL http(s) HOẶC đường dẫn file trong vault (tương đối tính từ
+    gốc vault). Trả (url, path, err) - đúng một trong url/path có giá trị.
+    File BẮT BUỘC nằm trong vault (cùng sandbox với tool file của Javis) - plugin chạy full
+    quyền nhưng không vì thế mà cho đăng file tuỳ ý ngoài vault lên mạng."""
+    from pathlib import Path
+    ref = str(ref or "").strip()
+    if not ref:
+        return None, None, "ERROR: thiếu đường dẫn file (trong vault) hoặc URL http(s) của media."
+    if ref.startswith("http://") or ref.startswith("https://"):
+        return ref, None, None
+    root = getattr(cctx, "vault_root", None)
+    if not root:
+        return None, None, "ERROR: không xác định được vault đang làm việc để tìm file."
+    try:
+        rp = (Path(root) / ref).resolve() if not Path(ref).is_absolute() else Path(ref).resolve()
+        if not str(rp).startswith(str(Path(root).resolve())):
+            return None, None, "ERROR: file phải nằm TRONG vault (chép vào vault rồi thử lại)."
+        if not rp.is_file():
+            return None, None, f"ERROR: không thấy file '{ref}' trong vault."
+    except OSError as e:
+        return None, None, f"ERROR: không đọc được đường dẫn ({type(e).__name__})."
+    return None, rp, None
+
+
+async def _post_file(path_in_graph, file_path, data, token, base=GRAPH, timeout=900):
+    """POST multipart (upload file thật). Video đi base GRAPH_VIDEO, timeout dài."""
+    import mimetypes
+    import httpx
+    from pathlib import Path
+    mime = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+    try:
+        with open(file_path, "rb") as f:
+            files = {"source": (Path(file_path).name, f, mime)}
+            async with httpx.AsyncClient(timeout=timeout) as c:
+                r = await c.post(f"{base}/{str(path_in_graph).lstrip('/')}",
+                                 data={**(data or {}), "access_token": token}, files=files)
+        try:
+            return r.json()
+        except Exception:
+            return {"error": {"message": f"HTTP {r.status_code}: {r.text[:200]}"}}
+    except Exception as e:
+        return {"error": {"message": f"{type(e).__name__}: {e}"}}
+
+
+async def _publish_photo(args, cctx):
+    token = await _token()
+    if not token:
+        return "ERROR: " + (_check() or "chưa kết nối")
+    args = args or {}
+    url, path, err = _resolve_media(args.get("photo") or args.get("image") or "", cctx)
+    if err:
+        return err
+    pid, ptok, pname, perr = await _resolve_page(args, token)
+    if perr:
+        return perr
+    caption = str(args.get("message") or args.get("caption") or "").strip()
+    data = {"caption": caption} if caption else {}
+    if url:
+        d = await _post(f"{pid}/photos", {**data, "url": url}, ptok)
+    else:
+        d = await _post_file(f"{pid}/photos", path, data, ptok)
+    if isinstance(d, dict) and d.get("error"):
+        return _fmt(d)
+    return json.dumps({"ok": True, "page": pname,
+                       "photo_id": d.get("id") if isinstance(d, dict) else None,
+                       "post_id": d.get("post_id") if isinstance(d, dict) else None},
+                      ensure_ascii=False, default=str)
+
+
+async def _publish_video(args, cctx):
+    token = await _token()
+    if not token:
+        return "ERROR: " + (_check() or "chưa kết nối")
+    args = args or {}
+    url, path, err = _resolve_media(args.get("video") or "", cctx)
+    if err:
+        return err
+    pid, ptok, pname, perr = await _resolve_page(args, token)
+    if perr:
+        return perr
+    data = {}
+    desc = str(args.get("message") or args.get("description") or "").strip()
+    title = str(args.get("title") or "").strip()
+    if desc:
+        data["description"] = desc
+    if title:
+        data["title"] = title
+    if url:
+        d = await _post(f"{pid}/videos", {**data, "file_url": url}, ptok)
+    else:
+        d = await _post_file(f"{pid}/videos", path, data, ptok, base=GRAPH_VIDEO)
+    if isinstance(d, dict) and d.get("error"):
+        return _fmt(d)
+    return json.dumps({"ok": True, "page": pname,
+                       "video_id": d.get("id") if isinstance(d, dict) else None,
+                       "note": "Video Facebook xử lý nền vài phút rồi mới hiện trên Trang."},
+                      ensure_ascii=False, default=str)
+
+
 async def _reply(args, ctx):
     token = await _token()
     if not token:
@@ -253,6 +357,31 @@ def register(ctx):
             "link": {"type": "string", "description": "Link đính kèm (tuỳ chọn)"},
             "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
             "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}}},
+    )
+    ctx.register_tool(
+        name="fb_page_photo", min_mode="full", check_fn=_check, handler=_publish_photo,
+        description=("ĐĂNG ẢNH lên Trang của bạn - hành động THẬT, công khai. photo = đường dẫn file ảnh "
+                     "trong vault (vd attachments/anh.jpg) hoặc URL http(s). message = caption tuỳ chọn. "
+                     "Bỏ trống page nếu chỉ có 1 Trang."),
+        schema={"type": "object", "properties": {
+            "photo": {"type": "string", "description": "Đường dẫn ảnh trong vault hoặc URL http(s)"},
+            "message": {"type": "string", "description": "Caption cho ảnh (tuỳ chọn)"},
+            "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
+            "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}},
+            "required": ["photo"]},
+    )
+    ctx.register_tool(
+        name="fb_page_video", min_mode="full", check_fn=_check, handler=_publish_video,
+        description=("ĐĂNG VIDEO lên Trang của bạn - hành động THẬT, công khai. video = đường dẫn file "
+                     "video trong vault hoặc URL http(s) (tối đa cỡ 1GB). message = mô tả, title = tiêu đề, "
+                     "đều tuỳ chọn. Facebook xử lý nền vài phút mới hiện bài. Bỏ trống page nếu chỉ có 1 Trang."),
+        schema={"type": "object", "properties": {
+            "video": {"type": "string", "description": "Đường dẫn video trong vault hoặc URL http(s)"},
+            "message": {"type": "string", "description": "Mô tả video (tuỳ chọn)"},
+            "title": {"type": "string", "description": "Tiêu đề video (tuỳ chọn)"},
+            "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
+            "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}},
+            "required": ["video"]},
     )
     ctx.register_tool(
         name="fb_page_reply", min_mode="full", check_fn=_check, handler=_reply,

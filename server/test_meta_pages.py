@@ -36,7 +36,8 @@ check("catalog: có fields client_id + client_secret",
       {f["key"] for f in fp["auth"]["fields"]} == {"client_id", "client_secret"})
 check("catalog: default_perm readonly + guide dùng localhost",
       fp["default_perm"] == "readonly" and "localhost" in fp["auth"]["guide"])
-check("catalog: tool ghi khai ở danger", set(fp["tool_meta"].get("danger") or []) == {"fb_page_post", "fb_page_reply"})
+check("catalog: tool ghi khai ở danger", set(fp["tool_meta"].get("danger") or [])
+      == {"fb_page_post", "fb_page_photo", "fb_page_video", "fb_page_reply"})
 import mcp_catalog  # noqa: E402
 check("mcp_catalog.get load được", mcp_catalog.get("facebook-pages") is not None)
 
@@ -57,12 +58,14 @@ class _Ctx:
 ctx = _Ctx()
 plug.register(ctx)
 byname = {t["name"]: t for t in ctx.tools}
-check("plugin: đủ 5 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
-                                            "fb_page_post", "fb_page_reply"})
+check("plugin: đủ 7 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
+                                            "fb_page_post", "fb_page_photo", "fb_page_video",
+                                            "fb_page_reply"})
 check("plugin: tool đọc = readonly",
       all(byname[n]["min_mode"] == "readonly" for n in ("fb_pages_list", "fb_page_posts", "fb_page_comments")))
-check("plugin: tool ghi (đăng/trả lời) = full",
-      byname["fb_page_post"]["min_mode"] == "full" and byname["fb_page_reply"]["min_mode"] == "full")
+check("plugin: tool ghi (đăng/ảnh/video/trả lời) = full",
+      all(byname[n]["min_mode"] == "full"
+          for n in ("fb_page_post", "fb_page_photo", "fb_page_video", "fb_page_reply")))
 
 # chưa kết nối → _check chặn
 plug._connected_id = lambda: None
@@ -136,6 +139,56 @@ async def handler_tests():
     check("fb_page_reply: thiếu message → ERROR", r_rep_nomsg.startswith("ERROR"))
     r_rep_notarget = await plug._reply({"message": "hi"}, None)
     check("fb_page_reply: thiếu comment_id/post_id → ERROR", r_rep_notarget.startswith("ERROR"))
+
+    # fb_page_photo: URL → POST {page}/photos với url + caption (không cần vault)
+    class _CtxNoVault:
+        vault_root = None
+    r_ph_url = await plug._publish_photo({"photo": "https://ex.com/a.jpg", "message": "cap"}, _CtxNoVault())
+    check("fb_page_photo(URL): POST P1/photos + url + caption + token Trang",
+          calls["post"][0] == "P1/photos" and calls["post"][1].get("url") == "https://ex.com/a.jpg"
+          and calls["post"][1].get("caption") == "cap" and calls["post"][2] == "PTOKA")
+    check("fb_page_photo: trả ok", '"ok": true' in r_ph_url.lower())
+    r_ph_miss = await plug._publish_photo({}, _CtxNoVault())
+    check("fb_page_photo: thiếu photo → ERROR", r_ph_miss.startswith("ERROR"))
+
+    # fb_page_photo: file trong vault → upload multipart (fake _post_file, không mạng)
+    vroot = Path(tempfile.mkdtemp(prefix="javis-fbvault-"))
+    (vroot / "attachments").mkdir()
+    (vroot / "attachments" / "a.jpg").write_bytes(b"img")
+
+    class _CtxVault:
+        vault_root = str(vroot)
+
+    filecalls = {}
+
+    async def _fake_post_file(pathg, fp, data, token, base=plug.GRAPH, timeout=900):
+        filecalls["args"] = (pathg, str(fp), data, token, base)
+        return {"id": "PH1", "post_id": "P1_PH"}
+
+    plug._post_file = _fake_post_file
+    r_ph_file = await plug._publish_photo({"photo": "attachments/a.jpg"}, _CtxVault())
+    check("fb_page_photo(file): upload đúng file trong vault + token Trang",
+          filecalls["args"][0] == "P1/photos" and filecalls["args"][1].endswith("a.jpg")
+          and filecalls["args"][3] == "PTOKA")
+    check("fb_page_photo(file): trả ok + photo_id", '"ok": true' in r_ph_file.lower() and "PH1" in r_ph_file)
+    r_ph_out = await plug._publish_photo({"photo": "../ben-ngoai.jpg"}, _CtxVault())
+    check("fb_page_photo: file NGOÀI vault → ERROR (sandbox)", r_ph_out.startswith("ERROR"))
+    r_ph_novault = await plug._publish_photo({"photo": "attachments/a.jpg"}, _CtxNoVault())
+    check("fb_page_photo: đường dẫn file mà không rõ vault → ERROR", r_ph_novault.startswith("ERROR"))
+
+    # fb_page_video: URL → file_url; file trong vault → đi host graph-video
+    r_vd_url = await plug._publish_video(
+        {"video": "https://ex.com/v.mp4", "message": "mo ta", "title": "T"}, _CtxNoVault())
+    check("fb_page_video(URL): POST P1/videos + file_url + description + title",
+          calls["post"][0] == "P1/videos" and calls["post"][1].get("file_url") == "https://ex.com/v.mp4"
+          and calls["post"][1].get("description") == "mo ta" and calls["post"][1].get("title") == "T")
+    check("fb_page_video: trả ok kèm ghi chú xử lý nền", '"ok": true' in r_vd_url.lower())
+    (vroot / "clip.mp4").write_bytes(b"vid")
+    await plug._publish_video({"video": "clip.mp4"}, _CtxVault())
+    check("fb_page_video(file): upload qua host graph-video riêng",
+          filecalls["args"][0] == "P1/videos" and filecalls["args"][4] == plug.GRAPH_VIDEO)
+    r_vd_miss = await plug._publish_video({}, _CtxNoVault())
+    check("fb_page_video: thiếu video → ERROR", r_vd_miss.startswith("ERROR"))
 
     # Nhiều Trang: không chỉ rõ → lỗi kèm danh sách; chỉ rõ tên → chọn đúng
     pages_data["data"].append({"id": "P2", "name": "Shop B", "category": "Retail", "access_token": "PTOKB"})

@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.202] - 2026-07-27
+Facebook Trang đăng được cả ảnh và video.
+### Thêm mới
+- **Tool fb_page_photo**: đăng ảnh lên Trang kèm caption. Nhận đường dẫn file ảnh trong vault (vd attachments/anh.jpg) hoặc URL http(s).
+- **Tool fb_page_video**: đăng video lên Trang kèm tiêu đề và mô tả, nhận file trong vault (tối đa cỡ 1GB) hoặc URL. Upload đi host video riêng của Meta; Facebook xử lý nền vài phút rồi bài mới hiện.
+- Cả hai là hành động THẬT công khai nên xếp mức Toàn quyền như đăng bài chữ: chế độ đề xuất và tự-làm-an-toàn không bao giờ tự đăng. File bắt buộc nằm TRONG vault, cùng sandbox với tool file - không đăng được file tuỳ ý ngoài vault lên mạng.
+### Kiểm thử
+- `test_meta_pages.py` thêm 10 case: đăng ảnh bằng URL và bằng file, chặn file ngoài vault, thiếu vault báo rõ, video đi đúng host graph-video, thiếu tham số báo lỗi, và danger list catalog khai đủ 4 tool ghi.
+
 ## [0.9.201] - 2026-07-27
 Đăng nhập OAuth trên VPS https hết bị Meta chặn "không dùng kết nối bảo mật".
 ### Sửa lỗi
