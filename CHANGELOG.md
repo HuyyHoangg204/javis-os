@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.205] - 2026-07-27
+Dán văn bản siêu dài vào khung chat tự thành file .txt đính kèm, kiểu Claude.
+### Thêm mới
+- **Dán dài thành file**: dán quá 1500 ký tự hoặc quá 25 dòng vào ô chat thì thay vì nhồi hết vào ô nhập, Javis biến đoạn đó thành file van-ban-dan-*.txt đính kèm dạng chip gọn. Hội thoại dễ đọc hẳn, Javis vẫn đọc trọn nội dung khi trả lời, và hỏi đáp tiếp trên tài liệu đó thoải mái. Chỉ áp dụng cho ô chat - dán vào các ô khác (form Kết nối, đặt tên...) vẫn như cũ; đoạn ngắn dán vào chat cũng như cũ.
+
 ## [0.9.204] - 2026-07-27
 Ảnh video dán vào khung chat đăng thẳng lên Facebook được, không phải chép vào vault trước.
 ### Sửa lỗi

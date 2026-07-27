@@ -1315,7 +1315,17 @@ fileInput.addEventListener("change", () => {
   fileInput.value = "";
 });
 
-// Dán ảnh (Ctrl+V)
+// Dán ảnh (Ctrl+V) + dán VĂN BẢN SIÊU DÀI thành file .txt đính kèm (kiểu Claude):
+// bài dài nhồi thẳng vào ô chat vừa khó đọc vừa nặng khung hội thoại - biến thành
+// file thì Javis đọc trọn vẹn còn màn hình chỉ hiện một chip gọn.
+const PASTE_TXT_CHARS = 1500;   // vượt MỘT trong hai ngưỡng là thành file
+const PASTE_TXT_LINES = 25;
+function pasteAsTxt(text) {
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  const name = `van-ban-dan-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.txt`;
+  const f = new File([new Blob([text], { type: "text/plain" })], name, { type: "text/plain" });
+  uploadFile(f);
+}
 document.addEventListener("paste", (e) => {
   const items = e.clipboardData?.items;
   if (!items) return;
@@ -1324,6 +1334,14 @@ document.addEventListener("paste", (e) => {
       const f = it.getAsFile();
       if (f) { uploadFile(f); e.preventDefault(); }
     }
+  }
+  // Văn bản dài: CHỈ khi đang dán vào ô chat - không cướp paste của các ô khác
+  // (form Kết nối, đặt tên brain...). Ô chat ngắn vẫn dán chữ bình thường.
+  if (e.defaultPrevented || e.target !== chatInput) return;
+  const txt = e.clipboardData.getData("text/plain") || "";
+  if (txt.length > PASTE_TXT_CHARS || txt.split("\n").length > PASTE_TXT_LINES) {
+    e.preventDefault();
+    pasteAsTxt(txt);
   }
 });
 
