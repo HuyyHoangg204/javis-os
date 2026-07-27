@@ -77,14 +77,26 @@ Google Ads và TikTok Ads chạy local qua công cụ `uv` - máy chạy Javis c
 
 Đây là con đường tự phục vụ chạy được ngay, không phụ thuộc beta MCP của Meta. Bạn tạo một Facebook App của riêng mình, Javis dùng nó để đọc số liệu ad account của bạn. Vì app do chính bạn làm và giữ ở chế độ thử nghiệm, bạn tự cấp được quyền đọc mà KHÔNG cần Meta duyệt.
 
+**Trước khi bắt đầu: xem bạn đang dùng giao diện nào.** Meta đang chuyển dần trang quản lý ứng dụng sang bản mới, nên hai người mở cùng lúc có thể thấy hai kiểu menu khác nhau. Nhìn **cột trái** trong trang app:
+
+- Thấy mục **"Sản phẩm"** (Products) là **giao diện CŨ**.
+- Thấy mục **"Trường hợp sử dụng"** (Use cases) và KHÔNG có mục "Sản phẩm" là **giao diện MỚI**.
+
+Hai bản làm giống nhau ở mọi bước, chỉ khác đúng chỗ mở phần Đăng nhập bằng Facebook (bước 2). Nếu bạn tìm mãi không thấy "Sản phẩm" hay "Đăng nhập bằng Facebook cho doanh nghiệp" thì gần như chắc chắn bạn đang ở bản mới, không phải do thiếu quyền hay do Business Manager chưa xác minh.
+
 1. Vào [developers.facebook.com/apps](https://developers.facebook.com/apps) > **Create App**. Chọn loại **Business** (hoặc "Other"), đặt tên bất kỳ (vd "Javis đọc ads").
-2. Trong app, vào **Add Product** > thêm **Facebook Login** (bản THƯỜNG, KHÔNG phải "Facebook Login for Business").
-3. Vào **Facebook Login > Settings**, ô **Valid OAuth Redirect URIs** dán CHÍNH XÁC dòng này rồi Save:
-   `http://localhost:7777/connect/oauth/callback`
-   Lưu ý phải là **localhost** chứ không phải 127.0.0.1 (Meta chỉ miễn HTTP cho localhost). Nếu bạn chạy Javis ở cổng khác 7777 thì đổi số cổng cho khớp.
+2. Mở phần **Đăng nhập bằng Facebook**, tuỳ giao diện:
+   - **Bản CŨ**: **Sản phẩm > Thêm sản phẩm** > thêm **Đăng nhập bằng Facebook** (bản THƯỜNG, KHÔNG phải "cho doanh nghiệp"), rồi bấm **Cài đặt**.
+   - **Bản MỚI**: cột trái **Trường hợp sử dụng** > mở **"Xác thực và yêu cầu dữ liệu từ người dùng qua phương thức Đăng nhập bằng Facebook"** > **Tùy chỉnh** > **Cài đặt**. Mục này thường đã có sẵn khi tạo app, bạn không phải thêm gì.
+3. Ô **URI chuyển hướng OAuth hợp lệ** (Valid OAuth Redirect URIs) dán CHÍNH XÁC địa chỉ callback của Javis rồi Lưu:
+   - Chạy trên máy cá nhân: `http://localhost:7777/connect/oauth/callback`. Phải là **localhost** chứ không phải 127.0.0.1 (Meta chỉ miễn HTTP cho localhost). Chạy Javis ở cổng khác 7777 thì đổi số cổng cho khớp.
+   - Chạy trên VPS/tên miền riêng: dùng đúng địa chỉ https của bạn, vd `https://javis.tenmiencuaban.com/connect/oauth/callback`. Ngoài localhost thì Meta bắt buộc **https**.
+   - Lấy nhanh: trong hộp thoại Kết nối của Javis có nút **Sao chép** sinh sẵn đúng địa chỉ cho máy bạn, cứ dán thẳng.
+   - Đừng vào "Cài đặt ứng dụng > Nâng cao", đó là chỗ khác không liên quan.
 4. Giữ app ở chế độ **Development** (công tắc góc trên cùng để ở "In development"). Đảm bảo bạn là **Admin** của app và của tài khoản quảng cáo muốn đọc - khi đó quyền `ads_read` tự cấp được, không cần App Review.
-5. Vào **App settings > Basic**, copy **App ID** và **App Secret**.
-6. Về Javis, trang **Kết nối** > thẻ **Meta Ads (tự tạo app - Graph API)** > dán App ID + App Secret > **Kết nối**. Trình duyệt mở trang Facebook để bạn đồng ý; xong quay lại Javis bấm làm mới.
+5. **Bỏ qua "Xác minh doanh nghiệp" và "Xét duyệt ứng dụng"** dù bảng "Việc cần làm" của app có gợi ý. Hai bước đó chỉ cần khi app của bạn phục vụ doanh nghiệp KHÁC truy cập dữ liệu của họ; bạn tự dùng cho tài khoản của chính mình thì không cần, làm chỉ mất thêm nhiều ngày chờ duyệt.
+6. Vào **App settings > Basic**, copy **App ID** và **App Secret**.
+7. Về Javis, trang **Kết nối** > thẻ **Meta Ads (tự tạo app - Graph API)** > dán App ID + App Secret > **Kết nối**. Trình duyệt mở trang Facebook để bạn đồng ý; xong quay lại Javis bấm làm mới.
 
 Sau khi kết nối, hỏi Javis bằng lời: "tài khoản quảng cáo Facebook của tôi tuần này tiêu bao nhiêu, hiệu quả thế nào?". Javis có sẵn các công cụ đọc: danh sách tài khoản ads, hiệu suất (chi tiêu/hiển thị/click/CTR/CPC/reach/chuyển đổi) theo kỳ, và danh sách chiến dịch. Tất cả CHỈ ĐỌC - Javis không tạo/sửa chiến dịch, không tiêu tiền của bạn.
 
@@ -140,6 +152,8 @@ Không đổi so với trước: hỏi trực tiếp trong chat ("hôm nay bán 
 - **Meta Ads (MCP chính chủ) báo "chưa cho kết nối tự phục vụ / DCR"**: đúng thực tế, không phải lỗi máy bạn - MCP hosted của Meta đang beta, chỉ nhận vài ứng dụng được Meta cấp phép sẵn. Muốn đọc số liệu ngay thì dùng kết nối **Meta Ads (tự tạo app - Graph API)** ở trên.
 - **Meta Ads (Graph API) báo "Facebook từ chối / redirect_uri"**: kiểm tra 3 điểm - (1) ô Valid OAuth Redirect URIs trong app khớp CHÍNH XÁC `http://localhost:7777/connect/oauth/callback` (dùng localhost, đúng cổng); (2) app đang ở chế độ Development và bạn là Admin/Developer/Tester; (3) App ID + App Secret dán đúng.
 - **Meta Ads (Graph API) báo "không thấy tài khoản quảng cáo"**: token thiếu quyền `ads_read` hoặc tài khoản Facebook đăng nhập không phải admin của ad account nào - kiểm tra vai trò trong Business/Ads Manager.
+- **Trong app không thấy mục "Sản phẩm", hoặc không thấy "Đăng nhập bằng Facebook cho doanh nghiệp"**: bạn đang ở **giao diện MỚI** của Meta, nơi menu Sản phẩm đã bị thay bằng **Trường hợp sử dụng**. Vào cột trái **Trường hợp sử dụng > Tùy chỉnh > Cài đặt** là thấy ô URI chuyển hướng. Đây KHÔNG phải do Business Manager chưa xác minh, cũng không phải do thiếu quyền - xem lại bước 2 ở mục hướng dẫn trên.
+- **Không thấy "Đăng nhập bằng Facebook cho doanh nghiệp" dù đã tìm đúng chỗ**: bản "cho doanh nghiệp" chỉ hiện với app tạo đúng **loại Doanh nghiệp (Business)**, và loại app đã tạo thì không đổi được. Nhưng cách đấu của Javis dùng **Đăng nhập bằng Facebook bản THƯỜNG**, nên bạn không cần bản cho doanh nghiệp.
 - **Mã QR hết hạn**: bấm thử lại để lấy QR mới (QR Zalo sống ~3 phút).
 - **Tool bị chặn kèm dòng "đang ở mức quyền hạn chế"**: đúng thiết kế - nâng quyền tài khoản trong menu chip nếu bạn thật sự muốn Javis làm việc đó.
 - **Sau khi cập nhật từ bản cũ**: các server MCP cũ tự chuyển thành tài khoản trong trang Kết nối (bản gốc backup ở `mcp_servers.v1.bak.json`), không phải khai lại.

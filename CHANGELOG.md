@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.209] - 2026-07-27
+Hướng dẫn đấu Meta Ads giờ đi được cả hai giao diện app của Meta, hết cảnh "không thấy mục Sản phẩm".
+### Cải thiện
+- **Hướng dẫn tạo Facebook App nhận biết 2 giao diện**: Meta đang chuyển trang quản lý ứng dụng từ bản cũ (menu "Sản phẩm") sang bản mới (menu "Trường hợp sử dụng"), nên mỗi người mở ra thấy một kiểu và ai ở bản mới thì tìm mãi không ra bước "thêm sản phẩm Đăng nhập bằng Facebook". Hướng dẫn trong hộp thoại Kết nối và tài liệu giờ mở đầu bằng cách tự nhận biết mình đang ở bản nào, rồi tách đường đi riêng cho từng bản (bản mới: Trường hợp sử dụng > Tùy chỉnh > Cài đặt).
+- **Nói rõ được phép bỏ qua xác minh và xét duyệt**: bảng "Việc cần làm" của app dụ người ta tick hết cả "Xác minh doanh nghiệp" lẫn "Xét duyệt ứng dụng", trong khi cách đấu của Javis (app giữ Chế độ phát triển, tự làm Admin) không cần hai bước đó. Hướng dẫn nay nói thẳng bỏ qua, tránh mất nhiều ngày chờ duyệt vô ích.
+- **Địa chỉ callback cho bản chạy VPS**: trước chỉ hướng dẫn `localhost`, ai cài trên VPS/tên miền riêng phải tự đoán. Nay ghi rõ cả hai trường hợp và nhắc ngoài localhost thì Meta bắt buộc https.
+- **Khắc phục sự cố** thêm 2 mục: không thấy menu "Sản phẩm" (do đang ở giao diện mới), và không thấy "Đăng nhập bằng Facebook cho doanh nghiệp" (chỉ có ở app tạo đúng loại Doanh nghiệp, nhưng Javis dùng bản thường nên không cần).
+
 ## [0.9.208] - 2026-07-27
 Nút "Cập nhật ngay" chạy được trên Mac (và Linux không có systemd).
 ### Sửa lỗi
