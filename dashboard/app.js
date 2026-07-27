@@ -33,6 +33,8 @@ function syncActiveUI() {
   const t = savedSessionId ? turns[savedSessionId] : null;
   isProcessing = !!(t && t.running);
   sendBtn.disabled = isProcessing;
+  // Đang trả lời thì khoá nút gửi lại của mọi tin (CSS .transcript.busy) cho khỏi chồng lượt.
+  try { chatArea.classList.toggle("busy", isProcessing); } catch (e) {}
   updateStopBtn();
 }
 
@@ -285,7 +287,7 @@ function persistSession() {
   } catch (e) {}
 }
 function recordTurn(role, text, atts, ask) {
-  convo.push({ role, text: text || "", atts: atts || [], ask: ask || null });
+  convo.push({ role, text: text || "", atts: atts || [], ask: ask || null, ts: Date.now() });
   if (convo.length > 200) convo = convo.slice(-200);
   persistSession();
 }
@@ -297,8 +299,9 @@ function restoreSession() {
   savedSessionId = s.sessionId || null;
   // Dựng lại bong bóng hội thoại
   convo.forEach((t, i) => {
-    if (t.role === "user") { appendUserMessage(t.text, t.atts || []); return; }
-    const el = appendJavisMessage(t.text);
+    // t.ts vắng mặt ở tin lưu từ trước bản này -> truyền 0 để ẩn giờ thay vì hiện giờ F5.
+    if (t.role === "user") { appendUserMessage(t.text, t.atts || [], t.ts || 0); return; }
+    const el = appendJavisMessage(t.text, t.ts || 0);
     // Chip chỉ sống lại ở tin CUỐI: có tin sau nó nghĩa là câu hỏi đã được trả lời rồi.
     if (t.ask) window.JavisAsk.render(el, t.ask, i === convo.length - 1);
   });
@@ -316,8 +319,9 @@ async function openStoredSession(id) {
     hideActivity();
     chatArea.innerHTML = "";
     (sess.messages || []).forEach(m => {
-      if (m.role === "user") { appendUserMessage(m.content || "", []); convo.push({ role: "user", text: m.content || "", atts: [] }); }
-      else if (m.role === "assistant") { appendJavisMessage(m.content || ""); convo.push({ role: "javis", text: m.content || "", atts: [] }); }
+      const ts = m.ts ? Math.round(m.ts * 1000) : 0;   // server lưu epoch giây (sessions.py)
+      if (m.role === "user") { appendUserMessage(m.content || "", [], ts); convo.push({ role: "user", text: m.content || "", atts: [], ts }); }
+      else if (m.role === "assistant") { appendJavisMessage(m.content || "", ts); convo.push({ role: "javis", text: m.content || "", atts: [], ts }); }
     });
     savedSessionId = id;          // lượt gửi tiếp theo → server resume đúng phiên này
     // Phiên này đang generate NỀN → gắn bong bóng SỐNG (kèm phần đã stream) để xem tiếp trực tiếp.
@@ -350,9 +354,17 @@ window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => cur
 // Báo các UI khác (sidebar Lịch sử trong chat workspace) biết phiên/danh sách vừa đổi
 function notifySessions() { try { window.dispatchEvent(new Event("javis:sessions-changed")); } catch (e) {} }
 
-function appendUserMessage(text, attachments) {
+// Hàng nút dưới bong bóng (giờ + gửi lại / sửa lại / copy). Tách sang chat-acts.js để
+// test được bằng node; ở đây chỉ là lối thoát khi file đó chưa kịp nạp.
+function actsHtml(role, ts) {
+  return window.JavisActs ? window.JavisActs.actsHtml(role, ts) : "";
+}
+// ts === undefined nghĩa là tin VỪA xảy ra; còn khôi phục tin cũ thì truyền ts thật
+// (hoặc 0 nếu tin lưu từ trước bản này chưa có mốc giờ, khi đó phần giờ được ẩn).
+function appendUserMessage(text, attachments, ts) {
   const div = document.createElement("div");
   div.className = "msg msg-user";
+  div.dataset.text = text || "";   // giữ nguyên văn để gửi lại / sửa lại đúng chữ gốc
   let attHtml = "";
   if (attachments && attachments.length) {
     attHtml = `<div class="msg-attach">` + attachments.map(a =>
@@ -367,22 +379,22 @@ function appendUserMessage(text, attachments) {
     ? `<div class="utext${isLong ? " clamped" : ""}">${escapeHtml(text)}</div>` +
       (isLong ? `<button class="clamp-more" type="button">Xem thêm</button>` : "")
     : "";
-  div.innerHTML = `<div class="bubble">${textHtml}${attHtml}</div>`;
+  div.innerHTML = `<div class="bubble">${textHtml}${attHtml}</div>` +
+    actsHtml("user", ts === undefined ? Date.now() : ts);
   chatAppend(div); scrollBottom(true);
 }
-function appendJavisMessage(text) {
+function appendJavisMessage(text, ts) {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
-    `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
+    actsHtml("javis", ts === undefined ? Date.now() : ts);
   chatAppend(div); scrollBottom();
   return div;
 }
 function createStreamingBubble() {
   const div = document.createElement("div");
   div.className = "msg msg-javis";
-  div.innerHTML = `<div class="bubble"></div>` +
-    `<button class="msg-copy" type="button" title="Copy cả tin nhắn">⧉</button>`;
+  div.innerHTML = `<div class="bubble"></div>` + actsHtml("javis", Date.now());
   chatAppend(div); scrollBottom();
   return div;
 }
@@ -513,19 +525,53 @@ function flashCopied(btn, label) {
   btn.textContent = "✓ Đã copy";
   setTimeout(() => { btn.textContent = label || old; }, 1200);
 }
+// Bấm một nút trong hàng .msg-acts. Gửi lại / sửa lại đều lấy chữ GỐC của tin người
+// dùng (dataset.text) chứ không đọc lại DOM, vì tin dài đang thu gọn và tin Javis đã
+// thành HTML. Gửi lại = một lượt MỚI ở cuối hội thoại, không xoá gì của lượt cũ.
+function runMsgAct(btn) {
+  const msgEl = btn.closest(".msg");
+  if (!msgEl) return;
+  const act = btn.dataset.act;
+  if (act === "copy") {
+    const b = msgEl.querySelector(".bubble");
+    if (b) copyText(b.innerText).then(() => flashCopied(btn, "⧉"));
+    return;
+  }
+  const text = window.JavisActs && window.JavisActs.isUserMsg(msgEl)
+    ? (msgEl.dataset.text || "")
+    : (window.JavisActs ? window.JavisActs.prevUserText(msgEl) : "");
+  if (!text) return;
+  if (act === "edit") {
+    // Chỉ đổ chữ vào ô nhập, KHÔNG tự gửi - để anh sửa xong tự bấm gửi.
+    chatInput.value = text;
+    chatInput.style.height = "auto";
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + "px";
+    try { chatInput.focus(); chatInput.setSelectionRange(text.length, text.length); } catch (e) {}
+    return;
+  }
+  if (act === "retry" && !isProcessing) sendMessage(text);
+}
 chatArea.addEventListener("click", (e) => {
   const t = e.target;
+  const actBtn = t.closest && t.closest(".msg-act");
+  if (actBtn) { runMsgAct(actBtn); return; }
   if (t.classList.contains("code-copy")) {
     const wrap = t.closest(".code-wrap");
     const pre = wrap && wrap.querySelector("pre");
     if (pre) copyText(pre.innerText).then(() => flashCopied(t, "⧉ Copy"));
-  } else if (t.classList.contains("msg-copy")) {
-    const b = t.closest(".msg") && t.closest(".msg").querySelector(".bubble");
-    if (b) copyText(b.innerText).then(() => flashCopied(t, "⧉"));
   } else if (t.classList.contains("clamp-more")) {
     const u = t.closest(".bubble") && t.closest(".bubble").querySelector(".utext");
     if (u) { u.classList.toggle("clamped"); t.textContent = u.classList.contains("clamped") ? "Xem thêm" : "Thu gọn"; }
   }
+});
+// Điện thoại không có hover: chạm vào tin để bật/tắt hàng nút của đúng tin đó.
+chatArea.addEventListener("click", (e) => {
+  try { if (!window.matchMedia("(hover: none)").matches) return; } catch (err) { return; }
+  if (!e.target.closest) return;
+  if (e.target.closest(".msg-acts")) return;   // bấm chính nút thì đừng đóng hàng nút
+  const msgEl = e.target.closest(".msg");
+  chatArea.querySelectorAll(".msg.acts-on").forEach(m => { if (m !== msgEl) m.classList.remove("acts-on"); });
+  if (msgEl) msgEl.classList.toggle("acts-on");
 });
 function updateSysStatus(s) {
   document.getElementById("claudeStatus").className = "mcp-item " + s;

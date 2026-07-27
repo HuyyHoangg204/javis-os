@@ -1,0 +1,83 @@
+/* Test hang nut duoi tin nhan (chat-acts.js). Chay tay / CI:
+       node dashboard/test_chat_acts.js
+   KHONG can trinh duyet: chi test ham thuan + mot vai node DOM gia.
+   Ghi chu: KHONG dung ky tu em dash o bat ky dau. */
+const A = require("./chat-acts.js");
+
+let fails = [];
+function check(name, cond) {
+  console.log((cond ? "ok   " : "FAIL ") + name);
+  if (!cond) fails.push(name);
+}
+function has(h, s) { return h.indexOf(s) !== -1; }
+
+// Mốc giờ dựng theo giờ máy để không lệ thuộc múi giờ chạy test.
+const TS = new Date(2026, 6, 27, 6, 38, 0).getTime();   // 06:38 ngày 27/07/2026
+const THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
+
+// ---- 1. Định dạng giờ ----
+check("giờ: HH:mm có số 0 đứng đầu", A.fmtTime(TS) === "06:38");
+check("giờ đầy đủ: có ngày tháng năm", has(A.fmtTimeFull(TS), "27/07/2026"));
+check("giờ đầy đủ: có thứ đúng", has(A.fmtTimeFull(TS), THU[new Date(TS).getDay()]));
+check("giờ đầy đủ: kèm cả giờ phút", has(A.fmtTimeFull(TS), "06:38"));
+
+// ---- 2. Tin cũ chưa có mốc giờ thì ẨN, tuyệt đối không lấy giờ hiện tại ----
+check("không có ts: giờ rỗng", A.fmtTime(0) === "" && A.fmtTime(null) === "" && A.fmtTime(undefined) === "");
+check("không có ts: giờ đầy đủ rỗng", A.fmtTimeFull(0) === "");
+check("ts hỏng: giờ rỗng", A.fmtTime("khong-phai-so") === "");
+check("không có ts: hàng nút không có ô giờ", !has(A.actsHtml("user", 0), "msg-time"));
+check("không có ts: vẫn còn các nút", has(A.actsHtml("user", 0), 'data-act="retry"'));
+
+// ---- 3. Tin của người dùng: giờ + gửi lại + sửa lại + copy ----
+let h = A.actsHtml("user", TS);
+check("tin user: có ô giờ", has(h, '<span class="msg-time"') && has(h, ">06:38</span>"));
+check("tin user: giờ đầy đủ nằm ở title", has(h, "27/07/2026 06:38"));
+check("tin user: có nút gửi lại", has(h, 'data-act="retry"'));
+check("tin user: có nút sửa lại", has(h, 'data-act="edit"'));
+check("tin user: có nút copy", has(h, 'data-act="copy"'));
+check("tin user: nút không submit form", (h.match(/type="button"/g) || []).length === 3);
+
+// ---- 4. Tin Javis: KHÔNG có nút sửa ----
+h = A.actsHtml("javis", TS);
+check("tin javis: có giờ", has(h, "msg-time"));
+check("tin javis: có gửi lại", has(h, 'data-act="retry"'));
+check("tin javis: KHÔNG có nút sửa", !has(h, 'data-act="edit"'));
+check("tin javis: có copy", has(h, 'data-act="copy"'));
+check("tin javis: nhãn gửi lại nói về câu hỏi phía trên", has(h, "phía trên"));
+
+// ---- 5. Chuỗi tiếng Việt hiển thị cho người dùng phải CÓ DẤU ----
+h = A.actsHtml("user", TS);
+check("nhãn có dấu: Gửi lại", has(h, "Gửi lại câu này"));
+check("nhãn có dấu: Sửa lại", has(h, "Sửa lại rồi gửi"));
+check("nhãn có dấu: Sao chép", has(h, "Sao chép nội dung"));
+
+// ---- 6. Tìm ngược lên tin người dùng gần nhất (nút trả lời lại ở tin Javis) ----
+function node(cls, text) {
+  return {
+    classList: { contains: function (c) { return cls.split(" ").indexOf(c) !== -1; } },
+    dataset: { text: text },
+    previousElementSibling: null,
+  };
+}
+function chain(list) {
+  for (let i = 1; i < list.length; i++) list[i].previousElementSibling = list[i - 1];
+  return list;
+}
+const u1 = node("msg msg-user", "câu hỏi một");
+const j1 = node("msg msg-javis", "");
+const u2 = node("msg msg-user", "câu hỏi hai");
+const j2 = node("msg msg-javis", "");
+chain([u1, j1, u2, j2]);
+
+check("tìm ngược: lấy đúng tin user liền trước", A.prevUserText(j2) === "câu hỏi hai");
+check("tìm ngược: bỏ qua tin Javis xen giữa", A.prevUserText(j1) === "câu hỏi một");
+check("tìm ngược: không có tin nào phía trên thì rỗng", A.prevUserText(u1) === "");
+check("tìm ngược: msgEl rỗng thì rỗng", A.prevUserText(null) === "");
+check("nhận diện tin user", A.isUserMsg(u1) === true && A.isUserMsg(j1) === false);
+check("nhận diện: node rỗng không nổ", A.isUserMsg(null) === false);
+
+// ---- 7. Escape: nhãn/giờ nhét vào HTML không được mở thẻ ----
+check("hàng nút không chứa thẻ lạ", !has(A.actsHtml("user", TS), "<script"));
+
+console.log(fails.length ? "\n" + fails.length + " test HỎNG" : "\nTất cả test đều đạt");
+process.exit(fails.length ? 1 : 0);

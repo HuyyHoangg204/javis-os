@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.187] - 2026-07-27
+Mỗi tin nhắn trong khung chat có thêm hàng nút nhỏ bên dưới: giờ gửi, gửi lại, sửa lại và sao chép.
+### Thêm mới
+- **Hàng nút dưới mỗi tin**: rê chuột vào tin (hoặc chạm vào tin trên điện thoại) là hiện giờ gửi cùng các nút gửi lại, sửa lại, sao chép. Hàng nút luôn chiếm chỗ sẵn nên hiện ra không làm nhảy khung chat.
+- **Giờ gửi từng tin**: hiện dạng `HH:mm`, rê chuột vào xem đủ thứ và ngày. Hội thoại mở lại từ Lịch sử lấy đúng giờ đã lưu trong SQLite; tin cũ lưu từ trước bản này chưa có mốc giờ thì ẩn phần giờ thay vì đoán bừa.
+- **Gửi lại và sửa lại**: gửi lại đưa đúng câu hỏi cũ thành một lượt mới ở cuối hội thoại, không xoá gì của lượt trước; ở tin của Javis thì nút này chạy lại câu hỏi ngay phía trên nó. Sửa lại đổ câu cũ vào ô nhập để sửa rồi tự bấm gửi. Đang chạy một lượt thì nút gửi lại bị khoá.
+### Cải thiện
+- Nút sao chép cũ của tin Javis gộp vào hàng nút chung cho đồng bộ hai phía.
+### Kiểm thử
+- Thêm `dashboard/test_chat_acts.js` phủ định dạng giờ, tin thiếu mốc giờ, thành phần hàng nút theo từng phía và việc dò ngược lên câu hỏi gần nhất.
+
 ## [0.9.186] - 2026-07-27
 Lượt chat web tiếp tục chạy trên server khi đóng hoặc tải lại trang, đồng thời vẫn có thể quay lại xem tiến độ và dừng đúng lượt.
 ### Sửa lỗi
