@@ -593,6 +593,9 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .engine-banner { display: inline-flex; align-items: center; max-width: 46vw; padding: 3px 12px;
   border: 1px solid #e0664a88; border-radius: 14px; background: rgba(224,102,74,.12);
   color: #f0a08c; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* display của class đè mất [hidden] mặc định của trình duyệt → phải tự ẩn lại, không thì
+   đèn lộ vỏ rỗng thường trực trên thanh trạng thái (bug 0.9.195). */
+.engine-banner[hidden] { display: none; }
 @media (max-width: 700px) { .engine-banner { max-width: 70vw; font-size: 11.5px; } }
 /* Khối D: khu "kết nối sẵn của CLI" gập mặc định + mobile 1 cột */
 .amb-details summary { cursor: pointer; list-style: none; }

@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.197] - 2026-07-27
+Đèn báo não hết lộ vỏ rỗng trên thanh trạng thái khi não vẫn khoẻ.
+### Sửa lỗi
+- **Đèn báo não ẩn đúng lúc khoẻ**: rule display của đèn đè mất thuộc tính hidden mặc định của trình duyệt nên viên đèn rỗng hiện thường trực cạnh chuông Thông báo dù não bình thường. Thêm rule ẩn tường minh; đèn giờ chỉ hiện khi bộ não thật sự mất đăng nhập.
+
 ## [0.9.196] - 2026-07-27
 Huỷ lịch nói tự nhiên cũng hiểu, huỷ nhầm khó hơn, và tin nhắc hẹn không còn lộ chỉ dẫn máy.
 ### Sửa lỗi
