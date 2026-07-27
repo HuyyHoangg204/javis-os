@@ -3792,6 +3792,7 @@
     const telegram = s.telegram || {};
     const dashboard = s.dashboard || {};
     const graphOn = dashboard.graph_enabled !== false;
+    const stripC2pa = !!((s.image || {}).strip_c2pa);
     const graphMode = (((typeof localStorage !== "undefined" && localStorage.getItem("javis.graphMode")) || dashboard.graph_mode || "2d") === "3d") ? "3d" : "2d";
     const mainProviderId = model.main?.provider || (model.engine === "openrouter" ? "openrouter" : "anthropic-cli");
     const mainProvider = (model.providers || []).find(p => p.id === mainProviderId);
@@ -3859,6 +3860,17 @@
             <p>Gom agents, workflows, memory và skills về cấu trúc phẳng đồng nhất. Chỉ di chuyển khi đích chưa tồn tại.</p>
             <button class="gcard-btn ghost" id="setBrainMigrate">Chuẩn hóa brain đang chọn</button>
             <div class="gcard-meta" id="setBrainMigrateResult"></div>
+          </div>
+          <div class="settings-card">
+            <div class="settings-card-head"><b>Dấu nguồn gốc ảnh AI</b><span class="gcard-tag">${stripC2pa ? "Đang gỡ" : "Đang giữ"}</span></div>
+            <p>Ảnh Javis tạo ra mang sẵn dấu nguồn gốc (Content Credentials) ghi rằng ảnh do AI sinh ra. Facebook đọc dấu này để gắn nhãn "Nội dung do AI tạo" lên bài. Gỡ dấu đi thì nhãn thường không hiện nữa, nhưng bạn vẫn phải tự chịu trách nhiệm công bố nội dung AI theo luật và điều khoản của nền tảng nơi bạn đăng. Nhãn tác giả javisos.com luôn được giữ dù bật hay tắt.</p>
+            <div class="js-actions">
+              <button class="gcard-btn ${stripC2pa ? "ghost" : ""}" id="setC2paKeep">Giữ dấu</button>
+              <button class="gcard-btn ${stripC2pa ? "" : "ghost"}" id="setC2paStrip">Gỡ dấu</button>
+            </div>
+            <div class="gcard-meta" id="setC2paMeta">${stripC2pa
+              ? "Đang GỠ dấu nguồn gốc khỏi ảnh mới tạo. Ảnh đã tạo trước đó không đổi."
+              : "Mặc định: giữ nguyên dấu nguồn gốc."}</div>
           </div>
         </div>
       </details>
@@ -3943,6 +3955,21 @@
     const graph3d = document.getElementById("setGraph3d");
     if (graph2d) graph2d.onclick = () => setGraphMode("2d");
     if (graph3d) graph3d.onclick = () => setGraphMode("3d");
+
+    // Gỡ dấu nguồn gốc AI: hỏi lại một lần khi BẬT (tắt thì cho về thẳng, vì về mặc định
+    // an toàn thì không cần cản). Chỉ đổi ảnh tạo MỚI, ảnh cũ giữ nguyên.
+    const setC2pa = async (strip) => {
+      if (strip && !confirm("Gỡ dấu nguồn gốc AI khỏi ảnh Javis tạo?\n\n"
+          + "Dấu này cho người xem biết ảnh do AI sinh ra. Gỡ đi thì Facebook thường "
+          + "không gắn nhãn nữa, nhưng nghĩa vụ công bố nội dung AI vẫn thuộc về bạn "
+          + "với tư cách người đăng.\n\nChỉ áp dụng cho ảnh tạo từ giờ trở đi.")) return;
+      await saveSetting("image", { strip_c2pa: !!strip });
+      refreshSettings();
+    };
+    const c2paKeep = document.getElementById("setC2paKeep");
+    const c2paStrip = document.getElementById("setC2paStrip");
+    if (c2paKeep) c2paKeep.onclick = () => setC2pa(false);
+    if (c2paStrip) c2paStrip.onclick = () => setC2pa(true);
 
     const migrate = document.getElementById("setBrainMigrate");
     if (migrate) migrate.onclick = async () => {

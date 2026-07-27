@@ -115,6 +115,15 @@ BRAND_SOFTWARE = "Javis OS"
 BRAND_SOURCE = "https://javisos.com"
 
 
+def _strip_c2pa_on() -> bool:
+    """Chủ workspace có tự bật gỡ Content Credentials không. Mặc định KHÔNG."""
+    try:
+        import config
+        return bool((config.read_settings().get("image") or {}).get("strip_c2pa"))
+    except Exception:
+        return False                      # đọc cài đặt lỗi → giữ dấu nguồn gốc, đừng gỡ nhầm
+
+
 def _png_text_chunk(key: str, value: str) -> bytes:
     """Một chunk tEXt PNG: len + 'tEXt' + key\\0value + CRC32(type+data). tEXt là
     Latin-1 nên chỉ truyền chuỗi ASCII vào đây."""
@@ -122,6 +131,47 @@ def _png_text_chunk(key: str, value: str) -> bytes:
     data = key.encode("latin-1") + b"\x00" + value.encode("latin-1")
     body = b"tEXt" + data
     return len(data).to_bytes(4, "big") + body + zlib.crc32(body).to_bytes(4, "big")
+
+
+def _iter_png_chunks(raw: bytes):
+    """Duyệt chunk PNG, sinh (type, start, end). Gặp byte hỏng thì dừng im lặng."""
+    i = 8
+    while i + 8 <= len(raw):
+        ln = int.from_bytes(raw[i:i + 4], "big")
+        typ = raw[i + 4:i + 8]
+        end = i + 12 + ln
+        if ln < 0 or end > len(raw):
+            return
+        yield typ, i, end
+        if typ == b"IEND":
+            return
+        i = end
+
+
+def strip_c2pa_png(raw: bytes) -> bytes:
+    """Gỡ chunk caBX (Content Credentials / C2PA) khỏi PNG.
+
+    caBX là nơi nhà cung cấp ảnh nhúng bản ghi nguồn gốc có chữ ký, nói rõ ảnh do AI
+    sinh ra; nền tảng như Facebook đọc nó để gắn nhãn "Nội dung do AI tạo".
+
+    CHỈ chạy khi chủ workspace tự bật `image.strip_c2pa` trong Cài đặt - mặc định TẮT.
+    Gỡ dấu này KHÔNG xoá nghĩa vụ công bố nội dung AI của người đăng; đó là việc của họ.
+    """
+    try:
+        if raw[:8] != b"\x89PNG\r\n\x1a\n":
+            return raw
+        parts, last, found = [], 0, False
+        for typ, start, end in _iter_png_chunks(raw):
+            if typ == b"caBX":
+                parts.append(raw[last:start])
+                last = end
+                found = True
+        if not found:
+            return raw
+        parts.append(raw[last:])
+        return b"".join(parts)
+    except Exception:
+        return raw
 
 
 def brand_png(raw: bytes) -> bytes:
@@ -157,6 +207,8 @@ def save_png_b64(b64: str, vault_root: Optional[str], prefix: str = "javis-img")
         return {"ok": False, "error": f"Ảnh base64 hỏng: {e}"}
     if not raw:
         return {"ok": False, "error": "Ảnh rỗng."}
+    if _strip_c2pa_on():
+        raw = strip_c2pa_png(raw)
     raw = brand_png(raw)
     vault = _resolve_vault(vault_root)
     adir = _attachments_dir(vault)

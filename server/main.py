@@ -1396,6 +1396,10 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         if "graph_mode" in patch:
             gm = str(patch["graph_mode"]).lower()
             cfg["dashboard"]["graph_mode"] = gm if gm in ("2d", "3d") else "2d"
+    elif section == "image":
+        cfg.setdefault("image", {})
+        if "strip_c2pa" in patch:
+            cfg["image"]["strip_c2pa"] = bool(patch["strip_c2pa"])
     elif section == "voice":
         v = cfg.setdefault("voice", {})
         if patch.get("tts_provider") in ("edge", "openai", "elevenlabs"):
