@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.203] - 2026-07-27
+Facebook Trang đăng được album nhiều ảnh và sửa được bài đã đăng.
+### Thêm mới
+- **Tool fb_page_album**: đăng 2 tới 10 ảnh gom vào MỘT bài kèm caption chung. Ảnh nhận file trong vault hoặc URL, trộn lẫn cũng được; up từng ảnh ở chế độ chưa đăng rồi gom một lượt nên lên Trang là thành một album gọn. Quá 10 ảnh báo rõ trần của Meta; một ảnh thì chỉ sang fb_page_photo.
+- **Tool fb_page_edit**: sửa nội dung chữ của bài đã đăng theo post_id, tự suy Trang từ id bài. Nói rõ giới hạn của Meta: chỉ đổi được chữ, không đổi được ảnh video đã đính kèm.
+- Cả hai xếp mức Toàn quyền và khai danger trong catalog như các tool đăng bài khác.
+### Kiểm thử
+- `test_meta_pages.py` thêm 11 case: album up published=false từng ảnh, bài cuối đủ attached_media, trộn URL với file vault, trần 10 ảnh, chuỗi phẩy vẫn hiểu, sửa bài đúng token Trang, thiếu tham số báo lỗi.
+
 ## [0.9.202] - 2026-07-27
 Facebook Trang đăng được cả ảnh và video.
 ### Thêm mới

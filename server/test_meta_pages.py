@@ -37,7 +37,8 @@ check("catalog: có fields client_id + client_secret",
 check("catalog: default_perm readonly + guide dùng localhost",
       fp["default_perm"] == "readonly" and "localhost" in fp["auth"]["guide"])
 check("catalog: tool ghi khai ở danger", set(fp["tool_meta"].get("danger") or [])
-      == {"fb_page_post", "fb_page_photo", "fb_page_video", "fb_page_reply"})
+      == {"fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video",
+          "fb_page_edit", "fb_page_reply"})
 import mcp_catalog  # noqa: E402
 check("mcp_catalog.get load được", mcp_catalog.get("facebook-pages") is not None)
 
@@ -58,14 +59,15 @@ class _Ctx:
 ctx = _Ctx()
 plug.register(ctx)
 byname = {t["name"]: t for t in ctx.tools}
-check("plugin: đủ 7 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
-                                            "fb_page_post", "fb_page_photo", "fb_page_video",
-                                            "fb_page_reply"})
+check("plugin: đủ 9 tool", set(byname) == {"fb_pages_list", "fb_page_posts", "fb_page_comments",
+                                            "fb_page_post", "fb_page_photo", "fb_page_album",
+                                            "fb_page_video", "fb_page_edit", "fb_page_reply"})
 check("plugin: tool đọc = readonly",
       all(byname[n]["min_mode"] == "readonly" for n in ("fb_pages_list", "fb_page_posts", "fb_page_comments")))
-check("plugin: tool ghi (đăng/ảnh/video/trả lời) = full",
+check("plugin: tool ghi (đăng/ảnh/album/video/sửa/trả lời) = full",
       all(byname[n]["min_mode"] == "full"
-          for n in ("fb_page_post", "fb_page_photo", "fb_page_video", "fb_page_reply")))
+          for n in ("fb_page_post", "fb_page_photo", "fb_page_album", "fb_page_video",
+                    "fb_page_edit", "fb_page_reply")))
 
 # chưa kết nối → _check chặn
 plug._connected_id = lambda: None
@@ -189,6 +191,48 @@ async def handler_tests():
           filecalls["args"][0] == "P1/videos" and filecalls["args"][4] == plug.GRAPH_VIDEO)
     r_vd_miss = await plug._publish_video({}, _CtxNoVault())
     check("fb_page_video: thiếu video → ERROR", r_vd_miss.startswith("ERROR"))
+
+    # fb_page_album: up từng ảnh published=false rồi gom vào MỘT bài /feed
+    seq = []
+
+    async def _fake_post_seq(path, data, token):
+        seq.append((path, dict(data or {}), token))
+        return {"id": f"M{len(seq)}"}
+
+    plug._post = _fake_post_seq
+    r_alb = await plug._publish_album(
+        {"photos": ["https://ex.com/1.jpg", "attachments/a.jpg"], "message": "Bộ ảnh"}, _CtxVault())
+    check("fb_page_album: ảnh URL up published=false",
+          seq[0][0] == "P1/photos" and seq[0][1].get("url") == "https://ex.com/1.jpg"
+          and seq[0][1].get("published") == "false")
+    check("fb_page_album: ảnh file up qua _post_file với published=false",
+          filecalls["args"][0] == "P1/photos" and filecalls["args"][2].get("published") == "false")
+    feed = seq[-1]
+    check("fb_page_album: bài cuối POST P1/feed + message + đủ attached_media",
+          feed[0] == "P1/feed" and feed[1].get("message") == "Bộ ảnh"
+          and json.loads(feed[1].get("attached_media[0]", "{}")).get("media_fbid") == "M1"
+          and json.loads(feed[1].get("attached_media[1]", "{}")).get("media_fbid") == "PH1")
+    check("fb_page_album: trả ok + số ảnh", '"ok": true' in r_alb.lower() and '"photos": 2' in r_alb)
+    r_alb_1 = await plug._publish_album({"photos": ["https://ex.com/1.jpg"]}, _CtxNoVault())
+    check("fb_page_album: 1 ảnh → ERROR chỉ sang fb_page_photo", r_alb_1.startswith("ERROR"))
+    r_alb_11 = await plug._publish_album({"photos": [f"https://ex.com/{i}.jpg" for i in range(11)]},
+                                         _CtxNoVault())
+    check("fb_page_album: 11 ảnh → ERROR trần 10", r_alb_11.startswith("ERROR") and "10" in r_alb_11)
+    seq.clear()
+    await plug._publish_album({"photos": "https://ex.com/1.jpg, https://ex.com/2.jpg"}, _CtxNoVault())
+    check("fb_page_album: photos dạng chuỗi phẩy vẫn hiểu", len(seq) == 3 and seq[-1][0] == "P1/feed")
+
+    # fb_page_edit: sửa message bài đã đăng, tự suy Trang từ post_id
+    seq.clear()
+    r_ed = await plug._edit_post({"post_id": "P1_10", "message": "Nội dung sửa lại"}, None)
+    check("fb_page_edit: POST {post_id} + message MỚI + token Trang",
+          seq[-1][0] == "P1_10" and seq[-1][1].get("message") == "Nội dung sửa lại"
+          and seq[-1][2] == "PTOKA")
+    check("fb_page_edit: trả ok", '"ok": true' in r_ed.lower())
+    r_ed_nomsg = await plug._edit_post({"post_id": "P1_10"}, None)
+    check("fb_page_edit: thiếu message → ERROR", r_ed_nomsg.startswith("ERROR"))
+    r_ed_noid = await plug._edit_post({"message": "x"}, None)
+    check("fb_page_edit: thiếu post_id → ERROR", r_ed_noid.startswith("ERROR"))
 
     # Nhiều Trang: không chỉ rõ → lỗi kèm danh sách; chỉ rõ tên → chọn đúng
     pages_data["data"].append({"id": "P2", "name": "Shop B", "category": "Retail", "access_token": "PTOKB"})

@@ -6,8 +6,9 @@ qua /me/accounts, mỗi Trang có access_token RIÊNG - mọi thao tác trên m�
 trả lời bình luận) đều dùng token của chính Trang đó, KHÔNG dùng token cá nhân.
 
 Tool đọc (fb_pages_list/fb_page_posts/fb_page_comments) = readonly. Tool ghi công khai
-(fb_page_post/fb_page_photo/fb_page_video/fb_page_reply) = min_mode full → không bao giờ tự
-chạy ở chế độ suggest/auto, phải mức Toàn quyền + kết nối đã ở mức đó.
+(fb_page_post/fb_page_photo/fb_page_album/fb_page_video/fb_page_edit/fb_page_reply) =
+min_mode full → không bao giờ tự chạy ở chế độ suggest/auto, phải mức Toàn quyền + kết nối
+đã ở mức đó.
 Ảnh/video nhận URL http(s) hoặc file TRONG vault (sandbox như tool file); video upload đi
 host graph-video riêng của Meta, Meta xử lý nền vài phút mới hiện bài.
 """
@@ -299,6 +300,80 @@ async def _publish_video(args, cctx):
                       ensure_ascii=False, default=str)
 
 
+async def _publish_album(args, cctx):
+    """Đăng NHIỀU ảnh thành một bài (album): up từng ảnh published=false lấy id,
+    rồi gom vào MỘT bài /feed qua attached_media. Meta cho tối đa 10 ảnh một bài."""
+    token = await _token()
+    if not token:
+        return "ERROR: " + (_check() or "chưa kết nối")
+    args = args or {}
+    photos = args.get("photos") or []
+    if isinstance(photos, str):   # model hay đưa chuỗi cách nhau dấu phẩy
+        photos = [p.strip() for p in photos.split(",") if p.strip()]
+    if len(photos) < 2:
+        return "ERROR: album cần ít nhất 2 ảnh trong 'photos' (1 ảnh thì dùng fb_page_photo)."
+    if len(photos) > 10:
+        return f"ERROR: Meta cho tối đa 10 ảnh một bài, đang có {len(photos)}. Bớt lại hoặc chia 2 bài."
+    pid, ptok, pname, perr = await _resolve_page(args, token)
+    if perr:
+        return perr
+    media_ids = []
+    for i, ref in enumerate(photos):
+        url, path, err = _resolve_media(ref, cctx)
+        if err:
+            return f"{err} (ảnh thứ {i + 1}: {str(ref)[:80]})"
+        if url:
+            d = await _post(f"{pid}/photos", {"url": url, "published": "false"}, ptok)
+        else:
+            d = await _post_file(f"{pid}/photos", path, {"published": "false"}, ptok)
+        if isinstance(d, dict) and d.get("error"):
+            return _fmt(d) + f" (ảnh thứ {i + 1})"
+        mid = (d or {}).get("id") if isinstance(d, dict) else None
+        if not mid:
+            return f"ERROR: Facebook không trả id cho ảnh thứ {i + 1}."
+        media_ids.append(mid)
+    data = {}
+    msg = str(args.get("message") or "").strip()
+    if msg:
+        data["message"] = msg
+    for i, mid in enumerate(media_ids):
+        data[f"attached_media[{i}]"] = json.dumps({"media_fbid": mid})
+    d = await _post(f"{pid}/feed", data, ptok)
+    if isinstance(d, dict) and d.get("error"):
+        return _fmt(d)
+    return json.dumps({"ok": True, "page": pname, "photos": len(media_ids),
+                       "post_id": d.get("id") if isinstance(d, dict) else None},
+                      ensure_ascii=False, default=str)
+
+
+async def _edit_post(args, cctx):
+    """Sửa NỘI DUNG CHỮ của bài đã đăng. Meta chỉ cho đổi message - không đổi được
+    ảnh/video đã đính kèm (muốn đổi media thì xoá đăng lại, Javis không tự xoá)."""
+    token = await _token()
+    if not token:
+        return "ERROR: " + (_check() or "chưa kết nối")
+    args = args or {}
+    post_id = str(args.get("post_id") or "").strip()
+    msg = str(args.get("message") or "").strip()
+    if not post_id:
+        return "ERROR: thiếu 'post_id' (id bài cần sửa, lấy từ fb_page_posts)."
+    if not msg:
+        return "ERROR: thiếu 'message' (nội dung MỚI thay cho nội dung cũ)."
+    # post_id dạng {pageid}_{postid}: tự suy Trang như fb_page_comments
+    if not (args.get("page_id") or args.get("page")) and "_" in post_id:
+        args = {**args, "page_id": post_id.split("_", 1)[0]}
+    pid, ptok, pname, err = await _resolve_page(args, token)
+    if err:
+        return err
+    d = await _post(post_id, {"message": msg}, ptok)
+    if isinstance(d, dict) and d.get("error"):
+        return _fmt(d)
+    ok = bool(isinstance(d, dict) and (d.get("success") is True or d.get("id")))
+    return json.dumps({"ok": ok, "page": pname, "post_id": post_id,
+                       "note": "" if ok else "Facebook trả về khác thường: " + str(d)[:120]},
+                      ensure_ascii=False, default=str)
+
+
 async def _reply(args, ctx):
     token = await _token()
     if not token:
@@ -369,6 +444,31 @@ def register(ctx):
             "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
             "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}},
             "required": ["photo"]},
+    )
+    ctx.register_tool(
+        name="fb_page_album", min_mode="full", check_fn=_check, handler=_publish_album,
+        description=("ĐĂNG ALBUM: nhiều ảnh (2-10) gom vào MỘT bài trên Trang - hành động THẬT, công khai. "
+                     "photos = danh sách đường dẫn ảnh trong vault hoặc URL http(s). message = caption chung. "
+                     "Một ảnh thì dùng fb_page_photo."),
+        schema={"type": "object", "properties": {
+            "photos": {"type": "array", "items": {"type": "string"},
+                       "description": "2-10 ảnh: đường dẫn trong vault hoặc URL http(s)"},
+            "message": {"type": "string", "description": "Caption chung của album (tuỳ chọn)"},
+            "page_id": {"type": "string", "description": "id Trang (bỏ trống nếu chỉ có 1 Trang)"},
+            "page": {"type": "string", "description": "tên Trang (thay cho page_id)"}},
+            "required": ["photos"]},
+    )
+    ctx.register_tool(
+        name="fb_page_edit", min_mode="full", check_fn=_check, handler=_edit_post,
+        description=("SỬA nội dung chữ của một bài ĐÃ ĐĂNG trên Trang - hành động THẬT. Cần post_id (từ "
+                     "fb_page_posts) và message MỚI thay toàn bộ nội dung cũ. Meta không cho đổi ảnh/video "
+                     "đã đính kèm, chỉ đổi được chữ."),
+        schema={"type": "object", "properties": {
+            "post_id": {"type": "string", "description": "id bài cần sửa (từ fb_page_posts)"},
+            "message": {"type": "string", "description": "Nội dung MỚI thay cho nội dung cũ"},
+            "page_id": {"type": "string", "description": "id Trang (thường tự suy từ post_id)"},
+            "page": {"type": "string", "description": "tên Trang (tuỳ chọn)"}},
+            "required": ["post_id", "message"]},
     )
     ctx.register_tool(
         name="fb_page_video", min_mode="full", check_fn=_check, handler=_publish_video,
