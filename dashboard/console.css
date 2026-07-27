@@ -589,6 +589,17 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
 .reuse-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 0 6px;
   padding: 9px 12px; border: 1px solid rgba(63,185,106,.35); border-radius: 10px; background: rgba(63,185,106,.06); }
 .reuse-row select { max-width: 200px; }
+/* Khối D: khu "kết nối sẵn của CLI" gập mặc định + mobile 1 cột */
+.amb-details summary { cursor: pointer; list-style: none; }
+.amb-details summary::-webkit-details-marker { display: none; }
+.amb-details summary h3::before { content: "▸ "; opacity: .6; }
+.amb-details[open] summary h3::before { content: "▾ "; }
+@media (max-width: 700px) {
+  .cat-grid { grid-template-columns: 1fr; }
+  .conn-accounts { flex-wrap: wrap; }
+  .conn-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .reuse-row select { max-width: 100%; }
+}
 .perm-chip { font-size: 11px; border: 1px solid; border-radius: 10px; padding: 1px 7px; opacity: .9; }
 .cat-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0 4px; }
 .cat-filter { display: flex; flex-wrap: wrap; gap: 6px; }

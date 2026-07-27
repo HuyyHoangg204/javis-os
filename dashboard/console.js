@@ -2699,7 +2699,8 @@
     safe: { label: "Ghi nháp", color: "#d9a521" },
     full: { label: "Toàn quyền", color: "#e06c5a" },
   };
-  const AUTH_BADGE = { apikey: "API key", qr: "QR Zalo", oauth: "OAuth", none: "Tự do" };
+  // Nhãn cách đăng nhập bằng tiếng người - dân thường không cần biết OAuth là gì
+  const AUTH_BADGE = { apikey: "Dán key", qr: "Quét QR", oauth: "Đăng nhập tài khoản", none: "Bấm là xong" };
   let _connPoll = null;
 
   function closeConnModal() {
@@ -3518,19 +3519,19 @@
     const cats = Array.from(new Set(cat.map(c => c.category || "Khác")));
     el.innerHTML = warn
       + '<div class="cview-section"><h3>◆ Đã kết nối <span style="opacity:.5">' + conns.length + ' tài khoản</span></h3>'
-      + '<div class="gcard-meta" style="max-width:740px">Một dịch vụ nối được NHIỀU tài khoản (nhiều shop, nhiều số Zalo…). Mọi bộ não - Claude Code, ChatGPT/Codex, OpenRouter, API - dùng chung kho này qua MCP hub, kèm phân quyền và nhật ký.'
-      + '<label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ' + (d.strict ? "checked" : "") + '> Chỉ dùng kết nối của Javis (bỏ MCP sẵn của máy)</label></div>'
+      + '<div class="gcard-meta" style="max-width:740px">Một dịch vụ nối được NHIỀU tài khoản (nhiều shop, nhiều số Zalo…). Mọi bộ não - Claude Code, ChatGPT/Codex, OpenRouter, API - dùng chung kho này qua trung tâm kết nối của Javis, kèm phân quyền và nhật ký.'
+      + '<label style="margin-left:8px;cursor:pointer"><input type="checkbox" id="mcpStrict" ' + (d.strict ? "checked" : "") + '> Chỉ dùng kết nối của Javis (bỏ kết nối sẵn của máy)</label></div>'
       + '<div class="prov-list" style="margin-top:12px">' + (connectedHtml || '<div class="mp-empty">Chưa đấu nguồn nào - chọn một dịch vụ trong Kho bên dưới để bắt đầu.</div>') + '</div></div>'
       + '<div class="cview-section"><h3>◆ Kho kết nối</h3>'
       + '<div class="cat-tools"><input class="js-input" id="catQ" placeholder="Tìm dịch vụ…" style="max-width:220px">'
       + '<span class="cat-filter"><button class="cat-chip on" data-catf="">Tất cả</button>' + cats.map(x => '<button class="cat-chip" data-catf="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</span></div>'
       + '<div class="cat-grid" id="catGrid">' + catalogCard(byId.custom) + groupCards(cat, conns) + catSolo(cat).map(catalogCard).join("") + '</div></div>'
-      + '<div class="cview-section"><h3>◆ MCP từ Claude Code <span style="opacity:.5">tài khoản - chỉ hiển thị</span></h3>'
-      + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã kết nối sẵn trong Claude Code (đồng bộ từ claude.ai). Engine Claude Code tự dùng các cái "Connected". Đăng nhập/quản lý trong app Claude, không sửa ở đây.</div>'
-      + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Đang tải… (kiểm tra sức khoẻ MCP, hơi lâu)</div></div></div>'
-      + '<div class="cview-section"><h3>◆ MCP từ Codex (ChatGPT) <span style="opacity:.5">kho gốc - chỉ hiển thị</span></h3>'
-      + '<div class="gcard-meta" style="max-width:740px">Các MCP anh đã đăng ký sẵn trong Codex CLI (kho gốc của Codex, thêm bằng lệnh <code>codex mcp add</code>). Engine ChatGPT/Codex tự nạp các server này khi chạy - server OAuth cần chạy <code>codex mcp login &lt;tên&gt;</code> một lần trong terminal. Quản lý bằng lệnh codex, không sửa ở đây.</div>'
-      + '<div class="prov-list" id="mcpAmbientCodex" style="margin-top:12px"><div class="mp-empty">Đang tải…</div></div></div>';
+      // Hai khu kết nối sẵn của CLI: GẬP mặc định (dân thường không cần thấy) + LAZY:
+      // chỉ gọi /mcp/ambient (chậm - phải health check) khi người dùng thật sự mở ra.
+      + '<details class="cview-section amb-details" id="ambWrap"><summary><h3 style="display:inline">◆ Kết nối sẵn của Claude Code và Codex <span style="opacity:.5">chỉ hiển thị - bấm để xem</span></h3></summary>'
+      + '<div class="gcard-meta" style="max-width:740px;margin-top:10px">Những nguồn đã đăng nhập sẵn trong tài khoản Claude (đồng bộ từ claude.ai) và trong Codex CLI. Bộ não tương ứng tự dùng được các nguồn "Connected". Đăng nhập và quản lý trong app Claude hoặc bằng lệnh <code>codex mcp</code>, không sửa ở đây.</div>'
+      + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Bấm để tải…</div></div>'
+      + '<div class="prov-list" id="mcpAmbientCodex" style="margin-top:12px"></div></details>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
     wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
     // Sức khoẻ kết nối: tô ngay khi mở trang + làm tươi mỗi 60s (tự dừng khi rời trang)
@@ -3563,18 +3564,28 @@
       ch.classList.add("on");
       applyFilter();
     });
-    fetch("/mcp/ambient").then(r => r.json()).then(a => {
+    // Lazy: chỉ tải danh sách ambient khi người dùng mở khu gập (lần đầu)
+    const ambWrap = document.getElementById("ambWrap");
+    if (ambWrap) ambWrap.addEventListener("toggle", () => {
+      if (!ambWrap.open || ambWrap._loaded) return;
+      ambWrap._loaded = true;
       const box = document.getElementById("mcpAmbient");
-      if (box) {
-        const list = a.servers || [];
-        box.innerHTML = list.length ? list.map(s => ambientCard(s, "claude code")).join("") : '<div class="mp-empty">Không có (hoặc Claude CLI chưa cài).</div>';
-      }
-      const cbox = document.getElementById("mcpAmbientCodex");
-      if (cbox) {
-        const clist = a.codex_servers || [];
-        cbox.innerHTML = clist.length ? clist.map(s => ambientCard(s, "codex")).join("") : '<div class="mp-empty">Không có (hoặc Codex CLI chưa cài).</div>';
-      }
-    }).catch(() => { ["mcpAmbient", "mcpAmbientCodex"].forEach(id => { const b = document.getElementById(id); if (b) b.innerHTML = '<div class="mp-empty">Không tải được.</div>'; }); });
+      if (box) box.innerHTML = '<div class="mp-empty">Đang tải… (kiểm tra tình trạng từng nguồn, hơi lâu)</div>';
+      fetch("/mcp/ambient").then(r => r.json()).then(a => {
+        if (box) {
+          const list = a.servers || [];
+          box.innerHTML = list.length ? list.map(s => ambientCard(s, "claude code")).join("") : '<div class="mp-empty">Không có (hoặc Claude CLI chưa cài).</div>';
+        }
+        const cbox = document.getElementById("mcpAmbientCodex");
+        if (cbox) {
+          const clist = a.codex_servers || [];
+          cbox.innerHTML = clist.length ? clist.map(s => ambientCard(s, "codex")).join("") : '<div class="mp-empty">Không có (hoặc Codex CLI chưa cài).</div>';
+        }
+      }).catch(() => {
+        ambWrap._loaded = false;   // mở lại sẽ thử tải lại
+        ["mcpAmbient", "mcpAmbientCodex"].forEach(id => { const b = document.getElementById(id); if (b) b.innerHTML = '<div class="mp-empty">Không tải được.</div>'; });
+      });
+    });
   }
   function openMcpForm(el, server) {
     const edit = !!server;

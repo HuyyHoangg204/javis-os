@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.194] - 2026-07-27
+Trang Kết nối bớt chữ kỹ thuật, gọn hơn và dễ đọc trên điện thoại.
+### Cải thiện
+- **Hai khu kết nối sẵn của Claude Code và Codex gộp làm một, gập mặc định**: người dùng thường không cần thấy, bấm mới mở. Danh sách chỉ tải khi mở ra nên trang Kết nối hiện nhanh hơn hẳn (trước đây gọi health check ambient ngay khi vào trang).
+- **Chữ MCP rời khỏi mọi text chính**: nhãn cách đăng nhập trên card kho đổi sang tiếng người (Dán key, Quét QR, Đăng nhập tài khoản, Bấm là xong); thuật ngữ kỹ thuật chỉ còn trong phần Tự thêm (nâng cao).
+- **Mobile**: kho kết nối xuống 1 cột, chip tài khoản dài tự cắt gọn không tràn khung.
+
 ## [0.9.193] - 2026-07-27
 Mọi dịch vụ Google gom về một cửa, kèm wizard từng bước, kéo thả file key và nút dùng lại key.
 ### Thêm mới
