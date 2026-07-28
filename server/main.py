@@ -21,7 +21,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, 
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, FileResponse, Response
-import edge_tts
+# edge_tts CỐ TÌNH không import ở đây mà nạp lười trong _tts_edge và /tts/voices.
+# Nó chiếm 944ms trong 2.263ms nạp main (41%), và kéo theo cả chuỗi aiohttp 212ms vào
+# đường khởi động, trong khi TTS là tính năng TUỲ CHỌN mà đa số phiên không đụng tới.
+# Khởi động chậm không chỉ khó chịu: trên VPS nó ăn vào cửa sổ healthcheck lúc deploy.
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -5313,6 +5316,7 @@ def _rate_to_speed(rate: str) -> float:
 
 
 async def _tts_edge(text: str, voice: str, rate: str) -> bytes:
+    import edge_tts   # lazy - xem ghi chú ở đầu file
     communicate = edge_tts.Communicate(text, voice, rate=rate)
     buf = bytearray()
     async for chunk in communicate.stream():
@@ -5391,6 +5395,7 @@ async def tts(
 
 @app.get("/tts/voices")
 async def tts_voices():
+    import edge_tts   # lazy - xem ghi chú ở đầu file
     voices = await edge_tts.list_voices()
     return {
         "voices": [
