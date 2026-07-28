@@ -26,6 +26,7 @@ AN TOÀN (lớp CỨNG - plugin chạy code Python THẬT trong tiến trình se
 from __future__ import annotations
 
 import asyncio
+import copy
 import importlib.util
 import inspect
 import json
@@ -91,12 +92,51 @@ def global_plugins_dir() -> Path:
 # ============================================================
 # State (bundled override) - STATE_DIR/plugins.json
 # ============================================================
+# Cache đọc file theo (mtime_ns, size) - cùng khuôn với config.read_settings (config.py:136).
+# Vì sao cần: describe() chạy trên đường nóng system prompt (mỗi lượt chat, mỗi task Kanban,
+# mỗi lần nhắc hẹn nổ, mỗi tick loop). Mỗi lần nó đọc + parse plugin.yaml của MỌI plugin, và
+# _effective_enabled còn đọc lại plugins.json cho TỪNG plugin bundled - 8 plugin là 8 lần đọc
+# cùng một file. File đổi thì mtime/size đổi nên tự nạp lại; bật/tắt plugin ghi thẳng vào
+# manifest hoặc plugins.json nên cũng tự hết hạn.
+# Luôn trả BẢN SAO SÂU: cả hai dict đều bị nơi gọi sửa tại chỗ rồi ghi ngược ra file
+# (xem toggle ở cuối file), trả thẳng object trong cache là bẩn cache.
+_STATE_CACHE = {"sig": None, "data": None}
+_MANIFEST_CACHE: dict = {}
+
+
+_MISSING = "<khong-ton-tai>"
+
+
+def _stat_sig(p: Path):
+    """(mtime_ns, size), hoặc _MISSING khi file chưa có, hoặc None khi lỗi lạ (không cache).
+
+    Phân biệt 'chưa có file' với 'lỗi lạ' là cần thiết: plugins.json chỉ sinh ra khi user
+    bật/tắt plugin bundled lần đầu, nên trên phần lớn bản cài nó KHÔNG tồn tại. Gộp nó vào
+    None thì _read_state không cache được và mỗi describe() lại ném FileNotFoundError một
+    lần cho MỖI plugin bundled - đúng cái đang muốn bỏ.
+    """
+    try:
+        st = p.stat()
+        return (st.st_mtime_ns, st.st_size)
+    except FileNotFoundError:
+        return _MISSING
+    except OSError:
+        return None
+
+
 def _read_state() -> dict:
+    sig = _stat_sig(_STATE_PATH)
+    if sig is not None and sig == _STATE_CACHE["sig"] and _STATE_CACHE["data"] is not None:
+        return copy.deepcopy(_STATE_CACHE["data"])
     try:
         d = json.loads(_STATE_PATH.read_text(encoding="utf-8"))
-        return d if isinstance(d, dict) else {}
+        out = d if isinstance(d, dict) else {}
     except Exception:
-        return {}
+        out = {}
+    if sig is not None:
+        _STATE_CACHE["sig"] = sig
+        _STATE_CACHE["data"] = copy.deepcopy(out)
+    return out
 
 
 def _write_state(state: dict) -> None:
@@ -148,11 +188,18 @@ def _read_manifest(pdir: Path) -> Tuple[dict, str]:
         f = pdir / "plugin.yml"
     if not f.is_file():
         return {}, ""
+    sig, key = _stat_sig(f), str(f)
+    hit = _MANIFEST_CACHE.get(key)
+    if sig is not None and hit is not None and hit["sig"] == sig:
+        return copy.deepcopy(hit["manifest"]), hit["err"]
     try:
         m = fastyaml.safe_load(f.read_text(encoding="utf-8")) or {}
-        return (m if isinstance(m, dict) else {}), ""
+        out, err = (m if isinstance(m, dict) else {}), ""
     except Exception as e:
-        return {}, f"manifest lỗi: {type(e).__name__}: {e}"
+        out, err = {}, f"manifest lỗi: {type(e).__name__}: {e}"
+    if sig is not None:
+        _MANIFEST_CACHE[key] = {"sig": sig, "manifest": copy.deepcopy(out), "err": err}
+    return out, err
 
 
 def _entry_file(pdir: Path) -> Optional[Path]:
@@ -368,9 +415,17 @@ def _load_all(vault_root: Optional[str], scope_vault: bool = True) -> dict:
 
 
 def invalidate() -> None:
-    """Xoá cache load - gọi sau khi bật/tắt/sửa plugin."""
+    """Xoá cache load - gọi sau khi bật/tắt/sửa plugin.
+
+    Dọn luôn cache đọc file. Về lý thuyết thừa (ghi file làm mtime đổi nên cache tự hết hạn),
+    nhưng mtime trên vài hệ tệp chỉ chính xác tới giây, mà bật rồi tắt liền nhau trong cùng
+    một giây lại đúng là thao tác user hay làm nhất trên trang Plugin.
+    """
     with _lock:
         _cache.clear()
+    _STATE_CACHE["sig"] = None
+    _STATE_CACHE["data"] = None
+    _MANIFEST_CACHE.clear()
 
 
 # ============================================================
