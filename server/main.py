@@ -3445,7 +3445,10 @@ async def usage_summary(period: str = "this_month", provider: str = "", project:
         except Exception:
             pass
     try:
-        return usage_index.summary(period=period, provider=provider or None, project=project or None)
+        # to_thread như refresh ngay trên: summary() truy vấn sqlite, đo được 46,7ms. Chạy
+        # thẳng trên event loop là chặn MỌI request khác, kể cả healthcheck 4 giây của Docker.
+        return await asyncio.to_thread(
+            usage_index.summary, period=period, provider=provider or None, project=project or None)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 
@@ -3459,7 +3462,7 @@ async def usage_insights(period: str = "this_month", refresh: int = 0):
         except Exception:
             pass
     try:
-        return {"items": usage_index.insights(period=period)}
+        return {"items": await asyncio.to_thread(usage_index.insights, period=period)}
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 

@@ -58,7 +58,18 @@ def _conversations_db() -> Path:
 
 
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH))
+    # WAL + busy_timeout: KHÔNG phải để nhanh (đo được _connect chỉ tốn 1,14ms trong 65ms
+    # của summary(), tức DDL lặp lại chưa tới 1,5% - bỏ nó đi cũng chẳng đáng). Đây là chuyện
+    # ĐÚNG SAI: từ 0.9.237 summary/insights chạy trong asyncio.to_thread, nên chúng đọc SONG
+    # SONG với refresh() đang ghi. Chế độ journal mặc định cho người đọc và người ghi khoá lẫn
+    # nhau -> "database is locked" ngay giữa lúc user mở trang Mức dùng. sessions.py:100-118 và
+    # task_store.py:61-65 đều đã làm đúng, riêng kho này thì chưa.
+    conn = sqlite3.connect(str(DB_PATH), timeout=5.0)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+    except sqlite3.OperationalError:
+        pass   # ổ đĩa mạng / hệ tệp không hỗ trợ WAL -> chạy chế độ mặc định, vẫn đúng
     conn.execute("CREATE TABLE IF NOT EXISTS files_seen("
                  "path TEXT PRIMARY KEY, size INTEGER, mtime REAL, offset INTEGER DEFAULT 0)")
     conn.execute("CREATE TABLE IF NOT EXISTS file_daily("

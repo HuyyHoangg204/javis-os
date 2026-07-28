@@ -32,14 +32,35 @@ def load_prices(path: str = None) -> dict:
         return {}
 
 
-def estimate_cost(ev: dict, prices: dict) -> float:
-    """Chi phi quy doi USD cho 1 UsageEvent theo bang gia (USD/1M token).
-    Khop model theo tien to DAI NHAT; khong khop -> 0."""
-    model = ev.get("model") or ""
+# Nho dem model -> khoa bang gia khop dai nhat. Mot o duy nhat, reset khi doi bang gia.
+# Vi sao: usage_index._group goi estimate_cost MOI DONG, moi lan lai quet tuyen tinh ca
+# bang gia. Do thuc te tren 1825 dong: 26.748 lan goi, 160.491 lan startswith, chiem 65%
+# thoi gian cua summary() - trong khi db chi co 11 model phan biet va bang gia co 6 khoa.
+# Giu THAM CHIEU MANH toi prices de id() khong bi tai dung cho dict khac.
+_KHOA_GIA_MEMO = {"prices": None, "map": {}}
+
+
+def _khoa_gia(model: str, prices: dict) -> str:
+    """Khoa bang gia co tien to DAI NHAT khop model ('' neu khong khop). Ket qua nho dem."""
+    if _KHOA_GIA_MEMO["prices"] is not prices:
+        _KHOA_GIA_MEMO["prices"] = prices
+        _KHOA_GIA_MEMO["map"] = {}
+    memo = _KHOA_GIA_MEMO["map"]
+    if model in memo:
+        return memo[model]
     best_key = ""
     for key in prices:
         if model.startswith(key) and len(key) > len(best_key):
             best_key = key
+    memo[model] = best_key
+    return best_key
+
+
+def estimate_cost(ev: dict, prices: dict) -> float:
+    """Chi phi quy doi USD cho 1 UsageEvent theo bang gia (USD/1M token).
+    Khop model theo tien to DAI NHAT; khong khop -> 0."""
+    model = ev.get("model") or ""
+    best_key = _khoa_gia(model, prices)
     if not best_key:
         return 0.0
     p = prices[best_key]
