@@ -45,13 +45,13 @@ const links = [
   g.graph = stubGraph({ nodes, links });
 
   check("chưa chạy: timelapseRunning=false", g.timelapseRunning === false);
-  // 6 node / (640ms / 160ms tick) = 4 nhịp → 2 node mỗi nhịp
-  check("startTimelapse trả true", g.startTimelapse(640) === true);
+  // Nhịp CỐ ĐỊNH mỗi note (test dùng 60ms cho nhanh) → 6 note = 6 nhịp, não dày phim dài
+  check("startTimelapse trả true", g.startTimelapse(60) === true);
   check("đang chạy: timelapseRunning=true", g.timelapseRunning === true);
   check("khung đầu tiên là não trống", frames[0].nodes.length === 0 && frames[0].links.length === 0);
-  check("gọi start lần 2 khi đang chạy → false", g.startTimelapse(640) === false);
+  check("gọi start lần 2 khi đang chạy → false", g.startTimelapse(60) === false);
 
-  await sleep(1400);   // đợi hết phim (4 nhịp x 160ms + dư an toàn)
+  await sleep(800);   // đợi hết phim (6 nhịp x 60ms + dư an toàn)
 
   check("hết phim: timelapseRunning=false", g.timelapseRunning === false);
   check("bắn sự kiện javis-timelapse-end", _events.includes("javis-timelapse-end"));
@@ -59,7 +59,9 @@ const links = [
   // Trình tự thời gian: mỗi khung node phải là PREFIX của [a,b,c,d,e,f] (xếp theo t tăng)
   const wantOrder = ["a", "b", "c", "d", "e", "f"];
   const growing = frames.slice(1, -1);   // bỏ khung trống đầu + khung khôi phục cuối
-  check("có khung trung gian (phim chiếu từng nhịp)", growing.length >= 2);
+  check("mỗi nhịp đúng MỘT note (6 note = 6 khung)", growing.length === 6);
+  check("khung sau nhiều hơn khung trước đúng 1 node",
+    growing.every((f, i) => f.nodes.length === i + 1));
   check("node hiện dần đúng thứ tự ra đời",
     growing.every(f => f.nodes.every((n, i) => n.id === wantOrder[i])));
   check("link chỉ hiện khi CẢ HAI đầu đã ra đời",
@@ -67,11 +69,11 @@ const links = [
       const present = new Set(f.nodes.map(n => n.id));
       return f.links.every(l => present.has(l.source) && present.has(l.target));
     }));
-  // Nhịp cụ thể: sau nhịp 1 có a,b → link a-b phải xuất hiện, link a-f thì CHƯA
-  const step1 = growing.find(f => f.nodes.length === 2);
-  check("nhịp 1 (a,b): có link a-b, chưa có a-f",
-    !!step1 && step1.links.some(l => l.source === "a" && l.target === "b")
-            && !step1.links.some(l => l.target === "f"));
+  // Nhịp cụ thể: sau nhịp 2 có a,b → link a-b phải xuất hiện, link a-f thì CHƯA
+  const step2 = growing.find(f => f.nodes.length === 2);
+  check("nhịp 2 (a,b): có link a-b, chưa có a-f",
+    !!step2 && step2.links.some(l => l.source === "a" && l.target === "b")
+            && !step2.links.some(l => l.target === "f"));
 
   const last = frames[frames.length - 1];
   check("khung cuối khôi phục ĐỦ mạng (6 node, 4 link)",
@@ -79,9 +81,9 @@ const links = [
   check("node được xoá toạ độ để d3 dựng lại từ đầu (fx/fy=null)",
     nodes.every(n => n.fx === null && n.fy === null));
 
-  // Bấm dừng giữa chừng: chạy lại rồi stop ngay → khôi phục đủ mạng
+  // Bấm dừng giữa chừng: chạy lại (nhịp chậm để chưa kịp hết) rồi stop ngay → khôi phục đủ mạng
   _events.length = 0;
-  g.startTimelapse(60000);
+  g.startTimelapse(10000);
   await sleep(200);
   g.stopTimelapse();
   const afterStop = g.graph.graphData();

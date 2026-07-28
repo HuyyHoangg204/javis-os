@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.225] - 2026-07-28
+Timelapse chậm rãi: mỗi note một nhịp cố định, não càng dày phim càng dài.
+### Cải thiện
+- Timelapse bỏ kiểu "ép xong trong 18 giây" (vault to là node túa ra như pháo hoa, không kịp ngắm): giờ mỗi note hiện cách nhau 320ms, MỘT note mỗi nhịp, tổng thời gian tự dài theo số note - xem thư thái như lật album cuộc đời brain. Yêu cầu trực tiếp của chủ: đừng đổi lại thành tổng thời gian cố định.
+
 ## [0.9.224] - 2026-07-28
 Nút Timelapse "cuộc đời brain": chiếu lại não lớn lên từ note đầu tiên tới hiện tại.
 ### Thêm mới
