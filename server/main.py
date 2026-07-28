@@ -4397,13 +4397,47 @@ async def _start_scheduler():
         print(f"[telegram start] {e}", file=__import__('sys').stderr)
 
 
-@app.get("/browse")
-async def browse(path: str = Query("", description="Thư mục cần liệt kê; rỗng = ổ đĩa/gốc")):
-    """Duyệt thư mục để chọn brain folder. Đếm số file .md trong mỗi folder con."""
-    import string
-    import glob as _glob
+_BROWSE_MD_CAP = 500        # trần đếm .md cho mỗi thư mục con
+_BROWSE_HERE_CAP = 1000     # trần đếm .md ngay tại thư mục đang đứng
+_BROWSE_DEPTH = 8           # tầng sâu tối đa khi đếm
 
-    # Rỗng → liệt kê ổ đĩa (Windows) hoặc home (Unix)
+
+def _count_md(root: str, cap: int) -> int:
+    """Đếm file .md dưới root, có TRẦN THẬT: chạm cap là dừng ngay, không đi nốt cây.
+
+    Bản cũ dùng `glob.glob(..., recursive=True)[:500]` - lát cắt chỉ áp lên KẾT QUẢ nên
+    glob vẫn quét hết cây trước rồi mới cắt. Trên VPS (/home ôm cả brains lẫn dự án khác)
+    một lần duyệt thư mục quét tới mức khoá cứng event loop, healthcheck bị bỏ đói, Docker
+    gắn unhealthy và Traefik gỡ route: cả trang thành 404 dù app vẫn sống.
+
+    Không đi theo symlink (symlink trỏ ngược lên cha làm glob recursive lặp vô tận), có
+    trần độ sâu, và lỗi quyền ở một nhánh không giết cả lần đếm."""
+    n = 0
+    stack = [(root, 0)]
+    while stack:
+        cur, depth = stack.pop()
+        try:
+            with os.scandir(cur) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            if depth < _BROWSE_DEPTH and not entry.name.startswith((".", "$")):
+                                stack.append((entry.path, depth + 1))
+                        elif entry.name.endswith(".md"):
+                            n += 1
+                            if n >= cap:
+                                return n
+                    except OSError:
+                        continue        # entry hỏng (symlink gãy, mất quyền) → bỏ qua
+        except OSError:
+            continue                    # thư mục không đọc được → bỏ qua, đừng bỏ cả cây
+    return n
+
+
+def _browse_sync(path: str) -> dict:
+    """Phần chạm đĩa của /browse. Tách hẳn ra để chạy trong thread, KHÔNG trên event loop."""
+    import string
+
     if not path:
         if os.name == "nt":
             drives = [f"{d}:\\" for d in string.ascii_uppercase if os.path.exists(f"{d}:\\")]
@@ -4421,22 +4455,31 @@ async def browse(path: str = Query("", description="Thư mục cần liệt kê;
                 continue
             full = os.path.join(path, name)
             if os.path.isdir(full):
-                # Đếm nhanh số .md (kể cả thư mục con) - giới hạn để nhẹ
                 try:
-                    md = len(_glob.glob(f"{full}/**/*.md", recursive=True)[:500])
+                    md = _count_md(full, _BROWSE_MD_CAP)
                 except Exception:
                     md = 0
                 dirs.append({"name": name, "path": full, "md": md})
+                if len(dirs) >= 300:
+                    break               # đủ hiển thị rồi, đừng đếm tiếp cho phần bị cắt
         parent = os.path.dirname(path.rstrip("\\/")) or None
         if os.name == "nt" and parent and len(parent) <= 2:
             parent = ""  # về danh sách ổ đĩa
-        # Tự đếm md ngay trong path hiện tại
-        here_md = len(_glob.glob(f"{path}/**/*.md", recursive=True)[:1000])
-        return {"path": path, "parent": parent, "here_md": here_md, "dirs": dirs[:300]}
+        here_md = _count_md(path, _BROWSE_HERE_CAP)
+        return {"path": path, "parent": parent, "here_md": here_md, "dirs": dirs}
     except PermissionError:
         return {"error": "Không có quyền truy cập", "path": path, "parent": None, "dirs": []}
     except Exception as e:
         return {"error": str(e), "path": path, "parent": None, "dirs": []}
+
+
+@app.get("/browse")
+async def browse(path: str = Query("", description="Thư mục cần liệt kê; rỗng = ổ đĩa/gốc")):
+    """Duyệt thư mục để chọn brain folder. Đếm số file .md trong mỗi folder con.
+
+    Quét đĩa đẩy sang thread: dù thư mục có to tới đâu, event loop vẫn phục vụ được
+    healthcheck và các request khác. Xem _count_md để biết vì sao (sự cố 404 trên VPS)."""
+    return await asyncio.to_thread(_browse_sync, path)
 
 
 @app.get("/path/exists")

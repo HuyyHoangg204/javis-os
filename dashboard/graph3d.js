@@ -431,7 +431,14 @@ class JavisGraph3D {
 
   // Pause SÂU - dùng khi rời cockpit (mở Console): dừng vòng render + engine vật lý +
   // autorotate → CPU/GPU về ~0, nhưng giữ context để bật lại tức thì. Đảo bằng wake().
+  hideTooltip() {
+    if (this.tooltip) this.tooltip.style.display = "none";
+  }
+
   pause() {
+    // Tooltip nằm NGOÀI canvas nên canvas bị che/đổi trang là không còn sự kiện rời
+    // hover để tự ẩn. Chuyển trang nhanh cũng nuốt luôn sự kiện đó.
+    this.hideTooltip();
     if (this._paused) return;
     this._paused = true;
     this.stop();                                  // dừng RAF render glow/firing

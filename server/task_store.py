@@ -504,6 +504,34 @@ class TaskStore:
                 self._db.rollback()
                 raise
 
+    def clear_board(self, brain_root: str) -> int:
+        """XOÁ TRẮNG bảng: mọi việc của brain này, TRỪ việc đang có worker cầm.
+
+        Khác purge_terminal (chỉ đụng việc đã kết thúc): đây là lệnh dứt khoát của chủ khi
+        cả bảng không còn giá trị. Giữ lại 'running' vì xoá task trong lúc worker còn chạy
+        sẽ để lại worker mồ côi ghi vào một task không còn tồn tại."""
+        with self._lock:
+            self._tx()
+            try:
+                rows = self._db.execute(
+                    "SELECT id FROM tasks WHERE brain_root=? AND status<>'running'",
+                    (brain_root,),
+                ).fetchall()
+                ids = [str(r["id"]) for r in rows]
+                for tid in ids:
+                    self._db.execute("DELETE FROM task_events WHERE task_id=?", (tid,))
+                    self._db.execute("DELETE FROM task_runs WHERE task_id=?", (tid,))
+                    self._db.execute(
+                        "DELETE FROM task_dependencies WHERE task_id=? OR depends_on_id=?",
+                        (tid, tid),
+                    )
+                    self._db.execute("DELETE FROM tasks WHERE id=?", (tid,))
+                self._db.commit()
+                return len(ids)
+            except Exception:
+                self._db.rollback()
+                raise
+
     def next_candidate(self, brain_root: str) -> Optional[dict]:
         with self._lock:
             row = self._db.execute(

@@ -918,6 +918,14 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
             self._snapshot(root)
             return {"ok": True, "removed": removed}
 
+        @router.post("/kanban/clear")
+        async def kanban_clear(brain: str = Form("brain")):
+            """Xoá TRẮNG bảng (trừ việc đang chạy). Dứt khoát, không hoàn tác được."""
+            root = self._ensure(brain)
+            removed = self.store.clear_board(root)
+            self._snapshot(root)
+            return {"ok": True, "removed": removed}
+
         @router.post("/kanban/orchestration")
         async def kanban_orchestration(
             mode: str = Form(...), brain: str = Form("brain")

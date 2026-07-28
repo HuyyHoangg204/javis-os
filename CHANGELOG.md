@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.234] - 2026-07-28
+Vá lỗi treo cả server khi duyệt thư mục, dọn trắng bảng Việc, tooltip đồ thị hết dính sang trang khác.
+### Sửa lỗi
+- **`/browse` không còn khoá chết cả server** (sự cố VPS trả 404 toàn trang): hàm khai `async def` nhưng bên trong quét đĩa đồng bộ, và đoạn `glob.glob(..., recursive=True)[:500]` chỉ trông như có trần - lát cắt áp lên KẾT QUẢ nên glob vẫn đi hết cây thư mục trước rồi mới cắt. Trên VPS `/home` ôm cả brains lẫn dự án khác, nên một request duyệt thư mục khoá cứng event loop; healthcheck bị bỏ đói, Docker gắn nhãn unhealthy, Traefik gỡ route và cả trang thành 404 dù app vẫn sống. Log chứng minh: healthcheck 200 đều mỗi 30 giây rồi câm hẳn ngay sau dòng `GET /browse?path=/home`. Nay tách `_browse_sync` chạy qua `asyncio.to_thread`, và `_count_md` đếm bằng `os.scandir` có trần THẬT (chạm trần là dừng), có trần độ sâu, không đi theo symlink (symlink trỏ ngược lên cha làm glob recursive lặp vô tận), lỗi quyền một nhánh không giết cả lần đếm.
+- **Tooltip node đồ thị hết dính lại khi chuyển trang** (Codex sửa, em soát và gộp): nguyên nhân thật là View Transition chụp khung cũ kèm tooltip đang hover, nên ẩn ở `pause()` là đã muộn. Nay ẩn ngay đầu `navigateTo` trước khi chụp, thêm `hideTooltip()` cho cả đồ thị 2D lẫn 3D, và chốt chặn cuối bằng CSS `body.in-console .graph-tooltip { display: none }`.
+### Thêm mới
+- **`TaskStore.clear_board` + `POST /kanban/clear`**: xoá TRẮNG bảng Việc của một brain, giữ lại đúng việc đang có worker cầm (xoá task trong lúc worker chạy sẽ để lại worker mồ côi ghi vào task không còn tồn tại).
+### Kiểm thử
+- `test_browse_khong_treo.py` mới (9 case): trần đếm dừng đúng chỗ, không đi theo symlink vòng, bỏ qua thư mục cấm quyền, cây 2400 file vẫn trả lời dưới 3 giây, và chốt chặn quan trọng nhất là event loop vẫn thở trong lúc quét.
+- `test_tasks_autonomous.py` thêm case cho `clear_board`; `test_graph_tooltip_cleanup.js` chạy bằng node cho phần tooltip.
+
 ## [0.9.233] - 2026-07-28
 Javis thôi tự đẻ việc: chỉ tạo việc khi được bảo thẳng, kèm nút dọn bảng.
 ### Thay đổi

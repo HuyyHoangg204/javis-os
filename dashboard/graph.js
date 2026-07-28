@@ -229,7 +229,13 @@ class JavisGraph {
   }
 
   // --- Interface khớp JavisGraph3D ---
-  pause() { if (this.graph) { try { this.graph.pauseAnimation(); } catch (e) {} } }
+  hideTooltip() {
+    if (this.tooltip) this.tooltip.style.display = "none";
+  }
+  pause() {
+    this.hideTooltip();
+    if (this.graph) { try { this.graph.pauseAnimation(); } catch (e) {} }
+  }
   wake() { if (this.graph) { try { this.graph.resumeAnimation(); } catch (e) {} } }
   resume() { this.wake(); }
   setThinking(active) { this._thinking = !!active; }

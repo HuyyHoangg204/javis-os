@@ -157,6 +157,16 @@
   function navigateTo(id) {
     const store = Alpine.store("nav");
     if (store.active === id) return;   // đang ở trang này → khỏi đổi (tránh nháy + mượn/trả node thừa)
+    // Ẩn TRƯỚC khi View Transition chụp khung cũ. Đợi tới swap()/pause() thì tooltip
+    // đang hover đã lọt vào ảnh chụp chuyển cảnh, dính lại trên trang mới.
+    try {
+      const g = window.__javisGraph;
+      if (g && g.hideTooltip) g.hideTooltip();
+      else {
+        const tip = document.getElementById("graphTooltip");
+        if (tip) tip.style.display = "none";
+      }
+    } catch (e) {}
     const swap = () => {
       const leave = _pageLeave; _pageLeave = null;
       if (leave) { try { leave(); } catch (e) {} }   // dọn trang cũ trước khi thay nội dung

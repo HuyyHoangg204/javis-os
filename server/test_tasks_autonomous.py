@@ -290,6 +290,27 @@ def test_purge_terminal_khong_dong_vao_viec_dang_chay(tmp_path):
     assert store.get_task(running) is not None
 
 
+def test_clear_board_xoa_sach_tru_viec_dang_chay(tmp_path):
+    """Xoá trắng bảng: mọi việc đi hết, RIÊNG việc đang có worker cầm thì giữ lại -
+    xoá nó ra khỏi kho trong lúc worker còn chạy là để lại worker mồ côi."""
+    store = TaskStore(tmp_path / "queue.sqlite3")
+    root = str(tmp_path / "brain")
+    other = str(tmp_path / "brain-khac")
+    ids = [
+        store.enqueue(root, f"Việc {s}", s, status=s)
+        for s in ("triage", "todo", "ready", "review", "blocked", "done", "cancelled", "archived")
+    ]
+    running = store.enqueue(root, "Đang chạy", "run", status="running")
+    khac = store.enqueue(other, "Brain khác", "x", status="ready")
+
+    n = store.clear_board(root)
+    assert n == len(ids)
+    assert all(store.get_task(i) is None for i in ids)
+    assert store.get_task(running) is not None, "việc đang chạy phải được giữ"
+    assert store.get_task(khac) is not None, "không được dọn lan sang brain khác"
+    assert store.clear_board(root) == 0
+
+
 # ---- Kết quả worker: lấy câu chốt, không lấy dòng suy nghĩ ----
 
 # Ca thật (0.9.232): worker kể lể "Tôi sẽ lần theo...", "Lệnh shell vừa bị chặn..." rồi

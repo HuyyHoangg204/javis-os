@@ -600,6 +600,8 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 .graph-tooltip strong { color: var(--accent); }
 .graph-tooltip .tt-path { color: var(--text3); font-family: var(--font); font-size: 12px; }
 .graph-tooltip .tt-links { color: var(--text2); font-size: 13px; }
+/* Chốt chặn cuối: rời cockpit là tooltip tắt, kể cả khi canvas chưa kịp phát sự kiện rời hover. */
+body.in-console .graph-tooltip { display: none !important; }
 
 /* RIGHT transcript */
 .transcript {
