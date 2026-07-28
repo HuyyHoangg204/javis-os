@@ -2353,30 +2353,55 @@ def _safe_brain_name(name: str) -> str:
     return name[:60].strip()
 
 
-@app.get("/brains")
-async def list_brains():
-    """Liệt kê mọi brain trong BRAINS_DIR (mỗi folder con = 1 brain) + số note .md.
-    Dropdown chọn brain đổ từ đây (server-side) thay vì localStorage."""
+_BRAINS_MD_CAP = 5000       # trần đếm .md mỗi brain cho dropdown chọn brain
+
+
+def _list_brains_sync() -> dict:
+    """Phần quét đĩa của GET /brains. Tách ra để chạy trong to_thread.
+
+    Đếm bằng _count_md (scandir, trần THẬT, không theo symlink) thay cho rglob("*.md").
+    rglob đi HẾT cây rồi mới trả, không có trần: đo được 136ms cho 4 brain / 837 file .md,
+    và tăng tuyến tính theo kích thước vault. Đúng lỗi này đã được chẩn và ghi comment cho
+    /viec/all (xem chỗ liệt kê brain RẺ ở dưới), nhưng /brains thì để nguyên - trong khi
+    dashboard gọi nó lúc BOOT, tức chặn event loop ngay lúc app vừa dậy.
+    Chạm trần thì trả đúng số trần và gắn cờ notes_capped để UI không nói dối là con số chính xác.
+    """
     base = Path(BRAINS_DIR)
     try:
         base.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
     default = _default_brain_dir()
+    try:
+        default_resolved = default.resolve()
+    except OSError:
+        default_resolved = default
     out = []
     try:
         for p in sorted(base.iterdir(), key=lambda x: x.name.lower()):
             if not p.is_dir() or p.name.startswith("."):
                 continue
             try:
-                notes = sum(1 for _ in p.rglob("*.md"))
+                notes = _count_md(str(p), _BRAINS_MD_CAP)
             except Exception:
                 notes = 0
+            try:
+                is_default = p.resolve() == default_resolved
+            except OSError:
+                is_default = False
             out.append({"name": p.name, "path": str(p), "notes": notes,
-                        "is_default": p.resolve() == default.resolve()})
+                        "notes_capped": notes >= _BRAINS_MD_CAP,
+                        "is_default": is_default})
     except Exception as e:
         return {"dir": str(base), "brains": [], "error": str(e)}
     return {"dir": str(base), "brains": out}
+
+
+@app.get("/brains")
+async def list_brains():
+    """Liệt kê mọi brain trong BRAINS_DIR (mỗi folder con = 1 brain) + số note .md.
+    Dropdown chọn brain đổ từ đây (server-side) thay vì localStorage."""
+    return await asyncio.to_thread(_list_brains_sync)
 
 
 @app.post("/brains/new")

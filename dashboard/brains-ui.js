@@ -11,7 +11,10 @@
   if (!sel) return;
 
   function label(b) {
-    return "🧠 " + b.name + (b.notes ? " · " + b.notes : "");
+    // notes_capped = server dừng đếm ở trần, con số là SÀN chứ không phải tổng thật.
+    // Thêm dấu + để không nói dối; brain thường không bao giờ chạm trần này.
+    const n = b.notes ? " · " + b.notes + (b.notes_capped ? "+" : "") : "";
+    return "🧠 " + b.name + n;
   }
 
   // Chuẩn hoá path để so trùng: bỏ dấu phân cách cuối, \ -> /, thường hoá (Windows không phân biệt hoa/thường).
