@@ -4,6 +4,23 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.244] - 2026-07-29
+Hội thoại Telegram từ nay được LƯU và được HỌC như hội thoại trên web, token Telegram được tính vào bảng Mức dùng, và khối nút bấm thôi lọt vào kho phiên.
+### Sửa lỗi
+- **Hội thoại Telegram không được lưu vào đâu cả**: không vào `/sessions`, không vào `brain/Memory/conversations`, không vào vòng tự học. Nói chuyện với Javis qua Telegram bao lâu cũng vậy, mở trang Lịch sử ra là trống, và bộ não không dày lên được một chút nào. Nay mỗi lượt Telegram mở/khớp một phiên trong kho như dashboard, lưu cả lượt hỏi lẫn lượt trả lời, tự đặt tiêu đề, ghi nhật ký hội thoại vào Memory của brain đang dùng, và đẩy vào hàng đợi tự học.
+- **Token Telegram không được tính, trừ khi chạy qua Codex**: nhánh Claude Code và nhánh API (OpenRouter/OpenAI/Anthropic/Gemini) đều thiếu `usage_store.record`, nên bảng Mức dùng báo thiếu mọi cuộc trò chuyện Telegram. Nhánh API còn bám model THẬT do sự kiện `meta` báo về, chứ không phải model đã đặt trong Settings (OpenRouter tính tiền theo model thật).
+- **Khối nút bấm thô lọt vào kho phiên và vào nhật ký hội thoại**: dashboard ghi thẳng `<!-- JAVIS_ASK ... -->` vào SQLite và vào `brain/Memory/conversations`, tức rác lọt vào chính corpus dùng để tự học. Nay bóc khối trước khi lưu ở CẢ HAI kênh. Nút bấm vẫn vẽ bình thường vì dashboard dựng nút từ sự kiện WebSocket sống, còn lịch sử thì vốn đã không dựng lại nút.
+- **Chỗ thứ 9 gọi route handler như hàm thường**: `bench_hotpath.py` gọi `asyncio.run(main.list_brains())`. Lưới dựng ở 0.9.243 bỏ sót vì nó chỉ soi `main.py` + `routes/` và chỉ bắt lời gọi trần, không bắt dạng `module.handler()`.
+### Thay đổi
+- **`_persist_turn(...)` - đường lưu một lượt, dùng chung cho mọi kênh**: bóc khối điều khiển rồi mới `append_message` + `auto_title` + `log_conversation` + `learn.enqueue`. Đây là mảnh chung DUY NHẤT được rút ra; luồng 4 nhánh engine vẫn để nguyên hai bản, đúng khuyến nghị trong spec là sửa từng lỗi trước rồi mới cân nhắc gộp.
+- **Telegram tách vỏ khỏi lõi**: `_tg_answer` (vỏ - phiên + lưu) và `_tg_answer_engine` (lõi 4 nhánh, giữ nguyên văn). Vỏ quyết định nhãn engine rồi truyền xuống lõi, để không có ngày phiên bị dán nhãn `cli` trong khi lượt thật chạy qua OpenRouter. Quy ước: lõi trả **dict = câu trả lời thật (đáng lưu)**, trả **chuỗi = thông báo lỗi (không lưu)**.
+- `/reset` và `/brain` trên Telegram nay mở phiên mới trong kho thay vì nối tiếp mạch cũ.
+- **`learn.enqueue` chuyển từ `asyncio.create_task` sang `await` thẳng**: nó chỉ đọc config + cộng bộ đếm dưới khoá (mẻ học thật chạy ở `tick`), rẻ hơn chính lần ghi file log ngay trên nó. Task mồ côi không ai chờ, nuốt lỗi im, không đáng.
+### Kiểm thử
+- **`test_luu_luot_chat.py`**: gọi THẲNG `_tg_answer` thật với engine giả nên đo hành vi chứ không đo hình dạng code - phủ cả nhánh Claude CLI lẫn nhánh API, khẳng định có ghi Mức dùng đúng nhà cung cấp/token/model thật, có lưu đủ lượt hỏi + lượt trả lời vào CÙNG một phiên, nhiều lượt không đẻ phiên mới, hai chat khác nhau ra hai phiên khác nhau, và bản lưu / nhật ký / corpus tự học đều sạch khối điều khiển.
+- **`test_handler_khong_goi_truc_tiep` quét rộng ra toàn bộ `server/`** và bắt cả dạng `module.handler()`, có phân biệt theo module nên `skill_router.list_skills()` (hàm thường trùng tên với handler) không bị báo động giả.
+- 89/89 xanh.
+
 ## [0.9.243] - 2026-07-29
 Bóc hai nhóm route đầu tiên khỏi `main.py`, và bịt một quả bom hẹn giờ: code nội bộ gọi thẳng route handler như hàm Python thường.
 ### Sửa lỗi

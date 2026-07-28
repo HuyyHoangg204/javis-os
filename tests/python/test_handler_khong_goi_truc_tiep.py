@@ -37,11 +37,13 @@ def check(name, cond):
 HTTP = {"get", "post", "put", "delete", "patch", "websocket"}
 
 
-def quet(path):
-    """(tên handler -> dòng khai báo, danh sách lời gọi nội bộ tới các tên đó)."""
-    src = path.read_text(encoding="utf-8", errors="replace")
-    tree = ast.parse(src, filename=str(path))
-    handlers = {}
+def cay(path):
+    return ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=str(path))
+
+
+def handlers_cua(tree):
+    """{tên handler -> dòng khai báo} trong một file."""
+    out = {}
     for node in ast.walk(tree):
         if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue
@@ -49,28 +51,46 @@ def quet(path):
             f = dec.func if isinstance(dec, ast.Call) else dec
             # bắt cả @app.get(...) lẫn @router.get(...)
             if isinstance(f, ast.Attribute) and f.attr in HTTP:
-                handlers[node.name] = node.lineno
-    goi = []
+                out[node.name] = node.lineno
+    return out
+
+
+# Quét TOÀN BỘ server/, không riêng main.py + routes/: bản trước chỉ soi hai chỗ đó nên
+# `bench_hotpath.py` gọi `main.list_brains()` lọt lưới suốt.
+FILES = sorted(SERVER.rglob("*.py"))
+TREES = {}
+for f in FILES:
+    try:
+        TREES[f] = cay(f)
+    except SyntaxError:
+        pass
+
+# handler theo TỪNG MODULE (không gộp một rổ): cần biết `main.` hay `skill_router.` mới
+# phân biệt được `main.list_brains()` (vi phạm) với `skill_router.list_skills()` (hàm khác
+# trùng tên, hoàn toàn hợp lệ). Gộp một rổ là báo động giả hàng loạt.
+H_THEO_MODULE = {f.stem: handlers_cua(t) for f, t in TREES.items()}
+tong_h = sum(len(v) for v in H_THEO_MODULE.values())
+
+vi_pham = []
+for f, tree in TREES.items():
+    cua_minh = H_THEO_MODULE.get(f.stem, {})
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         fn = node.func
-        ten = fn.id if isinstance(fn, ast.Name) else None
-        if ten and ten in handlers:
-            goi.append((ten, node.lineno))
-    return handlers, goi
+        if isinstance(fn, ast.Name):                      # gọi trần: list_brains()
+            if fn.id in cua_minh:
+                vi_pham.append(f"{f.name}:{node.lineno} gọi {fn.id}() "
+                               f"(khai báo dòng {cua_minh[fn.id]})")
+        elif isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
+            # qua module khác: main.list_brains(). Chỉ tính khi module ĐÓ thật sự khai báo
+            # handler tên đó -> không dính hàm thường trùng tên ở module không có route nào.
+            khac = H_THEO_MODULE.get(fn.value.id)
+            if khac and fn.attr in khac:
+                vi_pham.append(f"{f.name}:{node.lineno} gọi {fn.value.id}.{fn.attr}() "
+                               f"(handler khai báo ở {fn.value.id}.py dòng {khac[fn.attr]})")
 
-
-FILES = [SERVER / "main.py"] + sorted((SERVER / "routes").glob("*.py"))
-tong_h = 0
-vi_pham = []
-for f in FILES:
-    handlers, goi = quet(f)
-    tong_h += len(handlers)
-    for ten, dong in goi:
-        vi_pham.append(f"{f.name}:{dong} gọi {ten}() (khai báo dòng {handlers[ten]})")
-
-check(f"quét được {tong_h} route handler trong {len(FILES)} file", tong_h > 100)
+check(f"quét được {tong_h} route handler trong {len(TREES)} file", tong_h > 100)
 check("không chỗ nào gọi route handler như hàm thường"
       + ("\n       " + "\n       ".join(vi_pham) if vi_pham else ""), not vi_pham)
 

@@ -14,7 +14,6 @@ Chạy trên dữ liệu THẬT (không override JAVIS_STATE_DIR) thì số mớ
 thao tác đọc, trừ build_system_prompt có gọi system_sync mirror skill sang .claude/skills -
 đó đúng là việc app vẫn làm mỗi lượt chat, không phải tác dụng phụ do bench gây ra.
 """
-import asyncio
 import os
 import statistics
 import subprocess
@@ -100,7 +99,10 @@ def main_():
     bench("  _skill_router_block()", lambda: main._skill_router_block(brain, root))
 
     print("\n== Endpoint dashboard gọi lúc boot ==")
-    bench("GET /brains (list_brains)", lambda: asyncio.run(main.list_brains()))
+    # Đo LÕI THUẦN chứ không đo route handler: handler chỉ là vỏ `await to_thread(lõi)`, nên
+    # gọi nó ở đây vừa cộng thêm chi phí dựng event loop + nhảy thread vào con số, vừa lặp lại
+    # đúng lối gọi handler-như-hàm-thường mà 0.9.243 đã đi bịt (xem test handler_khong_goi_truc_tiep).
+    bench("GET /brains (_list_brains_sync)", lambda: main._list_brains_sync())
 
     print("\n== Truy vấn usage (từ 0.9.238 chạy trong to_thread, KHÔNG còn chặn loop) ==")
     bench("usage_index.summary()", lambda: usage_index.summary())

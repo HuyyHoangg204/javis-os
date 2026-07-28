@@ -5100,6 +5100,38 @@ async def tts_voices():
 
 
 # ============================================
+# Lưu MỘT lượt hội thoại - đường DUY NHẤT, dùng chung cho mọi kênh (dashboard, Telegram)
+# ============================================
+async def _persist_turn(store, conv_sid, brain, user_message, final_text):
+    """Lưu lượt vừa xong: kho phiên + tiêu đề + nhật ký Memory + hàng đợi tự học.
+
+    Bóc khối điều khiển (`<!-- JAVIS_ASK ... -->`) TRƯỚC khi lưu. Dashboard vẽ nút từ sự kiện
+    WebSocket SỐNG, còn bản lưu chỉ để đọc lại và để TỰ HỌC - giữ khối thô ở đây là đẩy rác
+    vào đúng corpus dùng để học. (`openStoredSession` bên dashboard vốn không dựng lại nút từ
+    lịch sử, nên bóc khối không mất gì cả.)
+
+    Vì sao là hàm chung: trước 0.9.244 chỉ nhánh dashboard lưu, nên hội thoại Telegram vắng
+    mặt ở `/sessions`, ở `brain/Memory/conversations`, và ở vòng tự học.
+
+    Trả về text đã bóc khối (rỗng/None thì KHÔNG lưu gì - lượt lỗi hoặc bị huỷ).
+    """
+    clean = channel_context.strip_control_blocks(final_text or "")
+    if not clean:
+        return None
+    store.append_message(conv_sid, "assistant", clean)
+    store.auto_title(conv_sid, user_message)
+    log_conversation(brain, user_message, clean)
+    # Rewire: đưa lượt vào hàng đợi học. `enqueue` chỉ đọc config + cộng bộ đếm dưới khoá
+    # (mẻ học thật chạy ở `learn_feature.tick`), nên await thẳng - rẻ hơn một lần ghi file
+    # log ngay trên. Trước đây dùng create_task: task mồ côi, không ai chờ, nuốt lỗi im.
+    try:
+        await learn_feature.enqueue(brain, conv_sid, user_message, clean)
+    except Exception as _e:
+        print(f"[learn enqueue hook] {_e}", file=__import__('sys').stderr)
+    return clean
+
+
+# ============================================
 # WebSocket - Voice chat với Claude Code
 # ============================================
 @app.websocket("/ws")
@@ -5315,11 +5347,10 @@ async def websocket_endpoint(ws: WebSocket):
                     elif etype == "error":
                         await ws.send_text(json.dumps({"type": "error", "content": event["content"]}))
 
-            # Lưu lượt assistant vào kho phiên + đặt title nhanh + log Memory để học sau.
+            # Lưu lượt assistant: kho phiên + title + log Memory + hàng đợi tự học.
+            # Đường lưu DÙNG CHUNG với Telegram (_persist_turn) - nó tự bóc khối điều khiển.
             if final_text:
-                store.append_message(conv_sid, "assistant", final_text)
-                store.auto_title(conv_sid, user_message)
-                log_conversation(brain, user_message, final_text)
+                await _persist_turn(store, conv_sid, brain, user_message, final_text)
                 # Nén NỀN phần lịch sử cũ sắp rơi khỏi cửa sổ (chỉ engine API - CLI tự quản
                 # context). Lỗi nén không ảnh hưởng lượt chat; lượt sau vẫn còn fallback trim.
                 if kind == "api" and api_key and prov in ("openrouter", "openai", "anthropic-api", "gemini"):
@@ -5328,12 +5359,6 @@ async def websocket_endpoint(ws: WebSocket):
                             store, conv_sid, prov, api_key, api_model, _api_stream))
                     except Exception as _e:
                         print(f"[compact hook] {_e}", file=__import__('sys').stderr)
-                # Rewire: đưa lượt vào hàng đợi học (non-blocking; gate/debounce/rate-limit ở learn.py).
-                # Đi theo guard `if final_text` sẵn có → lượt rỗng/lỗi cố ý không enqueue.
-                try:
-                    asyncio.create_task(learn_feature.enqueue(brain, conv_sid, user_message, final_text))
-                except Exception as _e:
-                    print(f"[learn enqueue hook] {_e}", file=__import__('sys').stderr)
 
         async def run_turn(conv_sid, user_message, brain, turn_tag):
             try:
@@ -5512,6 +5537,7 @@ def _tg_set_brain(chat_id, brain_path):
     sess["codex"] = None
     sess["or"] = None
     sess["last"] = None
+    sess["sid"] = None     # brain khác = hội thoại khác → mở phiên mới trong kho, đừng trộn
 
 
 def _tg_chat_busy(chat) -> bool:
@@ -5531,14 +5557,57 @@ def _javis_port() -> int:
 
 
 async def _tg_answer(text, meta=None, progress=None):
+    """Vỏ ngoài một lượt Telegram: khớp phiên trong kho -> chạy engine -> LƯU lượt.
+
+    Vì sao tách vỏ khỏi lõi: trước 0.9.244 nhánh Telegram không lưu gì cả, nên hội thoại
+    Telegram vắng mặt ở `/sessions`, ở `brain/Memory/conversations`, và ở vòng tự học -
+    lỗ hổng chức năng lớn nhất trong danh sách trôi lệch giữa hai bản dispatch.
+
+    Quy ước trả về của lõi: **dict = câu trả lời thật** (đáng lưu), **chuỗi = thông báo lỗi**
+    (không lưu). Đó là lý do nhánh gateway lịch cũng trả dict chứ không trả chuỗi như trước.
+    """
     # ĐA PHIÊN: định tuyến theo chat_id → ngữ cảnh của mỗi tài khoản tách biệt.
     chat_id = str((meta or {}).get("chat_id") or "default")
     sess = _tg_session(chat_id)
-    sess["last"] = text
-    sess["sent"] = set()    # lượt mới → reset dedupe (endpoint /telegram/send-file add vào đây)
     brain = _tg_brain(chat_id)   # brain riêng của phiên (đổi bằng /brain), mặc định theo Settings
     mcfg = cfgmod.read_settings().get("model", {})
     prov, kind, api_key, api_model = _chat_provider(mcfg)
+    # Nhãn engine phải do VỎ quyết định rồi truyền xuống lõi: hai bên tự suy ra độc lập là
+    # có ngày phiên bị dán nhãn 'cli' trong khi lượt thật chạy qua OpenRouter.
+    engine_label = ("codex" if prov == "openai-oauth"
+                    else prov if ((kind == "api" and api_key) or kind == "oauth")
+                    else "cli")
+
+    store = get_store()
+    conv_sid = ""
+    try:
+        # sess['sid'] sống theo RAM giống sess['cli']/['or']/['codex'] - restart server là mạch
+        # ngữ cảnh đã mất rồi, nên mở phiên mới mới đúng, chứ không nối tiếp phiên cụt.
+        conv_sid = store.get_or_create(sess.get("sid"), brain=brain, engine=engine_label,
+                                       model=(api_model or mcfg.get("claude_model")))
+        sess["sid"] = conv_sid
+        store.append_message(conv_sid, "user", text)
+    except Exception as e:
+        print(f"[telegram session] {e}", file=__import__('sys').stderr)
+
+    out = await _tg_answer_engine(
+        text, meta, progress, chat_id=chat_id, sess=sess, brain=brain, mcfg=mcfg,
+        prov=prov, kind=kind, api_key=api_key, api_model=api_model)
+
+    if conv_sid and isinstance(out, dict):
+        try:
+            await _persist_turn(store, conv_sid, brain, text, out.get("text") or "")
+        except Exception as e:
+            print(f"[telegram persist] {e}", file=__import__('sys').stderr)
+    return out
+
+
+async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
+                            prov, kind, api_key, api_model):
+    """Lõi 4 nhánh engine của một lượt Telegram. Trả dict khi có câu trả lời thật,
+    trả CHUỖI khi là thông báo lỗi (vỏ `_tg_answer` dựa vào đó để biết lượt nào đáng lưu)."""
+    sess["last"] = text
+    sess["sent"] = set()    # lượt mới → reset dedupe (endpoint /telegram/send-file add vào đây)
     reasoning = _reasoning_level(mcfg)
 
     async def _p(s):
@@ -5556,7 +5625,9 @@ async def _tg_answer(text, meta=None, progress=None):
     if schedule_action:
         for call in schedule_action.get("calls") or []:
             await _p(f"⚙ Lịch: {call.split(':')[-1]}")
-        return channel_context.strip_control_blocks(_schedule_cancel_reply(schedule_action))
+        # dict (không phải chuỗi): đây là câu trả lời THẬT nên vỏ phải lưu nó lại.
+        return {"text": channel_context.strip_control_blocks(_schedule_cancel_reply(schedule_action)),
+                "files": []}
     if prov == "openai-oauth":
         # Telegram dùng cùng Codex CLI + MCP native như dashboard. Trước đây nhánh OAuth
         # rơi vào Responses chat-thuần nên model nói đúng là phiên không có tool.
@@ -5615,12 +5686,19 @@ async def _tg_answer(text, meta=None, progress=None):
         sess["or"].append({"role": "user", "content": text})
         t0 = time.time()
         out = ""
+        actual_model = api_model or "?"
         _pinged = False
         async for ev in (await _api_stream_mcp(prov, api_key, api_model, sess["or"], reasoning, brain=brain)):
             if ev["type"] == "text":
                 if not _pinged:
                     _pinged = True; await _p("✍ Đang soạn câu trả lời…")
                 out += ev["content"]
+            elif ev["type"] == "meta":
+                actual_model = ev.get("model") or actual_model   # model THẬT (OpenRouter tính tiền theo cái này)
+            elif ev["type"] == "usage":
+                # Thiếu dòng này tới 0.9.244: mọi lượt Telegram không đi qua Codex đều không
+                # được tính vào bảng Mức dùng.
+                usage_store.record(prov, actual_model, ev.get("input", 0), ev.get("output", 0))
             elif ev["type"] == "tool_call":
                 await _p(f"⚙ Đang gọi công cụ: {ev.get('name', '')}")
             elif ev["type"] == "error":
@@ -5656,6 +5734,11 @@ async def _tg_answer(text, meta=None, progress=None):
             et = ev["type"]
             if et == "final":
                 out = ev.get("content") or out
+                # Thiếu dòng này tới 0.9.244 (xem nhánh API ngay trên): lượt Telegram qua
+                # Claude Code không được tính vào bảng Mức dùng.
+                usage_store.record("cli", cli.model or mcfg.get("claude_model") or "mặc định",
+                                   ev.get("tokens_in", 0), ev.get("tokens_out", 0),
+                                   ev.get("cost_usd") or 0)
             elif et == "tool_call":
                 nm = ev.get("name", "")
                 if nm in ("Write", "NotebookEdit"):
@@ -5933,6 +6016,7 @@ async def _tg_command(cmd, arg, chat=None):
             sess["codex"] = None
             sess["or"] = None
             sess["last"] = None
+            sess["sid"] = None     # hội thoại mới → phiên mới trong kho, khỏi nối vào mạch cũ
         return {"reply": "🔄 Đã reset hội thoại (chỉ phiên của bạn)."}
     if cmd in ("cli", "claude"):
         s = cfgmod.read_settings()

@@ -48,11 +48,11 @@ chép của cùng một luồng 4 nhánh engine. Chúng đã trôi lệch thật
 Ghi lại đây để lần sau sửa có danh sách, khỏi phân tích lại.
 
 Thiếu ở TELEGRAM:
-1. Không ghi `usage_store` cho nhánh Claude-CLI và nhánh API - bảng Mức dùng báo thiếu mọi
-   cuộc trò chuyện Telegram không đi qua Codex.
-2. Không `store.append_message` / `auto_title` / `log_conversation` / `learn_feature.enqueue`.
+1. ~~Không ghi `usage_store` cho nhánh Claude-CLI và nhánh API~~ - bảng Mức dùng báo thiếu mọi
+   cuộc trò chuyện Telegram không đi qua Codex. **XONG 0.9.244.**
+2. ~~Không `store.append_message` / `auto_title` / `log_conversation` / `learn_feature.enqueue`~~.
    Hội thoại Telegram vắng mặt ở `/sessions`, ở `brain/Memory/conversations`, và ở vòng tự học.
-   Đây là lỗ hổng chức năng lớn nhất trong danh sách.
+   Đây là lỗ hổng chức năng lớn nhất trong danh sách. **XONG 0.9.244.**
 3. Không có phần phục hồi khi Codex resume thất bại - mất sạch ngữ cảnh, không dựng lại.
 4. `_codex_safe_model` ép model hợp lệ nhưng KHÔNG ghi lại, và không báo user là model đã đổi.
 5. Sự kiện `error` đầu tiên huỷ cả lượt, kể cả khi luồng còn hồi phục được. Dashboard coi lỗi
@@ -67,9 +67,9 @@ Thiếu ở TELEGRAM:
     hề thấy các lượt ở giữa.
 
 Thiếu ở DASHBOARD:
-7. Không `strip_control_blocks` trước khi `store.append_message`/`log_conversation`, nên khối
+7. ~~Không `strip_control_blocks` trước khi `store.append_message`/`log_conversation`~~, nên khối
    `<!-- JAVIS_ASK ... -->` thô lọt vào kho phiên và vào nhật ký hội thoại - tức lọt vào chính
-   corpus dùng để tự học.
+   corpus dùng để tự học. **XONG 0.9.244.**
 8. Khung `response` của nhánh Claude nằm TRONG handler `final`, không có `final` thì không có
    `response`.
 
@@ -77,6 +77,36 @@ Về cách chữa: đề xuất dựng tầng trừu tượng chung (`TurnSink` 
 là ĐÚNG về thiết kế nhưng đây là đoạn code rủi ro nhất trong app. Khuyến nghị: sửa thẳng từng
 lỗi trên trước (mỗi cái một commit, có test), rồi mới cân nhắc gộp - chứ không gộp trước rồi
 mới sửa.
+
+### Đã chữa ở 0.9.244 (lỗi 1, 2, 7)
+
+Chữa theo đúng khuyến nghị trên: KHÔNG gộp cả luồng dispatch, chỉ rút đúng MỘT mảnh chung là
+**đường lưu một lượt** - `_persist_turn(store, conv_sid, brain, user_message, final_text)`. Nó
+bóc khối điều khiển rồi mới `append_message` + `auto_title` + `log_conversation` +
+`learn_feature.enqueue`. Cả `_do_turn` lẫn Telegram gọi chung nó, nên lỗi 7 hết cho cả hai
+kênh cùng lúc thay vì chỉ vá dashboard.
+
+Phía Telegram tách vỏ khỏi lõi: `_tg_answer` (vỏ - mở/khớp phiên trong kho, lưu lượt user, gọi
+lõi, lưu lượt assistant) và `_tg_answer_engine` (lõi 4 nhánh, giữ nguyên văn). Vỏ quyết định
+nhãn engine rồi TRUYỀN XUỐNG lõi chứ không để hai bên tự suy ra - nếu không thì có ngày phiên
+bị dán nhãn `cli` trong khi lượt thật chạy qua OpenRouter. Quy ước trả về: **dict = câu trả lời
+thật (đáng lưu), chuỗi = thông báo lỗi (không lưu)**; vì thế nhánh gateway lịch đổi sang trả
+dict. `sess["sid"]` sống theo RAM giống `sess["cli"]/["or"]/["codex"]` và bị xoá ở `/reset` +
+`/brain`.
+
+Lỗi 1 chỉ là hai dòng `usage_store.record` đặt đúng chỗ: nhánh CLI ghi ở sự kiện `final` (kèm
+`cost_usd`), nhánh API ghi ở sự kiện `usage` và bám model THẬT từ sự kiện `meta`.
+
+Một thay đổi kèm theo, có chủ ý: `learn_feature.enqueue` từ `asyncio.create_task` đổi thành
+`await` thẳng. `enqueue` chỉ đọc config + cộng bộ đếm dưới khoá (mẻ học thật chạy ở `tick`), rẻ
+hơn chính lần ghi file log ngay trên nó - nên task mồ côi không ai chờ, nuốt lỗi im, không đáng.
+
+Kèm một chỗ THỨ 9 gọi route handler như hàm thường mà lưới 0.9.243 bỏ sót:
+`bench_hotpath.py:103` gọi `asyncio.run(main.list_brains())`. Lưới cũ chỉ soi `main.py` +
+`routes/` và chỉ bắt lời gọi trần, nên vừa không thấy file này vừa không thấy dạng
+`module.handler()`. Nay `test_handler_khong_goi_truc_tiep` quét toàn bộ `server/` và bắt cả hai
+dạng, có phân biệt theo module để `skill_router.list_skills()` (hàm thường trùng tên) không bị
+báo động giả.
 
 ## 1. Vì sao làm, và ba giả định đã bị bác bỏ
 
