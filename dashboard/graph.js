@@ -246,6 +246,49 @@ class JavisGraph {
     return { nodes: d.nodes.length, links: d.links.length };
   }
 
+  // --- Timelapse "cuộc đời brain": dựng lại mạng từ trống, note hiện dần theo thời gian tạo ---
+  // Node sinh ra được XÓA toạ độ để d3 đặt lại từ đầu → mạng tự nở và co kéo hữu cơ như não
+  // đang lớn lên. Link chỉ hiện khi CẢ HAI đầu đã ra đời. Chỉ chạy khi user bấm - không nền.
+  startTimelapse(duration = 18000) {
+    if (!this.graph || this._tlTimer) return false;
+    const d = this.graph.graphData();
+    if (!d.nodes.length) return false;
+    this._tlFull = { nodes: d.nodes, links: d.links };            // snapshot khôi phục khi dừng/xong
+    const order = [...d.nodes].sort((a, b) => (a.t || 0) - (b.t || 0));
+    order.forEach(n => { delete n.x; delete n.y; delete n.vx; delete n.vy; n.fx = null; n.fy = null; });
+    const total = order.length;
+    const tick = 160;                                             // nhịp thêm node (ms)
+    const steps = Math.max(1, Math.round(duration / tick));
+    const perStep = Math.max(1, Math.ceil(total / steps));
+    const present = new Set();
+    let i = 0;
+    const self = this;
+    // Warmup 24 tick sync mỗi lần đổ data sẽ khựng khi lặp ~100 lần → tắt trong lúc chiếu
+    try { this.graph.warmupTicks(0); } catch (e) {}
+    this.graph.graphData({ nodes: [], links: [] });               // não trống - thức giấc
+    this._tlTimer = setInterval(() => {
+      const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+      order.slice(i, i + perStep).forEach(n => { present.add(n.id); n.__born = now; });
+      i += perStep;
+      const links = self._tlFull.links.filter(l => {
+        const s = (l.source && l.source.id) || l.source, t = (l.target && l.target.id) || l.target;
+        return present.has(s) && present.has(t);
+      });
+      self.graph.graphData({ nodes: order.slice(0, Math.min(i, total)), links });
+      if (i >= total) self.stopTimelapse();                       // hết phim → trả lại trạng thái thường
+    }, tick);
+    return true;
+  }
+
+  stopTimelapse() {
+    if (this._tlTimer) { clearInterval(this._tlTimer); this._tlTimer = null; }
+    try { this.graph.warmupTicks(24); } catch (e) {}
+    if (this._tlFull) { this.graph.graphData(this._tlFull); this._tlFull = null; }
+    try { window.dispatchEvent(new Event("javis-timelapse-end")); } catch (e) {}
+  }
+
+  get timelapseRunning() { return !!this._tlTimer; }
+
   addOrUpdate(node, linkTargets, isNew) {
     if (!this.graph || !node || !node.id) return { created: false };
     const d = this.graph.graphData();

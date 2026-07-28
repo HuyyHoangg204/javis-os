@@ -167,6 +167,20 @@
           </svg>
         </button>
 
+        <!-- Timelapse "cuộc đời brain": chiếu lại note mọc dần theo thời gian tạo (chỉ đồ thị 2D) -->
+        <button class="brain-overlay-toggle graph-timelapse-btn" id="graphTimelapseBtn" type="button"
+                aria-pressed="false" aria-label="Chiếu timelapse cuộc đời brain"
+                title="Timelapse: xem lại brain lớn lên từ note đầu tiên tới giờ">
+          <svg class="tl-play" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 7v5l3.5 2"></path>
+          </svg>
+          <svg class="tl-stop" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"></circle>
+            <rect x="9" y="9" width="6" height="6" rx="1"></rect>
+          </svg>
+        </button>
+
         <!-- Lớp Agentic: số agent / skill / workflow - bấm mở Studio -->
         <div class="brain-stats" id="brainStats">
           <button class="bstat" data-tab="agents" title="Mở Studio · Agents">

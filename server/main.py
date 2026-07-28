@@ -1794,6 +1794,11 @@ def _node_payload(fpath, roots):
     except ValueError:
         rel = Path(fpath).name
     stem = Path(fpath).stem
+    try:
+        _st = os.stat(fpath)
+        _born = min(getattr(_st, "st_birthtime", _st.st_ctime), _st.st_mtime)
+    except OSError:
+        _born = 0
     node = {
         "id": stem.lower(),
         "label": stem,
@@ -1801,6 +1806,7 @@ def _node_payload(fpath, roots):
         "color": _color_for(rel),
         "path": f"{root_name}/{rel}",
         "links": 0,
+        "t": _born,   # mốc ra đời - node live cũng xếp đúng chỗ trong timelapse
     }
     targets = []
     try:

@@ -34,6 +34,35 @@
     window.addEventListener("storage", function (event) {
       if (event.key === STORAGE_KEY) apply(event.newValue === "1", false);
     });
+
+    initTimelapse();
+  }
+
+  // Nút timelapse "cuộc đời brain": chiếu lại note mọc dần theo thời gian tạo.
+  // Chỉ đồ thị 2D có startTimelapse; đang ở chế độ 3D thì báo nhẹ qua title thay vì chết im.
+  function initTimelapse() {
+    var btn = document.getElementById("graphTimelapseBtn");
+    if (!btn) return;
+
+    function setPlaying(on) {
+      btn.classList.toggle("playing", !!on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.title = on ? "Dừng timelapse (trả lại đồ thị đầy đủ)"
+                     : "Timelapse: xem lại brain lớn lên từ note đầu tiên tới giờ";
+    }
+
+    btn.addEventListener("click", function () {
+      var g = window.__javisGraph;
+      if (!g || typeof g.startTimelapse !== "function") {
+        btn.title = "Timelapse chỉ chạy ở đồ thị 2D - hãy chuyển về chế độ 2D";
+        return;
+      }
+      if (g.timelapseRunning) { g.stopTimelapse(); return; }   // sự kiện end sẽ tự tắt trạng thái nút
+      if (g.startTimelapse()) setPlaying(true);
+    });
+
+    // Hết phim (hoặc bấm dừng) → nút về trạng thái nghỉ
+    window.addEventListener("javis-timelapse-end", function () { setPlaying(false); });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

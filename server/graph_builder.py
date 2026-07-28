@@ -60,6 +60,13 @@ def build_graph(roots: List[str], max_files: int = 2000, include_orphans: bool =
             if node_id in stem_to_id:
                 continue  # trùng tên -> bỏ qua bản sau
             stem_to_id[key] = node_id
+            # Mốc "note ra đời" cho timelapse: birthtime (macOS) > ctime (Windows = creation) >
+            # mtime; lấy min với mtime vì file copy/sync có thể mang mtime gốc cũ hơn ctime.
+            try:
+                st = os.stat(fpath)
+                born = min(getattr(st, "st_birthtime", st.st_ctime), st.st_mtime)
+            except OSError:
+                born = 0
             nodes[node_id] = {
                 "id": node_id,
                 "label": stem,
@@ -68,6 +75,7 @@ def build_graph(roots: List[str], max_files: int = 2000, include_orphans: bool =
                 "path": f"{root_name}/{rel}",
                 "fullpath": fpath,
                 "links": 0,
+                "t": born,
             }
             all_files.append((node_id, fpath))
             file_count += 1

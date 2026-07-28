@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.224] - 2026-07-28
+Nút Timelapse "cuộc đời brain": chiếu lại não lớn lên từ note đầu tiên tới hiện tại.
+### Thêm mới
+- **Nút timelapse dưới nút mắt** (khung đồ thị giữa): bấm là não về TRỐNG rồi các note hiện dần theo đúng THỨ TỰ RA ĐỜI, dây liên kết chỉ nối khi cả hai đầu đã sinh ra - xem lại cả hành trình vault từ khi thức giấc. Node được thả lại cho d3 tự xếp nên mạng nở và co kéo hữu cơ như não đang lớn thật. Bấm lần nữa là dừng và trả lại đồ thị đầy đủ ngay; hết phim tự về trạng thái thường. Đang chiếu thì nút đổi icon + nhấp nháy nhẹ.
+- Backend gắn mốc ra đời `t` cho mỗi node (birthtime macOS / ctime Windows / min với mtime cho file sync mang mtime gốc) ở cả `/graph` lẫn node đẩy realtime qua `/ws/graph` - node mới sinh trong phiên cũng xếp đúng chỗ trong lần chiếu sau.
+- Hiệu năng: chỉ chạy khi bấm nút, chiếu bằng nhịp 160ms và tắt warmup sync của force-graph trong lúc chiếu (24 tick warmup mỗi lần đổ data x ~110 nhịp là khựng); timelapse chỉ có ở đồ thị 2D, chế độ 3D bấm sẽ nhắc chuyển về 2D qua title.
+### Kiểm thử
+- `test_graph_timelapse.js` mới (16 case, stub ForceGraph thuần node): khung đầu trống, node hiện đúng thứ tự thời gian, link chỉ nối khi đủ hai đầu, khung cuối khôi phục đủ mạng, dừng giữa chừng trả lại ngay, sự kiện end bắn đúng.
+
 ## [0.9.223] - 2026-07-28
 Đồ thị realtime chạy bằng sự kiện file của hệ điều hành: vault không đổi thì server nằm im.
 ### Cải thiện
