@@ -337,9 +337,9 @@ async function openStoredSession(id) {
     syncActiveUI();
   } catch (e) {}
 }
-function newChat() {
-  // KHÔNG reset server, KHÔNG đụng lượt đang chạy của phiên khác - chúng chạy nền + tự lưu; vào
-  // Lịch sử bấm lại để xem tiếp. Ở đây chỉ mở một khung trống cho hội thoại mới (mint id khi gửi).
+// Xoá trắng khung chat về trạng thái "hội thoại mới" - dùng chung cho nút + Hội thoại mới
+// và lúc ĐỔI BRAIN (không focus input để đổi brain không bật bàn phím trên mobile).
+function resetChatView() {
   convo = [];
   hideActivity();          // dọn chip + timer trước khi xoá trắng khung
   chatArea.innerHTML = "";
@@ -347,6 +347,11 @@ function newChat() {
   persistSession();
   notifySessions();
   syncActiveUI();
+}
+function newChat() {
+  // KHÔNG reset server, KHÔNG đụng lượt đang chạy của phiên khác - chúng chạy nền + tự lưu; vào
+  // Lịch sử bấm lại để xem tiếp. Ở đây chỉ mở một khung trống cho hội thoại mới (mint id khi gửi).
+  resetChatView();
   try { chatInput.focus(); } catch (e) {}
 }
 window.JavisSessions = { open: openStoredSession, new: newChat, brain: () => currentBrainPath(), current: () => savedSessionId };
@@ -803,8 +808,21 @@ async function reloadGraph() {
     renderConceptLabels(data.categories || [], stats.total_notes || 0);
   } catch (e) { graphStats.textContent = "Lỗi: " + e.message; }
 }
+// Đổi brain → khung chat phải đổi theo brain (vụ Mac 0.9.230: transcript giữ nguyên phiên
+// brain cũ, tưởng mất hội thoại, phải reload mới thấy). Nhớ phiên đang xem của TỪNG brain
+// TRONG TRANG (cố ý không persist - giữ luật boot "mỗi lần tải trang là hội thoại mới"):
+// sang brain lạ thì khung trắng, quay lại brain cũ thì mở lại đúng phiên đang xem từ server.
+let _lastBrain = currentBrainPath();
+const _viewByBrain = {};   // brain -> session id đang xem gần nhất trong phiên trang này
 graphSource.addEventListener("change", () => {
   localStorage.setItem("javis.graphSource", graphSource.value);
+  const nb = currentBrainPath();
+  if (nb !== _lastBrain) {
+    if (savedSessionId) _viewByBrain[_lastBrain] = savedSessionId;
+    _lastBrain = nb;
+    resetChatView();                                       // xoá ngay khung của brain cũ
+    if (_viewByBrain[nb]) openStoredSession(_viewByBrain[nb]);   // brain quen → mở lại phiên đang dở
+  }
   reloadGraph();
   connectGraphWatch();   // theo dõi realtime trên nguồn mới
   loadMemStats();   // bộ nhớ theo vault → đổi vault thì đổi số ký ức

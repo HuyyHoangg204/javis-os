@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.231] - 2026-07-28
+Đổi brain là hội thoại đổi theo: hết cảnh "tưởng mất chat, phải reload trang".
+### Sửa lỗi
+- **Khung chat đổi theo brain khi chuyển brain trên dropdown**: trước đây handler đổi brain chỉ reload graph/số liệu, transcript và phiên đang xem vẫn dính brain cũ - chuyển qua lại tưởng mất hội thoại, phải reload trang mới thấy (phản hồi từ người dùng 2 second brain trên Mac). Nay trang nhớ phiên đang xem của TỪNG brain trong bộ nhớ trang: sang brain khác thì khung trắng sạch (hội thoại mới), quay lại brain cũ thì tự mở lại đúng phiên đang dở từ server, kể cả phiên đang trả lời nền (bong bóng sống gắn lại). Cố ý không persist qua reload để giữ luật "mỗi lần tải trang là vào hội thoại mới".
+
 ## [0.9.230] - 2026-07-28
 Sửa 3 lỗi từ máy Mac: banner "mất đăng nhập" báo oan, panel Lịch sử delay, tooltip 3D treo.
 ### Sửa lỗi
