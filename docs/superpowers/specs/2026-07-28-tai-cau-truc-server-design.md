@@ -13,7 +13,17 @@ Tiến độ:
       **2.263 -> ~1.400ms**, `GET /brains` 136,1ms -> chạy trong thread (48-77ms CPU,
       độ trễ event loop đo được 18ms). Hai chỗ spec đoán sai đã sửa lại theo số đo,
       ghi rõ ở mục 5.
-- [ ] Giai đoạn 2 - dọn dữ liệu runtime khỏi source
+- [x] Giai đoạn 2 - dọn dữ liệu runtime khỏi source (0.9.241), nhưng **THU HẸP so với kế hoạch**.
+      Mục 2.1 gốc SAI và đã bỏ: `server/brains-backup/` là bản sao làm việc git của tính năng
+      sao lưu brain lên GitHub (`main.py:1474`) và đang có thay đổi chưa commit;
+      `server/.staging/` chứa file người dùng upload thật; `server/tmp/` đang được
+      `claude_sdk_engine.py:254` dùng. Cả ba là nội dung `JAVIS_STATE_DIR`, mà `STATE_DIR`
+      mặc định chính là `server/`, nên "dời ra ngoài" thực chất là đổi `STATE_DIR` - đúng
+      điều mục 3 cấm. Muốn `server/` gọn thì đó là quyết định cấu hình của từng máy, không
+      phải thay đổi code.
+      Giá trị thật thu được nằm ở chỗ khác và lớn hơn dự kiến: `.dockerignore` để lọt
+      `.secret_key`, `.hub_token`, `.oauth_mcp.json`, `usage_index.db` vào image, và
+      context build từ **1.239 MB xuống 6 MB**.
 - [ ] Giai đoạn 3 - tách test
 - [ ] Giai đoạn 4 - chẻ main.py
 
