@@ -30,7 +30,53 @@ Tiến độ:
       được từ bất kỳ thư mục nào. Kèm 2 việc ngoài kế hoạch: 7 test JS chưa từng chạy lần nào
       giờ đã chạy (CI liệt tay 4 file, bỏ sót 7), và test JS thôi bị phục vụ công khai qua
       `/static/test_*.js`.
-- [ ] Giai đoạn 4 - chẻ main.py
+- [~] Giai đoạn 4 - chẻ main.py. **Phạm vi đã thu nhỏ có chủ đích** sau khi đo lại: mục tiêu
+      "dưới 800 dòng" bị BỎ. Lý do: lập luận "file to làm agent sửa mù" hoá ra yếu - suốt phiên
+      làm giai đoạn 1-3 đã sửa `main.py` khoảng 15 lần theo lối grep rồi sửa đúng vùng, không
+      lần nào kích thước file gây lỗi. Lợi ích là TUYẾN TÍNH (dễ đọc, dễ định vị) chứ không
+      phải dạng ngưỡng, nên làm một phần được một phần.
+      Đã làm (0.9.243): `routes/graph.py`, `routes/domain.py`, và sửa 8 chỗ gọi route handler
+      như hàm thường. `main.py` 6.491 -> 6.159.
+      CHƯA làm: bóc khối cập nhật (vướng: `test_update.py` vá đè `main._deploy_mode`, hàm đó
+      phải ở lại main và được gọi trễ), bóc khối Telegram, và gộp phần trùng lặp giữa
+      `_do_turn` với `_tg_answer`.
+
+## Phụ lục: 10 chỗ đã trôi lệch giữa hai bản dispatch engine (đo 2026-07-29)
+
+`_do_turn` (dashboard, trong `@app.websocket("/ws")`) và `_tg_answer` (Telegram) là hai bản
+chép của cùng một luồng 4 nhánh engine. Chúng đã trôi lệch thật, không phải nguy cơ lý thuyết.
+Ghi lại đây để lần sau sửa có danh sách, khỏi phân tích lại.
+
+Thiếu ở TELEGRAM:
+1. Không ghi `usage_store` cho nhánh Claude-CLI và nhánh API - bảng Mức dùng báo thiếu mọi
+   cuộc trò chuyện Telegram không đi qua Codex.
+2. Không `store.append_message` / `auto_title` / `log_conversation` / `learn_feature.enqueue`.
+   Hội thoại Telegram vắng mặt ở `/sessions`, ở `brain/Memory/conversations`, và ở vòng tự học.
+   Đây là lỗ hổng chức năng lớn nhất trong danh sách.
+3. Không có phần phục hồi khi Codex resume thất bại - mất sạch ngữ cảnh, không dựng lại.
+4. `_codex_safe_model` ép model hợp lệ nhưng KHÔNG ghi lại, và không báo user là model đã đổi.
+5. Sự kiện `error` đầu tiên huỷ cả lượt, kể cả khi luồng còn hồi phục được. Dashboard coi lỗi
+   là không chí mạng.
+6. `compact_mem` chạy trong đường request - phiên dài phải chờ một vòng tóm tắt trước khi thấy
+   câu trả lời.
+9. Nhánh Codex truyền `written=[]` cho `collect_turn_files` trong khi nhánh Claude có thu thập
+   đường dẫn Write/NotebookEdit. File Codex ghi ra chỉ được tự đính kèm nếu đường dẫn tuyệt đối
+   tình cờ xuất hiện trong câu trả lời.
+10. Không có bản tương ứng của `store.clear_codex_thread_id`, mà `sess["codex"]` chỉ bị xoá bởi
+    `/reset` và `/brain` - đổi provider sang Claude rồi quay lại là resume một luồng Codex chưa
+    hề thấy các lượt ở giữa.
+
+Thiếu ở DASHBOARD:
+7. Không `strip_control_blocks` trước khi `store.append_message`/`log_conversation`, nên khối
+   `<!-- JAVIS_ASK ... -->` thô lọt vào kho phiên và vào nhật ký hội thoại - tức lọt vào chính
+   corpus dùng để tự học.
+8. Khung `response` của nhánh Claude nằm TRONG handler `final`, không có `final` thì không có
+   `response`.
+
+Về cách chữa: đề xuất dựng tầng trừu tượng chung (`TurnSink` / `ChatHistory` / túi phụ thuộc)
+là ĐÚNG về thiết kế nhưng đây là đoạn code rủi ro nhất trong app. Khuyến nghị: sửa thẳng từng
+lỗi trên trước (mỗi cái một commit, có test), rồi mới cân nhắc gộp - chứ không gộp trước rồi
+mới sửa.
 
 ## 1. Vì sao làm, và ba giả định đã bị bác bỏ
 
