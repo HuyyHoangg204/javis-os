@@ -256,11 +256,23 @@ import ast  # noqa: E402
 _main_path = SERVER / "main.py"
 _main_tree = ast.parse(_main_path.read_text(encoding="utf-8"))
 
+# 0.9.243: phần dựng chỉ mục đã bóc khỏi handler sang hàm thuần `skills_index`, để Telegram
+# gọi được mà không phải gọi route handler như hàm thường. Handler giờ chỉ là vỏ HTTP mỏng,
+# nên soi nó bằng AST sẽ không thấy gì. Soi ĐÚNG hàm mang hành vi thay vì đúng cái tên cũ.
 _list_skills = next((n for n in ast.walk(_main_tree)
                      if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                     and n.name == "list_skills"), None)
-check("tìm thấy hàm list_skills (handler GET /skills) trong main.py (AST)",
+                     and n.name == "skills_index"), None)
+check("tìm thấy hàm skills_index (lõi của GET /skills) trong main.py (AST)",
       _list_skills is not None)
+
+# Và handler PHẢI thật sự dùng lõi đó, không được tự dựng lại một đường khác.
+_handler = next((n for n in ast.walk(_main_tree)
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and n.name == "list_skills"), None)
+check("handler GET /skills gọi skills_index (không tự dựng lại)",
+      _handler is not None and any(
+          isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "skills_index"
+          for n in ast.walk(_handler)))
 
 
 def _is_call_to(node, module, attr):
@@ -273,10 +285,10 @@ def _is_call_to(node, module, attr):
 if _list_skills is not None:
     _ru_assign = [n for n in ast.walk(_list_skills)
                   if isinstance(n, ast.Assign) and _is_call_to(n.value, "skill_usage", "read_usage")]
-    check("GET /skills gọi skill_usage.read_usage(...) và gán vào biến (AST)", bool(_ru_assign))
+    check("skills_index gọi skill_usage.read_usage(...) và gán vào biến (AST)", bool(_ru_assign))
 
     _is_calls = [n for n in ast.walk(_list_skills) if _is_call_to(n, "skill_usage", "is_stale")]
-    check("GET /skills gọi skill_usage.is_stale(...) (AST)", bool(_is_calls))
+    check("skills_index gọi skill_usage.is_stale(...) (AST)", bool(_is_calls))
 
     _stale_wired = _has_use_count_key = _has_last_used_key = False
     for node in ast.walk(_list_skills):

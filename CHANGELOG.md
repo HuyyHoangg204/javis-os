@@ -4,6 +4,22 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.243] - 2026-07-29
+Bóc hai nhóm route đầu tiên khỏi `main.py`, và bịt một quả bom hẹn giờ: code nội bộ gọi thẳng route handler như hàm Python thường.
+### Sửa lỗi
+- **8 chỗ gọi route handler như hàm thường**: khối Telegram gọi `await list_agents(brain)`, `await provider_models(provider=pid)`, `await list_brains()`, `await list_skills(brain)`, `await list_workflows(brain)` (6 chỗ), cộng `_fetch_provider_models` gọi `openrouter_models()` và `/notifications` gọi `changelog_info()`. Chạy được nên chưa ai thấy, nhưng tham số mặc định của handler là ĐỐI TƯỢNG `fastapi.params.Query` chứ không phải chuỗi: ngày nào có người gọi thiếu đối số thì `brain` thành một Query object, `_brain_root` nhận vào rồi `os.path.isdir(Query)` ném TypeError - và nó nổ ở Telegram chứ không ở chỗ vừa sửa. Nay handler chỉ còn là vỏ HTTP mỏng bọc quanh hàm thuần (`agents_index`, `workflows_index`, `skills_index`, `provider_models_index`, `changelog_index`, `openrouter_models_index`), nội bộ gọi thẳng hàm thuần.
+### Thay đổi
+- **`routes/graph.py`**: `GET /graph` + `WS /ws/graph` và 5 helper riêng rời khỏi `main.py`. Chép nguyên văn, chỉ đổi chỗ lấy đường dẫn brain/vault sang tiêm phụ thuộc.
+- **`routes/domain.py`**: 4 route tên miền/HTTPS (`/tls-check`, `/domain`, `/domain/status`, `/domain/ssl`). Đã xác minh 7 helper và 2 biến trạng thái không được dùng ngoài khối. `/tls-check` giữ nguyên đường dẫn vì nó nằm trong danh sách công khai của middleware và Caddy gọi nó trước khi xin chứng chỉ.
+- `main.py` 6.491 -> 6.159 dòng.
+### Kiểm thử
+- **`test_handler_khong_goi_truc_tiep.py`**: quét AST toàn bộ `main.py` + `routes/` tìm mọi lời gọi tới hàm có decorator route. Chính test này tìm ra 2 chỗ mà bản phân tích bỏ sót (nó chỉ soi vùng Telegram), và nó chặn tái phát cho cả những khối chưa đụng tới.
+- **`test_skill_usage` soi đúng chỗ mang hành vi**: nó dùng AST khẳng định handler `GET /skills` có gọi `skill_usage.read_usage`/`is_stale`. Bóc lõi sang `skills_index` là handler rỗng và test đỏ dù hành vi còn nguyên. Nay soi `skills_index`, VÀ thêm một khẳng định mới là handler phải thật sự gọi lõi đó chứ không tự dựng lại đường khác.
+- **`test_domain_setup_ui` thôi bám vào chỗ code nằm**: nó tìm chuỗi trong `main.py` để khẳng định backend xử lý Hostinger, nên mỗi lần bóc khối là đỏ oan. Nay đọc ghép cả `main.py` lẫn `routes/`.
+- 88/88 xanh. Bảng route khớp 192 mục đúng thứ tự sau mỗi bước, kể cả `WS /ws/graph` giữ nguyên kiểu `APIWebSocketRoute`, tên route và vị trí.
+### Ghi chú
+- Lưới an toàn dựng ở 0.9.235 đã trả công: khi bóc lõi `/changelog` và `/openrouter/models`, decorator bị gắn nhầm vào hàm lõi thay vì hàm vỏ, làm hai endpoint đổi tên route. Ảnh chụp bảng route bắt ngay lập tức.
+
 ## [0.9.242] - 2026-07-29
 Tách test ra khỏi mã nguồn. `server/` từ 126 file `.py` xuống còn 50 file nguồn thuần.
 ### Thay đổi

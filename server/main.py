@@ -1566,8 +1566,8 @@ async def backup_now(brain: str = Form("brain")):
 _OR_MODELS_CACHE = {"data": None, "ts": 0.0}
 
 
-@app.get("/openrouter/models")
-async def openrouter_models():
+async def openrouter_models_index():
+    """Lõi thuần của GET /openrouter/models. Dùng chung với _fetch_provider_models."""
     """Lấy danh sách model OpenRouter (API công khai, không cần key). Cache 1 giờ."""
     now = time.time()
     if _OR_MODELS_CACHE["data"] and (now - _OR_MODELS_CACHE["ts"]) < 3600:
@@ -1587,6 +1587,11 @@ async def openrouter_models():
         return {"models": [], "error": f"{type(e).__name__}: {e}"}
 
 
+@app.get("/openrouter/models")
+async def openrouter_models():
+    return await openrouter_models_index()
+
+
 # Model load ĐỘNG theo provider (không hardcode - provider đổi model không cần sửa code).
 _PROV_MODELS_CACHE = {}   # provider -> {"ids":[...], "ts": float}
 
@@ -1595,7 +1600,7 @@ async def _fetch_provider_models(provider, m):
     """Danh sách model id LIVE từ API của provider, hoặc None (caller fallback catalog)."""
     import httpx
     if provider == "openrouter":
-        d = await openrouter_models()
+        d = await openrouter_models_index()
         return [x["id"] for x in d.get("models", []) if x.get("id")] or None
     if provider == "openai":
         key = m.get("openai_api_key")
@@ -1661,9 +1666,8 @@ def _remember_catalog(cfg, d, ids):
         print(f"[models] không ghi được catalog {key}: {e}", file=sys.stderr)
 
 
-@app.get("/provider/models")
-async def provider_models(provider: str = Query(...)):
-    """Model động cho 1 provider (cache 10 phút). Trả {models, live}. live=False = fallback catalog."""
+async def provider_models_index(provider: str) -> dict:
+    """Lõi thuần của GET /provider/models. Dùng chung với Telegram (menu chọn model)."""
     cfg = cfgmod.read_settings()
     m = cfg.get("model", {})
     d = _provider_def(provider) or {}
@@ -1685,6 +1689,12 @@ async def provider_models(provider: str = Query(...)):
         _remember_catalog(cfg, d, ids)
         return {"models": ids, "live": True}
     return {"models": fallback, "live": False, "error": last_err}
+
+
+@app.get("/provider/models")
+async def provider_models(provider: str = Query(...)):
+    """Model động cho 1 provider (cache 10 phút). Trả {models, live}. live=False = fallback catalog."""
+    return await provider_models_index(provider)
 
 
 @app.get("/memory/stats")
@@ -2335,15 +2345,27 @@ def _log_agent_run(brain, slug, task, out):
         pass
 
 # ---- Agents ----
-@app.get("/agents")
-async def list_agents(brain: str = Query("brain")):
+# ---- Lõi dùng chung cho route VÀ cho Telegram (0.9.243) ----
+# Trước đây khối Telegram gọi THẲNG các route handler như hàm Python thường
+# (await list_agents(brain), await provider_models(provider=pid)...). Chạy được, nhưng
+# là một quả bom hẹn giờ: tham số mặc định của handler là đối tượng fastapi Query, nên
+# ngày nào có người gọi thiếu đối số thì `brain` trở thành một Query object, `_brain_root`
+# nhận vào rồi `os.path.isdir(Query)` ném TypeError. Nay handler chỉ còn là lớp vỏ HTTP
+# mỏng bọc quanh hàm thuần bên dưới, và Telegram gọi thẳng hàm thuần đó.
+
+def agents_index(brain: str) -> list:
+    """Danh sách agent của một brain. Lõi thuần, dùng chung cho GET /agents và Telegram."""
     out = []
     for f in sorted(_agents_dir(brain).glob("*.md")):
         meta, body = _read_md(f)
         out.append({"slug": f.stem, "name": meta.get("name", f.stem),
                     "role": meta.get("role", ""), "skills": meta.get("skills", []) or [],
                     "model": meta.get("model", ""), "prompt": body})
-    return {"agents": out}
+    return out
+
+@app.get("/agents")
+async def list_agents(brain: str = Query("brain")):
+    return {"agents": agents_index(brain)}
 
 @app.post("/agents")
 async def save_agent(name: str = Form(...), role: str = Form(""), skills: str = Form(""),
@@ -2364,8 +2386,10 @@ async def delete_agent(slug: str = Form(...), brain: str = Form("brain")):
     return {"ok": True}
 
 # ---- Skills ----
-@app.get("/skills")
-async def list_skills(brain: str = Query("brain")):
+
+def skills_index(brain: str) -> list:
+    """Chỉ mục skill của một brain (kèm cờ hệ thống + telemetry dùng).
+    Lõi thuần, dùng chung cho GET /skills và Telegram."""
     # NGUỒN SKILL: canonical <brain>/skills/<slug>/SKILL.md, fallback đọc .claude/skills (legacy +
     # bản mirror) và .agents (rất cũ). Dùng skill_router (CHUNG với engine) → hiển thị == thực thi.
     # NHÓM = field `group` trong frontmatter (mặc định "Chung"). Skill TẮT = <base>/.disabled/<slug>.
@@ -2398,7 +2422,11 @@ async def list_skills(brain: str = Query("brain")):
                     # native qua .claude/skills không đi qua bộ đếm nên use=0 KHÔNG có nghĩa
                     # là vô dụng. Không có gì tự tắt dựa trên cờ này.
                     "stale": skill_usage.is_stale(rec, _mtime(s["path"]), now)})
-    return {"skills": out}
+    return out
+
+@app.get("/skills")
+async def list_skills(brain: str = Query("brain")):
+    return {"skills": skills_index(brain)}
 
 
 def _skills_dir(brain):
@@ -3138,8 +3166,8 @@ async def files_taskcheck(brain: str = Form("brain"), path: str = Form(...),
 
 
 # ---- Workflows ----
-@app.get("/workflows")
-async def list_workflows(brain: str = Query("brain")):
+def workflows_index(brain: str) -> list:
+    """Danh sách workflow của một brain. Lõi thuần, dùng chung cho GET /workflows và Telegram."""
     out = []
     for f in sorted(_workflows_dir(brain).glob("*.md")):
         meta, _ = _read_md(f)
@@ -3147,7 +3175,11 @@ async def list_workflows(brain: str = Query("brain")):
                     "status": meta.get("status", "off"),
                     "description": meta.get("description", ""),
                     "steps": meta.get("steps", []) or []})
-    return {"workflows": out}
+    return out
+
+@app.get("/workflows")
+async def list_workflows(brain: str = Query("brain")):
+    return {"workflows": workflows_index(brain)}
 
 @app.post("/workflows")
 async def save_workflow(name: str = Form(...), description: str = Form(""), steps: str = Form("[]"),
@@ -4762,8 +4794,8 @@ async def _load_community_announcements():
     return list(by_id.values()), err
 
 
-@app.get("/changelog")
-async def changelog_info():
+async def changelog_index():
+    """Lõi thuần của GET /changelog. Dùng chung với /notifications (gọi nội bộ)."""
     """Nhật ký cập nhật: đọc CHANGELOG.md trong bản đang cài + đối chiếu bản trên GitHub để
     nêu cả phiên bản mới chưa cài. Mất mạng vẫn trả được phần local (bản đã cài)."""
     cur = _read_version()
@@ -4798,6 +4830,11 @@ async def changelog_info():
             "releases": merged, "error": err}
 
 
+@app.get("/changelog")
+async def changelog_info():
+    return await changelog_index()
+
+
 _NOTIFICATION_CACHE = {"at": 0.0, "data": None}
 
 
@@ -4809,7 +4846,7 @@ async def notifications_info():
     if cached is not None and now - float(_NOTIFICATION_CACHE.get("at") or 0) < 120:
         return cached
 
-    changelog_task = asyncio.create_task(changelog_info())
+    changelog_task = asyncio.create_task(changelog_index())
     announcements_task = asyncio.create_task(_load_community_announcements())
     changelog, (announcements, announcement_error) = await asyncio.gather(
         changelog_task, announcements_task
@@ -5668,7 +5705,7 @@ async def _tg_help_text(brain):
 
 async def _tg_skills_text(brain):
     try:
-        d = await list_skills(brain)
+        d = {"skills": skills_index(brain)}
         sk = d.get("skills", []) or []
     except Exception:
         sk = []
@@ -5712,7 +5749,7 @@ async def _tg_models_for(pid):
     """Model của 1 provider (live, cache 10' trong provider_models) + nhớ lại danh sách
     đã render để index nút bấm không lệch giữa lúc hiện menu và lúc user bấm."""
     try:
-        d = await provider_models(provider=pid)
+        d = await provider_models_index(pid)
         ids = [str(x) for x in (d.get("models") or [])]
     except Exception:
         ids = []
@@ -5824,7 +5861,7 @@ async def _tg_callback(data, chat=None):
             i = int(data.split(":", 1)[1])
         except ValueError:
             return {"alert": "Dữ liệu nút lỗi"}
-        d = await list_brains(); brains = d.get("brains") or []
+        d = await asyncio.to_thread(_list_brains_sync); brains = d.get("brains") or []
         if i < 0 or i >= len(brains):
             return {"alert": "Danh sách brain đã đổi - gõ /brain lại"}
         hit = brains[i]
@@ -5941,14 +5978,14 @@ async def _tg_command(cmd, arg, chat=None):
         # Không tham số → mở menu nút bấm (chọn provider → chọn model, phân trang)
         return {"reply": _model_header(), "reply_markup": await _model_provider_kb()}
     if cmd == "agents":
-        d = await list_agents(brain); ags = d.get("agents", []) or []
+        ags = agents_index(brain)
         busy = _tg_chat_busy(chat_key)
         if not ags:
             return {"reply": "Chưa có agent nào (tạo trong Studio trên dashboard)."}
         lines = [f"• {a.get('name')} - {(a.get('role') or '')[:50]}" for a in ags[:20]]
         return {"reply": f"🤖 Agents ({len(ags)}):\n" + "\n".join(lines) + f"\n\nĐang chạy lượt: {'có' if busy else 'không'}"}
     if cmd == "workflows":
-        d = await list_workflows(brain); wfs = d.get("workflows", []) or []
+        wfs = workflows_index(brain)
         if not wfs:
             return {"reply": "Chưa có workflow (tạo trong Studio trên dashboard)."}
         lines = [f"• {w.get('name')} ({w.get('status')})" for w in wfs[:20]]
@@ -5959,7 +5996,7 @@ async def _tg_command(cmd, arg, chat=None):
             return {"reply": "Chưa có câu nào để gửi lại."}
         return {"ask": last}
     if cmd in ("brain", "vault"):
-        d = await list_brains(); brains = d.get("brains") or []
+        d = await asyncio.to_thread(_list_brains_sync); brains = d.get("brains") or []
         if not brains:
             return {"reply": "Chưa có brain nào (tạo trong dashboard, nút + cạnh dropdown brain)."}
         a = arg.strip()
