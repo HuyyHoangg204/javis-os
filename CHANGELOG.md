@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.235] - 2026-07-28
+Dựng lưới an toàn trước đợt tái cấu trúc server. Chưa đụng một dòng code chạy nào.
+### Thêm mới
+- **`server/test_route_table.py` + `server/route_table.json`**: ảnh chụp toàn bộ 192 mục bảng route (185 APIRoute, 2 WebSocket, 4 route mặc định FastAPI, 1 Mount tĩnh) kèm cả THỨ TỰ đăng ký, vì Starlette khớp route theo thứ tự nên hai bảng cùng tập hợp mà khác thứ tự vẫn định tuyến khác nhau. Đây là dây bảo hiểm cho đợt bóc `main.py` thành các module APIRouter sắp tới: bóc đúng thì bảng phải y hệt từng ký tự. Đã kiểm chứng guard thật sự đỏ khi cố tình xoá `/brains`, dịch thứ tự `/health` và đổi tên `/version`. Đổi route có chủ đích thì chạy `python test_route_table.py --update` rồi commit file .json kèm theo.
+- **`server/bench_hotpath.py`**: đo các điểm đang chặn event loop. Baseline trên brain 623 file .md / 30 skill: `build_system_prompt` 150,8ms mỗi lượt chat, `GET /brains` 136,1ms, `usage_index.summary` 46,7ms, `import main` 2.263ms. Trên brain nhỏ 101 file thì `build_system_prompt` chỉ 39,6ms, chênh gần 4 lần, nên mọi mốc nghiệm thu đều phải nói rõ đo trên brain nào.
+### Kiểm thử
+- **CI thêm bước import thật `main`**: byte-compile không chạy code nên không thấy vòng import bị gãy, mà server có 3 vòng đang phá bằng import trong hàm cộng 8 module nữa dựa vào mẹo đó. Nâng nhầm một import lên đầu file là app chết lúc khởi động chứ không phải lúc build, CI cũ vẫn xanh rồi tự deploy lên VPS. Bước mới đóng đúng khe hở đó.
+### Tài liệu
+- `docs/superpowers/specs/2026-07-28-tai-cau-truc-server-design.md`: spec tái cấu trúc 5 giai đoạn. Đo trước khi thiết kế nên bác bỏ được 3 giả định: hermes-agent KHÔNG gọn hơn (`gateway/run.py` 18.911 dòng, 12 file source lớn hơn `main.py`, 200 route treo `@app.*` trong một file 14k dòng); độ dài file Python tốn 0 thời gian chạy (compile 155ms một lần rồi `.pyc` nạp 1,7ms, route scan 0,13-0,64ms và `include_router` gộp lại y hệt); treo app là do chặn event loop trên một tiến trình uvicorn không `--workers` chứ không phải do cấu trúc thư mục.
+
 ## [0.9.234] - 2026-07-28
 Vá lỗi treo cả server khi duyệt thư mục, dọn trắng bảng Việc, tooltip đồ thị hết dính sang trang khác.
 ### Sửa lỗi

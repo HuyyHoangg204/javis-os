@@ -75,6 +75,30 @@ Không có bước này thì mọi bước sau là hy vọng chứ không phải
 
 Nghiệm thu: CI đỏ nếu cố tình đổi một path route.
 
+### 4.1 Baseline đã đo (2026-07-28, VERSION 0.9.234)
+
+Ảnh bảng route: **192 mục** (185 APIRoute, 2 WebSocket, 4 route mặc định FastAPI, 1 Mount StaticFiles),
+tức 187 endpoint của app. Con số 182 nêu trong bản nghiên cứu là ước lượng cộng tay và thấp hơn thực tế;
+từ nay lấy `server/route_table.json` làm nguồn sự thật.
+
+Guard đã được kiểm chứng là bắt được lỗi: cố tình xoá `/brains`, dịch thứ tự `/health`, đổi tên
+`/version` thì test in ra đủ ba loại sai và trả exit 1.
+
+Số đo trên brain lớn `brains/My Bullet Journal` (623 file .md, 30 skill), máy Windows, cache nóng:
+
+- `build_system_prompt()` **150,8ms** (trung vị 5 lần). Bóc ra: `list_skills` 53,4ms,
+  `plugins_host.describe` 34,7ms, `_gather_capabilities` 76,9ms, `_javis_capability_summary` 69,8ms,
+  `_skill_router_block` 26,9ms.
+- `GET /brains` **136,1ms**.
+- `usage_index.summary()` 46,7ms, `usage_index.insights()` 46,6ms.
+- `import main` **2.263ms** (đã trừ 63ms khởi động interpreter trần).
+
+Trên brain mặc định nhỏ (101 file .md, 7 skill) thì `build_system_prompt` chỉ 39,6ms. Chênh gần 4 lần,
+nên **mọi ngưỡng nghiệm thu phải nói rõ đo trên brain nào**, nếu không là tự lừa mình.
+
+Lưu ý baseline này cao hơn con số 95-110ms của bản nghiên cứu. Không đi tìm lý do chênh, chỉ lấy số
+đo lại làm chuẩn vì cùng máy cùng script thì mới so trước-sau được.
+
 ## 5. Giai đoạn 1: gỡ chặn event loop (khoảng 1 ngày)
 
 Toàn bộ là thay đổi không đổi hành vi, mỗi mục một commit revert độc lập được.
@@ -125,8 +149,16 @@ gọi `list_events(task_id, 20)`, tức N+1 truy vấn, rồi serialize và ghi 
 gọi từ `_claim_and_spawn` (`tasks.py:313`) và `_worker_done` (`tasks.py:324`). Hiện miễn phí vì bảng
 rỗng, nhưng tăng tuyến tính tới trần 5000. Gộp thành một truy vấn events theo lô, và offload.
 
-Nghiệm thu: `bench_hotpath.py` cho `build_system_prompt` xuống dưới 40ms, `/brains` dưới 10ms,
-thời gian import `main` xuống dưới 1.400ms. Toàn bộ 67 test cũ vẫn xanh.
+Nghiệm thu (đo bằng `bench_hotpath.py` trên brain `My Bullet Journal`, so với baseline mục 4.1):
+
+- `build_system_prompt` từ 150,8ms xuống **dưới 60ms**. Tính tay: bỏ cú quét trùng bớt ~53ms,
+  cache `describe` bớt ~35ms, còn lại phần lớn là `list_skills` mà YAML chiếm 64% nên `CSafeLoader`
+  đưa 53ms xuống ~24ms. Cộng lại khoảng 34ms, nên 60ms là ngưỡng thoải mái còn 40ms là mục tiêu phấn đấu.
+- `GET /brains` từ 136,1ms xuống **dưới 15ms**.
+- `import main` từ 2.263ms xuống **dưới 1.400ms** (bỏ `edge_tts` là bớt 944ms).
+- `usage_index.summary/insights` không cần nhanh hơn, chỉ cần không còn nằm trên event loop.
+
+Toàn bộ test cũ vẫn xanh, và `test_route_table.py` vẫn khớp 192 mục.
 
 ## 6. Giai đoạn 2: dọn dữ liệu runtime khỏi source (1-2 giờ)
 
@@ -298,9 +330,11 @@ và luôn `git fetch` trước khi bump version.
 
 ## 11. Tiêu chí nghiệm thu tổng
 
-1. `bench_hotpath.py`: `build_system_prompt` dưới 40ms, `GET /brains` dưới 10ms, import `main` dưới 1.400ms.
+1. `bench_hotpath.py` trên brain `My Bullet Journal`: `build_system_prompt` dưới 60ms
+   (baseline 150,8ms), `GET /brains` dưới 15ms (baseline 136,1ms), import `main` dưới 1.400ms
+   (baseline 2.263ms).
 2. `server/main.py` dưới 800 dòng.
 3. `du -sh server/` dưới 50 MB, `git status --porcelain -uall server/` sạch.
-4. `tests/test_route_table.py` xanh, tức 182 endpoint không đổi path, method hay tên.
-5. 67 test Python và 11 test JS chạy trong CI, tất cả xanh.
+4. `test_route_table.py` xanh, tức 192 mục bảng route không đổi path, method, tên hay thứ tự.
+5. 68 test Python và 11 test JS chạy trong CI, tất cả xanh.
 6. `uvicorn main:app --app-dir server` vẫn là lệnh khởi động, `updater.py` không cần sửa.

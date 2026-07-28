@@ -23,6 +23,18 @@ jobs:
       - name: Byte-compile toàn bộ server + plugin
         run: python -m compileall -q server system/plugins
 
+      # Byte-compile KHÔNG chạy code nên không thấy vòng import bị gãy. Server có 3 vòng
+      # đang được phá bằng import trong hàm (config<->secrets_store, oauth_mcp<->mcp_store,
+      # claude_cli<->claude_sdk_engine) cộng 8 module nữa dựa vào mẹo đó. Nâng nhầm một
+      # import lên đầu file là app chết lúc khởi động chứ không phải lúc build, mà CI cũ
+      # vẫn xanh rồi tự deploy lên VPS. Bước này đóng đúng khe hở đó.
+      - name: Import thật main (bắt vòng import mà byte-compile bỏ lọt)
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          cd server
+          python -c "import main; print(f'ok, nap duoc main voi {len(main.app.routes)} muc route')"
+
       - name: Chay test JS dashboard
         run: |
           node dashboard/test_chat_ask.js
