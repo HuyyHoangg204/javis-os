@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.236] - 2026-07-28
+CI xanh trở lại sau nhiều bản đỏ liên tiếp. Hai lỗi độc lập, không cái nào là lỗi logic của app.
+### Sửa lỗi
+- **`test_graph_watch.py` segfault trên Linux**: test in đủ "TẤT CẢ PASS" rồi mới `Segmentation fault (core dumped)`, nên vòng lặp CI nhận exit code khác 0 và cả bộ test bị tính là đỏ dù không assertion nào hỏng. Nguyên nhân là `awatch` của watchfiles chạy trên luồng Rust (notify); khi socket đóng, khối `finally` của `/ws/graph` chỉ `.cancel()` các task chứ không `await`, nên luồng đó còn sống lúc interpreter finalize và chạm vào object đã giải phóng. Nay test ngủ 0,5 giây cho watcher thấy `stop_event` rồi thoát bằng `os._exit`, bỏ qua hẳn bước finalize. Đã kiểm chứng mã thoát vẫn đúng: 0 khi pass, 1 khi cố tình làm hỏng một assertion. Không ảnh hưởng production vì server chạy liên tục không thoát, nhưng việc `/ws/graph` cancel mà không await thì vẫn nên dọn riêng.
+- **`test_catalog_guides` bắt 2 guide vượt trần 200 ký tự/dòng**: `meta-ads-graph` có dòng 291 và 441 ký tự, `facebook-pages` có dòng 442. Đã CHÈN xuống dòng tại ranh giới câu, KHÔNG đổi một chữ nào; kiểm chứng bằng cách bỏ hết khoảng trắng rồi so cây JSON thì trùng khít bản cũ. Sửa bằng thay chuỗi trong văn bản thô nên diff đúng 2 dòng (ghi lại bằng `json.dump` sẽ bung các mảng gọn, phình file từ 1012 lên 1633 dòng).
+### Ghi chú
+- CI đỏ kinh niên từ 0.9.231 nghĩa là suốt 5 bản vừa rồi không ai thấy được tín hiệu test. Bước import thật thêm ở 0.9.235 chỉ có giá trị khi CI xanh nền, nên hai vá này đi cùng đợt.
+
 ## [0.9.235] - 2026-07-28
 Dựng lưới an toàn trước đợt tái cấu trúc server. Chưa đụng một dòng code chạy nào.
 ### Thêm mới
