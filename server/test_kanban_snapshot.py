@@ -168,15 +168,34 @@ async def _duong_dong_bo():
     return feat._snapshot(ROOT)      # hành vi TRƯỚC 0.9.240: chạy thẳng trên loop
 
 
-tre_async = asyncio.run(do_tre(_duong_that))
-tre_sync = asyncio.run(do_tre(_duong_dong_bo))
-print(f"     (độ trễ nhịp tim: qua to_thread {tre_async:.0f} ms | "
-      f"gọi thẳng trên loop {tre_sync:.0f} ms)")
+# Ép bước GHI chậm một cách TẤT ĐỊNH thay vì trông vào 120 việc là đủ nặng. Bản trước
+# dùng ngưỡng tương đối và ĐỎ trên CI: máy runner nhanh nên snapshot chỉ mất 20ms, không
+# đủ biên để phân biệt. Việc nặng bao nhiêu phụ thuộc máy; độ trễ do sleep thì không.
+DO_TRE_GIA = 0.15
+_ghi_that = feat.deps.atomic_write_text
+
+
+def _ghi_cham(path, text):
+    time.sleep(DO_TRE_GIA)      # giả lập đĩa chậm / bảng việc lớn
+    _ghi_that(path, text)
+
+
+try:
+    feat.deps.atomic_write_text = _ghi_cham
+    tre_async = asyncio.run(do_tre(_duong_that))
+    tre_sync = asyncio.run(do_tre(_duong_dong_bo))
+finally:
+    feat.deps.atomic_write_text = _ghi_that
+
+nguong = DO_TRE_GIA * 1000
+print(f"     (mỗi lần ghi mất {nguong:.0f} ms | độ trễ nhịp tim: qua to_thread "
+      f"{tre_async:.0f} ms, gọi thẳng trên loop {tre_sync:.0f} ms)")
 # Đối chứng: không có bước này thì con số bên trên có thể nhỏ vì việc quá nhẹ chứ không
 # phải vì code đúng.
-check(f"phép đo có răng: gọi thẳng trên loop trễ hơn hẳn ({tre_sync:.0f} so với {tre_async:.0f} ms)",
-      tre_sync > max(3 * tre_async, 25))
-check(f"đường thật KHÔNG khoá loop quá 100ms ({tre_async:.0f} ms)", tre_async < 100)
+check(f"phép đo có răng: gọi thẳng trên loop khoá loop >= {nguong:.0f} ms ({tre_sync:.0f} ms)",
+      tre_sync >= nguong)
+check(f"đường thật KHÔNG khoá loop dù mỗi lần ghi mất {nguong:.0f} ms ({tre_async:.0f} ms)",
+      tre_async < nguong / 2)
 
 # ---- 7. Snapshot song song phải NỐI TIẾP, không ghi đè ngược ----
 # Không có khoá thì lần chạy CŨ có thể hạ cánh sau lần MỚI và để lại mirror thiu.

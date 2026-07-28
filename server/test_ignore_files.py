@@ -114,6 +114,22 @@ sot_git = [p for p in NHAY_CAM + CHAY + NANG if not git_ignore(p)]
 check(f"git bỏ qua hết {len(NHAY_CAM + CHAY + NANG)} đường dẫn trên"
       + (f" (SÓT: {sot_git})" if sot_git else ""), not sot_git)
 
+
+# Quy tắc phải nằm trong .gitignore ĐÃ COMMIT, không phải .git/info/exclude của một máy.
+# info/exclude không đi theo repo, nên thứ chỉ được che ở đó sẽ hiện ra untracked với mọi
+# người clone mới hoặc fork. Đúng lỗi này: .gitnexus/ (106MB index) chỉ nằm trong
+# info/exclude nên test xanh trên máy dev mà đỏ trên CI - đó là cách nó bị phát hiện.
+def nguon_ignore(p: str) -> str:
+    r = subprocess.run(["git", "check-ignore", "-v", p], cwd=ROOT, capture_output=True, text=True)
+    return (r.stdout.split("\t")[0] if r.stdout else "")
+
+
+DEV_ARTIFACT = [".gitnexus/index.db", ".superpowers/sdd/x.diff", ".claude/worktrees/x/y",
+                ".learn/hermes/cli.py"]
+chi_cuc_bo = [p for p in DEV_ARTIFACT if "info/exclude" in nguon_ignore(p) or not nguon_ignore(p)]
+check("artifact dev được che bởi .gitignore đã commit, không phải info/exclude cục bộ"
+      + (f" (CHỈ CỤC BỘ: {chi_cuc_bo})" if chi_cuc_bo else ""), not chi_cuc_bo)
+
 # ---------------------------------------------------------------- 4. Không có gì lọt hai lưới
 # Artifact đang tồn tại trên đĩa mà KHÔNG track và cũng KHÔNG ignore -> `git add -A` là commit.
 lot = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"],
