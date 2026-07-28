@@ -201,9 +201,11 @@ def test_probe_khong_de_den_do_do_luot_chay(monkeypatch):
     _reset_engines()
 
 
-def test_probe_claude_credentials_cac_nhanh(tmp_path):
+def test_probe_claude_credentials_cac_nhanh(tmp_path, monkeypatch):
     import json as _json
     import time as _time
+    # ép non-darwin để nhánh "chưa có file" không rơi sang đường Keychain khi chạy test trên Mac
+    monkeypatch.setattr(connect_health.sys, "platform", "linux")
     p = tmp_path / "cred.json"
     # chưa có file
     ok, msg = connect_health.probe_claude_credentials(p)
@@ -217,4 +219,29 @@ def test_probe_claude_credentials_cac_nhanh(tmp_path):
     # không refreshToken, token quá hạn → chết kèm lý do
     p.write_text(_json.dumps({"claudeAiOauth": {"expiresAt": 1000}}), encoding="utf-8")
     ok, msg = connect_health.probe_claude_credentials(p)
+    assert ok is False and "hết hạn" in msg
+
+
+def test_probe_mac_doc_keychain_khong_bao_do_oan(tmp_path, monkeypatch):
+    """Vụ Mac 0.9.229: Claude Code trên macOS cất OAuth trong Keychain, KHÔNG có file
+    ~/.claude/.credentials.json → probe cũ kết luận nhầm 'Chưa đăng nhập' và banner đỏ
+    treo vĩnh viễn dù não vẫn chạy tốt. Nhánh darwin phải hỏi Keychain, và khi không
+    xác định được thì coi là sống (thà bỏ sót còn hơn báo oan)."""
+    missing = tmp_path / "khong-ton-tai.json"
+    monkeypatch.setattr(connect_health.sys, "platform", "darwin")
+    # Keychain có credentials (kèm refreshToken) → sống
+    monkeypatch.setattr(connect_health, "_mac_keychain_creds",
+                        lambda: ({"claudeAiOauth": {"refreshToken": "r"}}, True))
+    assert connect_health.probe_claude_credentials(missing)[0] is True
+    # Keychain trả lời chắc chắn KHÔNG có item → thật sự chưa đăng nhập
+    monkeypatch.setattr(connect_health, "_mac_keychain_creds", lambda: (None, True))
+    ok, msg = connect_health.probe_claude_credentials(missing)
+    assert ok is False and "Chưa đăng nhập" in msg
+    # Không xác định được (security bị chặn/treo/JSON hỏng) → coi là sống, không báo oan
+    monkeypatch.setattr(connect_health, "_mac_keychain_creds", lambda: (None, False))
+    assert connect_health.probe_claude_credentials(missing)[0] is True
+    # Keychain có item nhưng token hết hạn, không refreshToken → chết kèm lý do hết hạn
+    monkeypatch.setattr(connect_health, "_mac_keychain_creds",
+                        lambda: ({"claudeAiOauth": {"expiresAt": 1000}}, True))
+    ok, msg = connect_health.probe_claude_credentials(missing)
     assert ok is False and "hết hạn" in msg

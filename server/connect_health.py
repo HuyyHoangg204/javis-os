@@ -175,19 +175,54 @@ def engine_run_ok(name) -> None:
         _set_engine(name, True, "", "run")
 
 
+def _mac_keychain_creds() -> tuple[dict | None, bool]:
+    """macOS: Claude Code KHÔNG ghi ~/.claude/.credentials.json mà cất OAuth trong Keychain
+    (generic password, service 'Claude Code-credentials'). Đọc CHỈ-ĐỌC qua CLI `security`.
+    Trả (creds, known): known=False = KHÔNG XÁC ĐỊNH ĐƯỢC (security bị chặn/treo/JSON hỏng)
+    - caller phải coi như não sống, thà bỏ sót còn hơn báo đỏ oan (vụ Mac 0.9.229: banner
+    'mất đăng nhập' treo vĩnh viễn dù đã đăng nhập)."""
+    import json as _json
+    import subprocess
+    try:
+        r = subprocess.run(
+            ["security", "find-generic-password", "-s", "Claude Code-credentials", "-w"],
+            capture_output=True, text=True, timeout=5)
+    except Exception:
+        return None, False
+    if r.returncode != 0:
+        # errSecItemNotFound: keychain khẳng định KHÔNG có item → thật sự chưa đăng nhập.
+        if "could not be found" in (r.stderr or "").lower():
+            return None, True
+        return None, False   # bị từ chối quyền / lỗi lạ → không kết luận
+    try:
+        return _json.loads(r.stdout.strip()), True
+    except Exception:
+        return None, False
+
+
 def probe_claude_credentials(path=None) -> tuple[bool, str]:
-    """Đọc hạn token Claude CLI (~/.claude/.credentials.json). CHỈ ĐỌC - tuyệt đối không
-    tự refresh (tự refresh làm user bị đăng xuất, xem bài học cũ).
+    """Đọc hạn token Claude CLI (~/.claude/.credentials.json; macOS rơi về Keychain).
+    CHỈ ĐỌC - tuyệt đối không tự refresh (tự refresh làm user bị đăng xuất, xem bài học cũ).
     Có refreshToken → CLI tự làm mới được, coi là sống dù access token đã quá hạn."""
     from pathlib import Path
     p = Path(path) if path else Path.home() / ".claude" / ".credentials.json"
+    data = None
     try:
         import json as _json
-        oa = _json.loads(p.read_text(encoding="utf-8")).get("claudeAiOauth") or {}
+        data = _json.loads(p.read_text(encoding="utf-8"))
     except FileNotFoundError:
-        return False, "Chưa đăng nhập Claude Code trên máy này."
+        if sys.platform == "darwin":
+            creds, known = _mac_keychain_creds()
+            if not known:
+                return True, ""   # không xác định được → coi là sống; đèn do lượt chạy thật lo
+            if not creds:
+                return False, "Chưa đăng nhập Claude Code trên máy này."
+            data = creds
+        else:
+            return False, "Chưa đăng nhập Claude Code trên máy này."
     except Exception:
         return False, "Không đọc được thông tin đăng nhập Claude Code."
+    oa = (data or {}).get("claudeAiOauth") or {}
     if not oa:
         return False, "Chưa đăng nhập Claude Code trên máy này."
     if oa.get("refreshToken"):

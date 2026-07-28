@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.230] - 2026-07-28
+Sửa 3 lỗi từ máy Mac: banner "mất đăng nhập" báo oan, panel Lịch sử delay, tooltip 3D treo.
+### Sửa lỗi
+- **Mac hết bị banner "Bộ não claude mất đăng nhập" báo oan**: Claude Code trên macOS cất OAuth trong Keychain chứ KHÔNG ghi `~/.claude/.credentials.json`, probe cũ chỉ đọc file nên kết luận nhầm "Chưa đăng nhập" và cứ 10 phút lại đè đèn đỏ. Nay nhánh darwin hỏi Keychain qua `security find-generic-password` (chỉ-đọc, timeout 5s); không xác định được thì coi là sống - thà bỏ sót còn hơn báo oan, đèn do lượt chạy thật (source=run) vẫn là bằng chứng mạnh nhất. Test `test_probe_mac_doc_keychain_khong_bao_do_oan` chốt 4 nhánh.
+- **Tooltip node đồ thị hết treo lơ lửng trên editor**: bấm node mở note thì editor phủ lên canvas làm canvas không còn nhận hover để tự ẩn tooltip → card "click để mở" dính vĩnh viễn đè lên bài. Nay ẩn thẳng tooltip ngay lúc click node (cả 2D lẫn 3D) + ẩn khi chuột rời vùng graph.
+### Cải thiện
+- **Panel Lịch sử hiện tức thì**: trước bấm Lịch sử mới bắt đầu debounce 150ms + fetch nên thấy "Đang tải…" rõ. Nay prefetch danh sách 1.5s sau khi cockpit load, mở panel là vẽ ngay từ cache rồi fetch mới đè lên sau; lần đầu mount cũng nạp thẳng không qua debounce. Lỗi mạng thoáng qua không đập danh sách đang hiện.
+
 ## [0.9.229] - 2026-07-28
 Bố cục cockpit hài hoà hơn: chuông Thông báo về góc phải, ô chat thành pill nổi có khoảng thở.
 ### Cải thiện

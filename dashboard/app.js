@@ -623,6 +623,9 @@ graph3dContainer.addEventListener("mousemove", (e) => {
   graphTooltip.style.left = (e.clientX + 14) + "px";
   graphTooltip.style.top = (e.clientY + 14) + "px";
 });
+// Tooltip chỉ được ẩn bởi onNodeHover(null) của canvas; khi editor/overlay phủ lên thì canvas
+// hết nhận pointer event nên tooltip treo mãi. Chuột rời vùng graph là ẩn thẳng tay.
+graph3dContainer.addEventListener("mouseleave", () => { graphTooltip.style.display = "none"; });
 
 let _graphMode = "2d";                 // mặc định 2D (canvas thuần, nhẹ, đỡ lag). Đổi trong Cài đặt.
 let _libs3dPromise = null;
@@ -699,6 +702,8 @@ window.reinitGraph = async function (forceMode) {
 // Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
   if (!node || !node.path) return;
+  // Editor mở phủ lên canvas → canvas không còn hover event để tự ẩn tooltip, phải ẩn ngay tại đây
+  try { graphTooltip.style.display = "none"; } catch (e) {}
   const brainRel = (node.path || "").split("/").slice(1).join("/") || node.path;   // bỏ đoạn gốc → path tương đối brain
   if (typeof window.JavisOpenNote === "function") window.JavisOpenNote(brainRel);   // mở editor cây (WYSIWYG + công cụ)
   else openNodePopup(node);   // dự phòng nếu editor cây chưa sẵn

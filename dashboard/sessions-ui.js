@@ -37,6 +37,18 @@
   // Danh sách chỉ hiện PAGE mục đầu, bấm "Xem thêm" mở thêm PAGE nữa.
   // shown = số mục đang hiện; giữ nguyên qua các lần refresh, chỉ reset khi đổi brain.
   var PAGE = 20, shown = PAGE, lastBrain = null;
+  // Kết quả /sessions gần nhất. Prefetch lúc app load để bấm Lịch sử là danh sách hiện
+  // NGAY từ cache (fetch mới vẫn chạy nền đè lên sau) - trước đây mở panel mới bắt đầu
+  // debounce 150ms + fetch nên user thấy "Đang tải…" delay rõ.
+  var cached = null;   // {brain, items}
+
+  async function fetchList() {
+    var b = brain();
+    var r = await fetch("/sessions?brain=" + encodeURIComponent(b) + "&limit=" + (shown + 1));
+    var data = await r.json();
+    cached = { brain: b, items: data.sessions || [] };
+    return cached;
+  }
 
   function mount(container) {
     if (!container) return;
@@ -58,7 +70,7 @@
       var q = searchEl.value.trim();
       searchTimer = setTimeout(function () { q ? doSearch(q) : loadList(); }, 280);
     };
-    refresh();
+    loadList();   // lần đầu mở panel: nạp THẲNG, không qua debounce 150ms của refresh()
   }
 
   function refresh() {
@@ -86,15 +98,23 @@
 
   async function loadList() {
     if (!listEl) return;
-    // Chỉ hiện "Đang tải…" lần đầu; các lần sau giữ danh sách cũ cho khỏi nháy.
-    if (!listEl.children.length) listEl.innerHTML = '<div class="cside-empty">Đang tải…</div>';
+    // Khung đang trống: vẽ ngay từ cache prefetch (nếu đúng brain) cho hết cảm giác delay;
+    // không có cache mới hiện "Đang tải…". Các lần sau giữ danh sách cũ cho khỏi nháy.
+    if (!listEl.querySelector(".cside-item")) {
+      if (cached && cached.brain === brain() && cached.items.length) {
+        renderList(cached.items.slice(0, shown), cached.items.length > shown);
+      } else {
+        listEl.innerHTML = '<div class="cside-empty">Đang tải…</div>';
+      }
+    }
     try {
       // Lấy dư 1 mục để biết còn hội thoại phía sau hay không.
-      var r = await fetch("/sessions?brain=" + encodeURIComponent(brain()) + "&limit=" + (shown + 1));
-      var data = await r.json();
-      var items = data.sessions || [];
-      renderList(items.slice(0, shown), items.length > shown);
-    } catch (e) { listEl.innerHTML = '<div class="cside-empty">Lỗi tải danh sách.</div>'; }
+      var c = await fetchList();
+      renderList(c.items.slice(0, shown), c.items.length > shown);
+    } catch (e) {
+      // Lỗi mạng thoáng qua: còn danh sách (từ cache) thì giữ nguyên, đừng đập đi
+      if (!listEl.querySelector(".cside-item")) listEl.innerHTML = '<div class="cside-empty">Lỗi tải danh sách.</div>';
+    }
   }
 
   function renderList(items, hasMore) {
@@ -188,6 +208,8 @@
     btn.onclick = function () { if (window.JavisChatStage) window.JavisChatStage.showSide(); };
     var host = document.querySelector(".hud-actions");
     (host || document.body).appendChild(btn);
+    // Prefetch danh sách sau khi cockpit đã yên: bấm Lịch sử lần đầu là có sẵn dữ liệu
+    setTimeout(function () { fetchList().catch(function () {}); }, 1500);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindGlobal);
   else bindGlobal();
