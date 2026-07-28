@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.228] - 2026-07-28
+Router việc nền: chuỗi fallback nhiều mắt xích, mắt cuối là OpenRouter model free mạnh nhất.
+### Thêm mới
+- **Fallback 0.9.227 nâng thành ROUTER chuỗi** (`_FallbackChain`): engine phụ user chọn → Claude → OpenRouter model free. Mắt trước chết lúc chạy (hết quota, CLI lỗi, stream câm, không sẵn sàng) là mắt sau tiếp quản nguyên nhiệm vụ; cả chuỗi chết mới báo lỗi thật. Giờ cả CLAUDE hết hạn mức thì việc nền vẫn sống bằng model free.
+- **Tự chọn model free mạnh nhất trên OpenRouter** (`pick_openrouter_free`): tải danh sách model, lọc `:free`, chấm điểm theo họ model + cỡ tham số + context, cache 6 giờ. Hiện chọn ra `nvidia/nemotron-3-ultra-550b-a55b:free`. Model đã chọn lưu vào settings `model.fallback_openrouter_model` - user xem/đổi sau được; đặt sẵn field này thì router tôn trọng, không tự chọn nữa.
+- Điều kiện có mắt OpenRouter: đã dán key OpenRouter ở trang Model (model free vẫn cần key tài khoản). Chưa có key thì chuỗi dừng ở Claude như 0.9.227.
+### Kiểm thử
+- `test_aux_fallback.py` nâng lên 22 case: chuỗi 3 mắt (phụ + Claude cùng chết → free cứu), chấm điểm model free (họ mạnh thắng, cùng họ to thắng), cache picker, swap ghép chuỗi đúng từng cấu hình (Claude không key = không bọc, phụ openrouter trống không nhân đôi mắt).
+
 ## [0.9.227] - 2026-07-28
 Việc nền hết chết vì engine phụ hết quota: tự rơi về Claude khi Codex/API lỗi lúc chạy.
 ### Sửa lỗi

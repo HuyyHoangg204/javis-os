@@ -27,7 +27,9 @@ Hợp đồng sự kiện giữ y như ClaudeSDK để nơi gọi không phải 
 """
 from __future__ import annotations
 
+import re
 import sys
+import time
 from typing import Optional
 
 import config as cfgmod
@@ -46,6 +48,54 @@ _KEY_FIELD = {
 
 # mode của Javis -> sandbox của Codex CLI
 _CODEX_SANDBOX = {"suggest": "read-only", "auto": "workspace-write", "full": None}
+
+# ── Chọn model FREE mạnh nhất trên OpenRouter (mắt xích cuối của router việc nền) ──
+# Xếp hạng theo HỌ model (đầu danh sách = mạnh nhất) rồi tới cỡ tham số trong id, rồi context.
+# Danh sách model free của OpenRouter đổi liên tục nên chấm điểm động thay vì ghim cứng 1 tên.
+_FREE_FAMILY_RANK = ("deepseek-r1", "deepseek", "qwen3", "qwen", "llama-4", "llama-3.3",
+                     "llama", "glm", "gemini", "mistral", "kimi")
+_OR_FREE_CACHE = {"ts": 0.0, "model": ""}   # cache 6h - khỏi gọi API models mỗi lần fallback
+_OR_FREE_TTL = 6 * 3600
+
+
+def _score_free_model(mid: str, ctx: int = 0) -> tuple:
+    low = (mid or "").lower()
+    fam = 0
+    for i, f in enumerate(_FREE_FAMILY_RANK):
+        if f in low:
+            fam = len(_FREE_FAMILY_RANK) - i
+            break
+    sizes = [int(x) for x in re.findall(r"(\d{1,4})b\b", low)]
+    return (fam, max(sizes, default=0), ctx)
+
+
+async def pick_openrouter_free(key: str = "") -> str:
+    """Model free mạnh nhất đang có trên OpenRouter. Lỗi mạng → đoán tĩnh một id phổ biến."""
+    now = time.time()
+    if _OR_FREE_CACHE["model"] and now - _OR_FREE_CACHE["ts"] < _OR_FREE_TTL:
+        return _OR_FREE_CACHE["model"]
+    data = []
+    try:
+        import httpx
+        headers = {"Authorization": f"Bearer {key}"} if key else {}
+        async with httpx.AsyncClient(timeout=20) as cx:
+            r = await cx.get("https://openrouter.ai/api/v1/models", headers=headers)
+            r.raise_for_status()
+            data = (r.json() or {}).get("data") or []
+    except Exception as e:
+        print(f"[aux router] không tải được danh sách model OpenRouter: {e}", file=sys.stderr)
+    best, best_score = "", (-1, -1, -1)
+    for m in data:
+        mid = m.get("id") or ""
+        if not mid.endswith(":free"):
+            continue
+        score = _score_free_model(mid, int(m.get("context_length") or 0))
+        if score > best_score:
+            best, best_score = mid, score
+    if not best:
+        best = "deepseek/deepseek-chat:free"
+    _OR_FREE_CACHE.update(ts=now, model=best)
+    return best
 
 
 def read_spec(settings: dict = None) -> dict:
@@ -122,6 +172,23 @@ class _ApiAuxEngine:
             yield {"type": "error", "content": f"Chưa có API key cho {self.provider}."}
             return
 
+        # OpenRouter model trống = "tự chọn free mạnh nhất". User ghi đè bằng
+        # settings model.fallback_openrouter_model; lần chọn tự động đầu tiên cũng lưu vào
+        # đúng field đó để user thấy đang dùng gì và đổi sau nếu muốn.
+        if self.provider == "openrouter" and not self.model:
+            try:
+                s = cfgmod.read_settings()
+                override = ((s.get("model", {}) or {}).get("fallback_openrouter_model") or "").strip()
+                self.model = override or await pick_openrouter_free(key)
+                if not override and self.model:
+                    s.setdefault("model", {})["fallback_openrouter_model"] = self.model
+                    cfgmod.write_settings(s)
+            except Exception as e:
+                print(f"[aux router] chọn model free lỗi: {e}", file=sys.stderr)
+            if not self.model:
+                yield {"type": "error", "content": "Không chọn được model free OpenRouter."}
+                return
+
         tools, route = [], {}
         try:
             tools, route = await mcp_hub.discover_all(self.javis_mode or "full",
@@ -158,36 +225,34 @@ class _ApiAuxEngine:
         yield {"type": "final", "content": "".join(buf)}
 
 
-class _FallbackToClaude:
-    """Bọc engine việc nền KHÔNG-phải-Claude: engine phụ chết LÚC CHẠY (hết quota ChatGPT,
-    CLI lỗi, stream câm không final) thì tự chạy lại nguyên prompt bằng engine Claude gốc
-    đã dựng sẵn ở nơi gọi. Triết lý của swap() vốn là "việc nền phải chạy chứ không chết"
-    nhưng trước đây chỉ đỡ được lỗi lúc DỰNG (thiếu key/CLI); lỗi lúc chạy thì việc nền chết
-    thật - ca thật: Codex "You've hit your usage limit" làm nhắc hẹn chỉ báo ⚠ về Telegram.
-    Trong suốt với nơi gọi: đọc attr → engine phụ; GÁN attr (max_wall_s...) → đặt cho CẢ HAI
-    để engine Claude dự phòng cũng nhận giới hạn/cấu hình mà caller đặt sau swap."""
+class _FallbackChain:
+    """Router việc nền: CHUỖI engine thử lần lượt, mắt trước chết LÚC CHẠY (hết quota, CLI
+    lỗi, stream câm không final, không sẵn sàng) thì chạy lại nguyên prompt bằng mắt sau.
+    Chuỗi điển hình: engine phụ user chọn → Claude → OpenRouter model free mạnh nhất.
+    Triết lý của swap() vốn là "việc nền phải chạy chứ không chết" nhưng trước đây chỉ đỡ
+    được lỗi lúc DỰNG (thiếu key/CLI); lỗi lúc chạy thì chết thật - ca thật: Codex "You've
+    hit your usage limit" làm nhắc hẹn chỉ báo ⚠ về Telegram rồi thôi.
+    Trong suốt với nơi gọi: đọc attr → mắt đầu; GÁN attr (max_wall_s...) → đặt cho MỌI mắt
+    để engine dự phòng cũng nhận giới hạn/cấu hình mà caller đặt sau swap()."""
 
-    def __init__(self, primary, claude):
-        object.__setattr__(self, "_primary", primary)
-        object.__setattr__(self, "_claude", claude)
+    def __init__(self, engines):
+        object.__setattr__(self, "_engines", [e for e in (engines or []) if e is not None])
 
-    def _pair(self):
-        return (object.__getattribute__(self, "_primary"),
-                object.__getattribute__(self, "_claude"))
+    def _all(self):
+        return object.__getattribute__(self, "_engines")
 
     def __getattr__(self, name):
-        return getattr(object.__getattribute__(self, "_primary"), name)
+        return getattr(self._all()[0], name)
 
     def __setattr__(self, name, value):
-        primary, claude = self._pair()
-        setattr(primary, name, value)
-        try:
-            setattr(claude, name, value)
-        except Exception:
-            pass
+        for e in self._all():
+            try:
+                setattr(e, name, value)
+            except Exception:
+                pass
 
     def is_available(self) -> bool:
-        for e in self._pair():
+        for e in self._all():
             try:
                 if e.is_available():
                     return True
@@ -196,41 +261,39 @@ class _FallbackToClaude:
         return False
 
     def reset_session(self):
-        for e in self._pair():
+        for e in self._all():
             try:
                 e.reset_session()
             except Exception:
                 pass
 
+    @staticmethod
+    def _name(e) -> str:
+        return getattr(e, "provider", None) or type(e).__name__
+
     async def query(self, prompt: str):
-        primary, claude = self._pair()
-        fail = None
-        try:
-            if primary.is_available():
-                async for ev in primary.query(prompt):
+        fail = "chuỗi engine việc nền rỗng"
+        for e in self._all():
+            try:
+                if not e.is_available():
+                    fail = f"{self._name(e)} không sẵn sàng"
+                    continue
+                got_final, got_error = False, None
+                async for ev in e.query(prompt):
                     if (ev or {}).get("type") == "error":
-                        fail = ev.get("content") or "engine phụ trả error"
+                        got_error = ev.get("content") or f"{self._name(e)} trả error"
                         break
                     yield ev
                     if (ev or {}).get("type") == "final":
-                        return                                   # phụ chạy ngon → xong
-                if fail is None:
-                    fail = "engine phụ kết thúc mà không có final"
-            else:
-                fail = "engine phụ không sẵn sàng"
-        except Exception as e:
-            fail = f"{type(e).__name__}: {e}"
-        try:
-            claude_ok = claude.is_available()
-        except Exception:
-            claude_ok = False
-        if not claude_ok:
-            yield {"type": "error", "content": str(fail)}        # hết đường → trả lỗi thật
-            return
-        print(f"[aux fallback] Engine việc nền phụ lỗi → chạy lại bằng Claude. Lý do: {str(fail)[:300]}",
-              file=sys.stderr)
-        async for ev in claude.query(prompt):
-            yield ev
+                        got_final = True
+                if got_final:
+                    return                                       # mắt này chạy ngon → xong
+                fail = got_error or f"{self._name(e)} kết thúc mà không có final"
+            except Exception as exc:
+                fail = f"{self._name(e)}: {type(exc).__name__}: {exc}"
+            print(f"[aux router] {self._name(e)} lỗi → thử mắt xích kế tiếp. Lý do: {str(fail)[:300]}",
+                  file=sys.stderr)
+        yield {"type": "error", "content": str(fail)}            # hết chuỗi → trả lỗi thật
 
 
 def _build_api(spec, claude_cli_obj, mode, tag):
@@ -282,29 +345,53 @@ def apply(deps, cli, mode: str = None, tag: str = None):
     return cli
 
 
+def _openrouter_free_engine(cli, mode, tag, settings):
+    """Mắt xích CUỐI của router: OpenRouter model free (model '' = tự chọn free mạnh nhất
+    lúc chạy, xem _ApiAuxEngine.query). Chưa có key OpenRouter thì không có mắt này."""
+    if not api_key_for("openrouter", settings):
+        return None
+    return _ApiAuxEngine(
+        provider="openrouter",
+        model="",
+        system_prompt=getattr(cli, "system_prompt", None),
+        vault_root=getattr(cli, "javis_vault", None),
+        mode=mode or getattr(cli, "javis_mode", None) or "full",
+        tag=(tag or getattr(cli, "tag", "aux")) + "-orfree",
+    )
+
+
 def swap(cli, mode: str = None, tag: str = None, spec: dict = None,
          codex_profile=None, settings: dict = None):
-    """Engine Claude đã dựng -> engine theo model việc nền người dùng chọn.
+    """Engine Claude đã dựng -> ROUTER việc nền theo model phụ người dùng chọn.
 
-    Mặc định (hoặc provider lạ / thiếu key) thì TRẢ LẠI NGUYÊN engine Claude: đổi model nền
-    là tuỳ chọn, hỏng cấu hình thì việc nền phải vẫn chạy chứ không được chết.
+    Chuỗi fallback (mắt trước chết lúc chạy thì mắt sau tiếp quản, xem _FallbackChain):
+      engine phụ user chọn → Claude → OpenRouter model free mạnh nhất (nếu có key).
+    Mặc định Claude + không có key OpenRouter thì trả NGUYÊN engine Claude như xưa;
+    hỏng cấu hình kiểu gì việc nền cũng phải chạy được chứ không chết.
     """
     try:
         sp = spec if spec is not None else read_spec(settings)
         prov = sp.get("provider", CLAUDE)
         if prov == CLAUDE:
             cli.model = sp.get("model") or None
-            return cli
+            or_free = _openrouter_free_engine(cli, mode, tag, settings)
+            return _FallbackChain([cli, or_free]) if or_free else cli
         ok, why = availability(sp, settings)
         if not ok:
             print(f"[aux] {why} → việc nền tạm dùng lại Claude.", file=sys.stderr)
             return cli
-        # Bọc fallback: engine phụ lỗi LÚC CHẠY (quota/CLI/stream câm) → tự chạy lại bằng
-        # chính engine Claude đã dựng - nhắc hẹn/loop/kanban không chết vì hết hạn mức phụ.
         if prov == CODEX:
-            return _FallbackToClaude(_build_codex(sp, cli, mode, tag, codex_profile), cli)
-        if prov in API_PROVIDERS:
-            return _FallbackToClaude(_build_api(sp, cli, mode, tag), cli)
+            primary = _build_codex(sp, cli, mode, tag, codex_profile)
+        elif prov in API_PROVIDERS:
+            primary = _build_api(sp, cli, mode, tag)
+        else:
+            return cli
+        chain = [primary, cli]
+        or_free = _openrouter_free_engine(cli, mode, tag, settings)
+        # Phụ ĐANG là openrouter với model trống thì mắt or_free trùng hệt → khỏi thêm.
+        if or_free and not (prov == "openrouter" and not (sp.get("model") or "").strip()):
+            chain.append(or_free)
+        return _FallbackChain(chain)
     except Exception as e:
         print(f"[aux swap] {e} → giữ engine Claude.", file=sys.stderr)
     return cli
