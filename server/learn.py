@@ -141,6 +141,38 @@ def injection_in_output(text: str) -> bool:
     return bool(text) and bool(_INJECT_RE.search(text))
 
 
+# ─────────── Cửa gác việc learn tự tạo (chống backlog rác) ───────────
+# Worker nền là HEADLESS: chỉ thao tác file trong brain + đọc MCP. Nó KHÔNG có tay chủ,
+# không có trình duyệt đã đăng nhập, không được gửi ra ngoài (learn luôn tạo task mode
+# auto nên kernel chặn external-write ở bước chạy), và không thấy repo nằm ngoài brain.
+# Việc thuộc các nhóm dưới đây vào hàng đợi là CHẮC CHẮN hỏng - chặn ngay ở cửa vào rẻ
+# hơn để nó chạy rồi chặn: đỡ một lượt worker, đỡ quota, đỡ một thông báo làm phiền.
+_TASK_GATES: List[tuple] = [
+    (re.compile(r"(cookie|đăng\s*nhập|login|oauth|xác\s*thực|otp|quét\s*mã|mã\s*qr"
+                r"|đổi\s*mật\s*khẩu|2fa)", re.I),
+     "cần chính chủ thao tác đăng nhập, worker nền không làm được"),
+    (re.compile(r"(gửi|nhắn|đăng|publish|post|comment|trả\s*lời)\s+"
+                r"[^.\n]{0,40}(zalo|telegram|messenger|email|mail|fanpage|page|nhóm|khách"
+                r"|bình\s*luận|bài|lên\s+\w+)", re.I),
+     "gửi/đăng ra ngoài - việc này phải do chủ bấm, không tự chạy nền"),
+    (re.compile(r"(theo\s*dõi|chờ|đợi)\s+[^.\n]{0,30}(duyệt|phản\s*hồi|trả\s*lời|approve)", re.I),
+     "chỉ là chờ người khác - nên đặt nhắc hẹn thay vì việc nền"),
+    (re.compile(r"(repo|repository|source\s*code|mã\s*nguồn|codebase|ipn|pull\s*request)", re.I),
+     "đụng mã nguồn dự án ngoài brain - worker nền không có repo đó"),
+]
+
+
+def task_infeasible(title: str, intent: str = "") -> str:
+    """Việc này worker nền KHÔNG thể làm? Trả LÝ DO tiếng Việt ngắn, hoặc "" nếu làm được."""
+    text = f"{title or ''}\n{intent or ''}"
+    if not text.strip():
+        return "thiếu tiêu đề"
+    for pattern, reason in _TASK_GATES:
+        if pattern.search(text):
+            return reason
+    return ""
+
+
 def _extract_json(raw: str) -> Optional[dict]:
     """Bóc manifest JSON từ output fork (ưu tiên fenced ```json, rồi {...} cân bằng cuối)."""
     if not raw:
@@ -513,10 +545,17 @@ class LearnFeature:
                "  8. KHÔNG tạo skill kiểu router chỉ trỏ sang skill khác.\n"
                "  9. group BẮT BUỘC, chọn nhóm sát nhất với skill đã có.\n\n"
                if caps.get("skill") else "")
-            + ("TASK (chống spam backlog): CHỈ đề xuất task khi hội thoại có VIỆC RÕ RÀNG chưa làm - "
-               "user nhờ lặp lại, việc bỏ dở được nhắc, hoặc câu hỏi mở cần điều tra thêm. intent phải "
-               "TỰ-ĐỦ (agent nền chỉ thao tác file, KHÔNG thấy hội thoại này). Đa số batch không có việc "
-               "mới → để tasks rỗng.\n\n" if caps.get("task") else "")
+            + ("TASK (chống spam backlog): worker nền là HEADLESS - chỉ đọc/ghi file TRONG brain này "
+               "và đọc dữ liệu qua MCP. Nó KHÔNG có tay user, KHÔNG có trình duyệt đã đăng nhập, "
+               "KHÔNG được gửi tin/đăng bài, KHÔNG thấy repo hay máy nào ngoài brain.\n"
+               "  CHỈ đề xuất task khi HỘI ĐỦ CẢ BA: (a) user nhờ rõ ràng một việc chưa làm xong, "
+               "(b) worker tự làm trọn được bằng file trong brain + đọc MCP, (c) làm xong có một "
+               "kết quả cụ thể kiểm chứng được (file/note đã ghi).\n"
+               "  TUYỆT ĐỐI KHÔNG đề xuất: việc cần đăng nhập/cookie/OTP, việc gửi-đăng ra ngoài, "
+               "việc chỉ chờ người khác duyệt, việc sửa mã nguồn dự án khác. Đó là việc của CHỦ, "
+               "không phải việc nền.\n"
+               "  Đa số batch KHÔNG có việc nào đạt cả ba → để tasks rỗng. Thà bỏ sót còn hơn đẻ "
+               "backlog rác.\n\n" if caps.get("task") else "")
             + f"CHỈ tạo các loại: {', '.join(want)}.\n"
             "OUTPUT JSON (đúng khoá, thiếu loại thì để mảng rỗng):\n{" + ",".join(schema_bits) +
             ',"notes":"tóm tắt tiếng Việt 1-2 câu"}\n\n'
@@ -873,6 +912,9 @@ class LearnFeature:
                         report["blocked"].append(f"task '{title[:40]}': chứa secret"); continue
                     if injection_in_output(title + "\n" + intent):
                         report["blocked"].append(f"task '{title[:40]}': chứa câu injection"); continue
+                    why = task_infeasible(title, intent)
+                    if why:
+                        report["blocked"].append(f"task '{title[:40]}': {why}"); continue
                     if allow_write and self.deps.enqueue_task:
                         try:
                             pr = max(1, min(3, int(t.get("priority", 2))))

@@ -243,3 +243,114 @@ def test_auto_archive_old_terminal_tasks(tmp_path):
     assert store.get_task(still_ready)["status"] == "ready"
     # chạy lại không dọn thêm gì (idempotent)
     assert store.archive_old_terminal(root, age_days=3) == 0
+
+
+# ---- Kết quả worker: lấy câu chốt, không lấy dòng suy nghĩ ----
+
+# Ca thật (0.9.232): worker kể lể "Tôi sẽ lần theo...", "Lệnh shell vừa bị chặn..." rồi
+# mới chốt. Cả chuỗi bị gom làm result → Telegram nhận một bức tường văn.
+_NARRATION = [
+    "Tôi sẽ lần theo chỗ ShortMason đang xử lý IPN, tìm luồng subscription hiện có.",
+    "Lệnh shell vừa bị chặn bởi môi trường sandbox, nên tôi đổi sang truy vấn tối giản.",
+    "Tôi đang kiểm tra xem workspace có nguồn truy cập thay thế ngoài shell không.",
+]
+
+
+class _FakeCli:
+    """Engine giả phát đúng chuỗi event như engine thật (text… rồi final)."""
+
+    def __init__(self, events):
+        self.events = events
+
+    def is_available(self):
+        return True
+
+    async def query(self, _prompt):
+        for ev in self.events:
+            yield ev
+
+
+def test_query_lay_final_bo_dong_suy_nghi(tmp_path):
+    """result phải là CÂU CHỐT của worker, không phải toàn bộ dòng tường thuật."""
+    feature = _feature(tmp_path, [tmp_path / "Brain"])
+    events = [{"type": "text", "content": t} for t in _NARRATION]
+    events.append({"type": "final", "content": "Đã tạo file bonus.md, đã kiểm chứng bằng test."})
+    out, error, _ = asyncio.run(feature._query(_FakeCli(events), "p"))
+    assert error == ""
+    assert out == "Đã tạo file bonus.md, đã kiểm chứng bằng test."
+    assert "Tôi sẽ lần theo" not in out
+
+
+def test_query_khong_co_final_thi_giu_text(tmp_path):
+    """Engine không phát final (CLI cũ) → vẫn phải có kết quả, không được rỗng."""
+    feature = _feature(tmp_path, [tmp_path / "Brain"])
+    events = [{"type": "text", "content": "Chỉ có dòng này."}]
+    out, _, _ = asyncio.run(feature._query(_FakeCli(events), "p"))
+    assert out == "Chỉ có dòng này."
+
+
+def test_needs_input_reason_lay_mot_y_ngan(tmp_path):
+    """Lý do chặn là MỘT ý ngắn để đọc trên điện thoại, không phải 1000 ký tự tường thuật."""
+    raw = "[[NEEDS_INPUT]]\n" + "\n".join(_NARRATION) + \
+          "\nCần anh cho biết bonus cộng theo gói nào."
+    reason = TasksFeature._needs_input_reason(raw)
+    assert len(reason) <= 220
+    assert "\n" not in reason
+    # lấy Ý CUỐI (câu hỏi thật), không phải câu mở đầu kể lể
+    assert "bonus cộng theo gói nào" in reason
+
+
+def test_report_ngan_va_khong_lap_lai(tmp_path):
+    """Thông báo Telegram: 1 dòng tiêu đề + lý do gọn. Không dán result rồi dán lại y hệt."""
+    sent = []
+
+    async def capture(chat_id, text):
+        sent.append(text)
+
+    feature = _feature(tmp_path, [tmp_path / "Brain"])
+    feature.deps.report = capture
+    long_result = "\n".join(_NARRATION * 6)
+    asyncio.run(
+        feature._report(
+            {
+                "title": "Thiết kế credit bonus cho subscription WarriorPlus",
+                "status": "blocked",
+                "result": long_result,
+                "block_reason": "Cần anh chốt bonus cộng theo gói nào.",
+                "chat_id": "1",
+            }
+        )
+    )
+    msg = sent[0]
+    assert len(msg) <= 400, f"thông báo dài {len(msg)} ký tự"
+    assert "Thiết kế credit bonus" in msg
+    assert "Cần anh chốt bonus cộng theo gói nào." in msg
+    # result tường thuật KHÔNG được dán vào tin nhắn việc bị chặn
+    assert "Tôi sẽ lần theo" not in msg
+    # lý do chỉ xuất hiện đúng một lần
+    assert msg.count("Cần anh chốt bonus") == 1
+
+
+def test_report_done_bao_ngan_gon(tmp_path):
+    """Việc xong: báo tiêu đề + tóm tắt ngắn, không đổ nguyên bản kết quả."""
+    sent = []
+
+    async def capture(chat_id, text):
+        sent.append(text)
+
+    feature = _feature(tmp_path, [tmp_path / "Brain"])
+    feature.deps.report = capture
+    asyncio.run(
+        feature._report(
+            {
+                "title": "Lấy bảng giá Submagic",
+                "status": "done",
+                "result": "Đã lấy xong bảng giá.\n" + ("chi tiết dài " * 200),
+                "chat_id": "1",
+            }
+        )
+    )
+    msg = sent[0]
+    assert len(msg) <= 400
+    assert "Lấy bảng giá Submagic" in msg
+    assert "Đã lấy xong bảng giá." in msg

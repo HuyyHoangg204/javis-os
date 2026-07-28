@@ -461,16 +461,21 @@ class TasksFeature:
         if not cli.is_available():
             spec = aux_engine.read_spec()
             return "", f"Engine {spec.get('provider') or 'AI'} chưa sẵn sàng", []
-        output: list[str] = []
+        # Gom RIÊNG câu chốt (final) và dòng tường thuật (text). Trước đây trộn chung nên
+        # result = toàn bộ dòng suy nghĩ của worker ("Tôi sẽ lần theo...", "Lệnh shell bị
+        # chặn...") rồi đổ nguyên si về Telegram. Có final thì final LÀ kết quả; text chỉ
+        # là lối thoát cho engine không phát final.
+        final = ""
+        narration: list[str] = []
         error = ""
         tool_calls: list[str] = []
         try:
             async for event in cli.query(prompt):
                 kind = event.get("type")
                 if kind == "final":
-                    output.append(event.get("content") or "")
+                    final = str(event.get("content") or "") or final
                 elif kind == "text":
-                    output.append(event.get("content") or "")
+                    narration.append(str(event.get("content") or ""))
                 elif kind == "tool_call":
                     name = str(event.get("name") or event.get("tool") or "")
                     if name:
@@ -479,7 +484,8 @@ class TasksFeature:
                     error = str(event.get("content") or "engine error")
         except Exception as exc:
             error = f"{type(exc).__name__}: {exc}"
-        return "\n".join(v for v in output if v).strip(), error, tool_calls
+        out = final.strip() or "\n".join(v for v in narration if v).strip()
+        return out, error, tool_calls
 
     async def _specify(self, task: dict) -> tuple[dict, str]:
         cli = self._base_cli(task, [], "suggest", "specifier")
@@ -683,8 +689,14 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
 
     @staticmethod
     def _needs_input_reason(result: str) -> str:
+        """MỘT ý ngắn đủ đọc trên điện thoại. Worker hay kể lể vài dòng rồi mới nêu điều
+        còn thiếu ở CUỐI, nên lấy dòng cuối có nghĩa chứ không phải câu mở đầu."""
         text = (result or "").replace("[[NEEDS_INPUT]]", "").strip()
-        return text[:1000] or "Worker cần thêm thông tin để tiếp tục."
+        lines = [ln.strip(" -•\t") for ln in text.splitlines()]
+        lines = [ln for ln in lines if len(ln) > 8]
+        if not lines:
+            return "Worker cần thêm thông tin để tiếp tục."
+        return lines[-1][:200]
 
     @staticmethod
     def _artifacts(result: str, root: str) -> list[dict]:
@@ -722,14 +734,19 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
         }
         icon = "✅" if status in ("review", "done") else "⚠"
         parts = [f"{icon} Việc '{task.get('title', '')}' {labels.get(status, status)}."]
-        result = str(task.get("result") or "").strip()
-        if result:
-            parts.append(result[:1200])
+        # Tin nhắn PHẢI ngắn - đây là cái liếc trên điện thoại, chi tiết đã nằm ở trang Việc.
+        # Việc bị chặn: chỉ cần LÝ DO (result lúc này là tường thuật dở dang, dán vào chỉ
+        # tổ thành bức tường văn và lặp lại chính lý do). Việc xong: vài dòng đầu của kết quả.
         if status == "blocked":
-            parts.append(
-                "Lý do: "
-                + str(task.get("block_reason") or task.get("block_kind") or "")[:500]
-            )
+            reason = str(task.get("block_reason") or task.get("block_kind") or "").strip()
+            parts.append("Lý do: " + (reason[:240] or "không rõ"))
+        else:
+            head = "\n".join(
+                ln for ln in str(task.get("result") or "").strip().splitlines() if ln.strip()
+            )[:240].strip()
+            if head:
+                parts.append(head)
+        parts.append("Xem chi tiết ở trang Việc.")
         try:
             await self.deps.report(
                 task.get("chat_id", ""),

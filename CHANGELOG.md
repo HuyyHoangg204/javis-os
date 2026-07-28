@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.232] - 2026-07-28
+Việc nền báo gọn và thôi tự đẻ việc rác: chặn ngay ở cửa vào thứ worker headless không thể làm.
+### Sửa lỗi
+- **Thông báo Telegram của việc nền hết là bức tường văn**: `_query` gom CHUNG dòng tường thuật (`text`) với câu chốt (`final`) nên `result` = toàn bộ dòng suy nghĩ của worker ("Tôi sẽ lần theo...", "Lệnh shell vừa bị chặn..."); `_report` dán `result[:1200]` rồi dán tiếp `block_reason[:500]` vốn cũng cắt từ chính chuỗi đó - một tin nhắn lặp lại y hệt hai lần. Nay có `final` thì `final` LÀ kết quả (text chỉ là lối thoát cho engine không phát final), việc bị chặn chỉ báo LÝ DO gọn, việc xong báo vài dòng đầu, đóng bằng "Xem chi tiết ở trang Việc". Tin nhắn xuống dưới 400 ký tự.
+- **Lý do chặn lấy đúng ý cần hỏi**: `_needs_input_reason` cắt 1000 ký tự từ ĐẦU chuỗi nên toàn dính đoạn kể lể mở bài. Nay lấy dòng cuối có nghĩa (chỗ worker thật sự nêu cái còn thiếu), tối đa 200 ký tự, một dòng.
+### Cải thiện
+- **Cửa gác việc learn tự tạo** (`learn.task_infeasible`): bảng Kanban brain chính có 28 việc thì 100% do learn tự tạo, và nhóm "cập nhật cookie Facebook", "gửi link Drive vào Zalo nhóm", "theo dõi duyệt bài Substack", "sửa IPN repo ShortMason" đều kết thúc archived/cancelled/blocked - worker nền là headless, chỉ có file trong brain + đọc MCP, không có tay chủ, không trình duyệt đăng nhập, không được gửi ra ngoài, không thấy repo ngoài brain. Bốn nhóm đó nay bị loại NGAY ở cửa vào kèm lý do tiếng Việt (trước để lọt rồi mới chặn lúc chạy: tốn một lượt worker, tốn quota, thêm một thông báo làm phiền). Prompt learn cũng siết theo: chỉ đề xuất task khi hội đủ ba điều kiện (user nhờ rõ, worker tự làm trọn được, có kết quả kiểm chứng được), thà bỏ sót còn hơn đẻ backlog rác.
+### Kiểm thử
+- `test_learn_task_gate.py` mới (7 case): 4 nhóm việc bất khả thi bị loại, việc thao tác file trong brain và việc đọc MCP vẫn đi qua (không gác quá tay), lý do trả về là câu tiếng Việt ngắn.
+- `test_tasks_autonomous.py` thêm 5 case: `_query` lấy final bỏ tường thuật, không có final thì giữ text, lý do chặn một ý ngắn, thông báo blocked/done đều dưới 400 ký tự và không lặp lại.
+
 ## [0.9.231] - 2026-07-28
 Đổi brain là hội thoại đổi theo: hết cảnh "tưởng mất chat, phải reload trang".
 ### Sửa lỗi
