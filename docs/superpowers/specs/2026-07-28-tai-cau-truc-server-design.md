@@ -1,8 +1,17 @@
 # Tái cấu trúc server Javis OS
 
 Ngày: 2026-07-28
-Trạng thái: đã chốt hướng, chờ lập kế hoạch thực thi
+Trạng thái: giai đoạn 0 XONG (0.9.235 + 0.9.236). Giai đoạn 1-4 chờ kế hoạch thực thi.
 Phiên bản gốc: 0.9.234
+
+Tiến độ:
+- [x] Giai đoạn 0 - lưới an toàn. Kèm phát hiện ngoài dự kiến: CI đã đỏ liên tục từ 0.9.231,
+      nên đã vá luôn hai lỗi chặn (guide connector vượt trần ký tự, và `test_graph_watch.py`
+      segfault lúc thoát do luồng Rust của watchfiles). CI xanh toàn bộ từ 0.9.236.
+- [ ] Giai đoạn 1 - gỡ chặn event loop
+- [ ] Giai đoạn 2 - dọn dữ liệu runtime khỏi source
+- [ ] Giai đoạn 3 - tách test
+- [ ] Giai đoạn 4 - chẻ main.py
 
 ## 1. Vì sao làm, và ba giả định đã bị bác bỏ
 
