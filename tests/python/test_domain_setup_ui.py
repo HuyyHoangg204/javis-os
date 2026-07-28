@@ -9,7 +9,14 @@ from pathlib import Path
 
 INDEX = (ROOT / "dashboard" / "index.html").read_text(encoding="utf-8")
 BRANDING = (ROOT / "dashboard" / "branding.js").read_text(encoding="utf-8")
-MAIN = (ROOT / "server" / "main.py").read_text(encoding="utf-8")
+# Đây là test HỢP ĐỒNG trên mã nguồn: nó khẳng định backend có xử lý một số tình huống,
+# bằng cách tìm chuỗi trong nguồn. Từ 0.9.243 các nhóm route được bóc dần khỏi main.py sang
+# routes/, nên đọc mỗi main.py là đỏ oan mỗi lần bóc một khối. Ghép cả main.py lẫn routes/
+# để test bám vào HÀNH VI CÒN TỒN TẠI chứ không bám vào chỗ nó đang nằm.
+MAIN = "\n".join(
+    [(SERVER / "main.py").read_text(encoding="utf-8")]
+    + [p.read_text(encoding="utf-8") for p in sorted((SERVER / "routes").glob("*.py"))]
+)
 HOSTINGER = (ROOT / "docker-compose.hostinger.yml").read_text(encoding="utf-8")
 VPS = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 DOC = (ROOT / "docs" / "15-thuong-hieu-ten-mien.md").read_text(encoding="utf-8")
