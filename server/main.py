@@ -16,6 +16,7 @@ import re
 import shutil
 import time
 import yaml
+import fastyaml
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, UploadFile, File, Form, Request, Body, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -2462,7 +2463,7 @@ def _read_md(path):
         parts = text.split("---", 2)
         if len(parts) >= 3:
             try:
-                meta = yaml.safe_load(parts[1]) or {}
+                meta = fastyaml.safe_load(parts[1]) or {}
             except Exception:
                 meta = {}
             return (meta if isinstance(meta, dict) else {}), parts[2].strip()
@@ -3062,7 +3063,7 @@ def _scan_note_md(text):
         parts = text.split("---", 2)
         if len(parts) >= 3:
             try:
-                meta = yaml.safe_load(parts[1])
+                meta = fastyaml.safe_load(parts[1])
                 if isinstance(meta, dict):
                     fm = _json_safe_fm(meta)
             except Exception:

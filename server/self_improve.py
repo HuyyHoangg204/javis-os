@@ -58,6 +58,7 @@ from pathlib import Path
 from typing import Any, Callable, List, Optional, Tuple
 
 import yaml
+import fastyaml
 from fastapi import APIRouter, Form, Query
 
 from claude_cli import claude_engine, cancel_all, _empty_mcp_file
@@ -308,7 +309,7 @@ class LoopFeature:
                 if not m:
                     print(f"[loops] bỏ qua {fp.name}: không có frontmatter", file=__import__('sys').stderr)
                     continue
-                fm = yaml.safe_load(m.group(1))
+                fm = fastyaml.safe_load(m.group(1))
                 if not isinstance(fm, dict):
                     print(f"[loops] bỏ qua {fp.name}: frontmatter không phải mapping", file=__import__('sys').stderr)
                     continue

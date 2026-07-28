@@ -30,7 +30,7 @@ import zipfile
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-import yaml
+import fastyaml
 
 _MAX_FILES = 300
 _MAX_TOTAL = 20 * 1024 * 1024      # tổng giải nén 20MB
@@ -44,7 +44,7 @@ def _parse(text: str):
         parts = text.split("---", 2)
         if len(parts) >= 3:
             try:
-                meta = yaml.safe_load(parts[1]) or {}
+                meta = fastyaml.safe_load(parts[1]) or {}
             except Exception:
                 meta = {}
             return (meta if isinstance(meta, dict) else {}), parts[2]

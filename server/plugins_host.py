@@ -38,6 +38,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import yaml
+import fastyaml
 
 import mcp_catalog
 from config import STATE_DIR
@@ -148,7 +149,7 @@ def _read_manifest(pdir: Path) -> Tuple[dict, str]:
     if not f.is_file():
         return {}, ""
     try:
-        m = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        m = fastyaml.safe_load(f.read_text(encoding="utf-8")) or {}
         return (m if isinstance(m, dict) else {}), ""
     except Exception as e:
         return {}, f"manifest lỗi: {type(e).__name__}: {e}"

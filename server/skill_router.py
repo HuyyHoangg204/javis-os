@@ -26,7 +26,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-import yaml
+import fastyaml
 
 # slug 1 đoạn an toàn (không '/', không '..') → chống path traversal khi join base/slug
 _SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
@@ -114,7 +114,7 @@ def split_frontmatter(text: str):
         parts = text.split("---", 2)
         if len(parts) >= 3:
             try:
-                meta = yaml.safe_load(parts[1]) or {}
+                meta = fastyaml.safe_load(parts[1]) or {}
             except Exception:
                 meta = {}
             return (meta if isinstance(meta, dict) else {}), parts[2]

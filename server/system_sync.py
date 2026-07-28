@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
+import fastyaml
 
 PROJECT_ROOT = Path(__file__).parent.parent
 SYSTEM_SKILLS_DIR = PROJECT_ROOT / ".claude" / "skills"
@@ -88,7 +89,7 @@ def _split_frontmatter(text: str):
         parts = text.split("---", 2)
         if len(parts) >= 3:
             try:
-                meta = yaml.safe_load(parts[1]) or {}
+                meta = fastyaml.safe_load(parts[1]) or {}
             except Exception:
                 meta = {}
             return (meta if isinstance(meta, dict) else {}), parts[2]
@@ -268,7 +269,7 @@ def _cap_desc(text: str, cap: int) -> Optional[str]:
         block = "\n".join(lines[:take])
         end = end + len(block)
         try:
-            val = yaml.safe_load(f"description: {raw}\n{block}\n").get("description")
+            val = fastyaml.safe_load(f"description: {raw}\n{block}\n").get("description")
         except Exception:
             return None
         if not isinstance(val, str):
@@ -276,7 +277,7 @@ def _cap_desc(text: str, cap: int) -> Optional[str]:
     elif len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
         # Bóc nháy bao ngoài để đếm ĐÚNG phần chữ, rồi trả lại bằng scalar JSON an toàn cho YAML.
         try:
-            val = yaml.safe_load(raw)
+            val = fastyaml.safe_load(raw)
         except Exception:
             return None
         val = val if isinstance(val, str) else raw
