@@ -24,7 +24,12 @@ Tiến độ:
       Giá trị thật thu được nằm ở chỗ khác và lớn hơn dự kiến: `.dockerignore` để lọt
       `.secret_key`, `.hub_token`, `.oauth_mcp.json`, `usage_index.db` vào image, và
       context build từ **1.239 MB xuống 6 MB**.
-- [ ] Giai đoạn 3 - tách test
+- [x] Giai đoạn 3 - tách test (0.9.242). `server/` từ 126 file `.py` xuống **50 file nguồn**.
+      Làm KHÁC kế hoạch theo hướng tốt hơn: spec định giữ `cwd=server` trong CI, nhưng đã bỏ
+      hẳn ràng buộc đó - 97 chỗ phụ thuộc vị trí quy về `tests/python/_paths.py`, test chạy
+      được từ bất kỳ thư mục nào. Kèm 2 việc ngoài kế hoạch: 7 test JS chưa từng chạy lần nào
+      giờ đã chạy (CI liệt tay 4 file, bỏ sót 7), và test JS thôi bị phục vụ công khai qua
+      `/static/test_*.js`.
 - [ ] Giai đoạn 4 - chẻ main.py
 
 ## 1. Vì sao làm, và ba giả định đã bị bác bỏ
