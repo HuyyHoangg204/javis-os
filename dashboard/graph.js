@@ -251,7 +251,8 @@ class JavisGraph {
   // đang lớn lên. Link chỉ hiện khi CẢ HAI đầu đã ra đời. Chỉ chạy khi user bấm - không nền.
   // Nhịp CỐ ĐỊNH cho mỗi note (không ép tổng thời gian): não càng dày phim càng dài,
   // xem thư thái như lật album - yêu cầu của chủ, đừng đổi lại thành duration.
-  startTimelapse(perNoteMs = 320) {
+  // 160ms/note = chủ chốt sau khi thử 320ms thấy hơi rề.
+  startTimelapse(perNoteMs = 160) {
     if (!this.graph || this._tlTimer) return false;
     const d = this.graph.graphData();
     if (!d.nodes.length) return false;

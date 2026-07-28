@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.226] - 2026-07-28
+Timelapse nhanh gấp đôi: 160ms mỗi note.
+### Cải thiện
+- Nhịp timelapse 320ms → 160ms mỗi note (chủ xem thử thấy hơi rề, chốt x2). Vẫn giữ nguyên triết lý nhịp cố định theo note - não càng dày phim càng dài, không ép tổng thời gian.
+
 ## [0.9.225] - 2026-07-28
 Timelapse chậm rãi: mỗi note một nhịp cố định, não càng dày phim càng dài.
 ### Cải thiện
