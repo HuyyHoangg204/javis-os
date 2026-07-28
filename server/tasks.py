@@ -73,6 +73,7 @@ class TasksFeature:
         self._dispatcher_task: Optional[asyncio.Task] = None
         self._wake = asyncio.Event()
         self._closing = False
+        self._snap_locks: dict[str, asyncio.Lock] = {}
         self.router = self._make_router()
 
     # ------------------------------------------------------------------
@@ -115,6 +116,9 @@ class TasksFeature:
         """Mirror runtime state to JSON for old builds and brain backup."""
         try:
             tasks = self.store.list_tasks(root, include_archived=True, limit=5000)
+            # MỘT truy vấn cho mọi task thay vì một truy vấn mỗi task (N+1). Với bảng đầy
+            # tới trần 5000 thì đây là 5000 lượt round-trip sqlite biến thành 10 lượt.
+            events = self.store.list_events_bulk([t["id"] for t in tasks], 20)
             for task in tasks:
                 task["log"] = [
                     {
@@ -124,7 +128,7 @@ class TasksFeature:
                         ),
                         "msg": event.get("message") or event.get("event_type") or "",
                     }
-                    for event in self.store.list_events(task["id"], 20)
+                    for event in events.get(task["id"], [])
                 ]
                 task.pop("normalized_title", None)
             data = {
@@ -140,6 +144,20 @@ class TasksFeature:
             )
         except Exception as exc:
             print(f"[kanban snapshot] {type(exc).__name__}: {exc}", file=__import__("sys").stderr)
+
+    async def _asnapshot(self, root: str) -> None:
+        """_snapshot cho nơi gọi async: đẩy ra thread, nhưng SERIAL theo từng brain.
+
+        Vì sao cần khoá: _snapshot đọc cả bảng rồi ghi đè file mirror. Hai lần chạy song
+        song đều ghi ra file hợp lệ, nhưng lần CŨ có thể hạ cánh sau lần MỚI và để lại
+        bản thiu cho tới lần thay đổi kế tiếp. Bản đồng bộ trước đây tự nối tiếp nên
+        không có vấn đề này; đẩy ra thread mà quên khoá là tự tạo ra nó.
+        """
+        lock = self._snap_locks.get(root)
+        if lock is None:
+            lock = self._snap_locks[root] = asyncio.Lock()
+        async with lock:
+            await asyncio.to_thread(self._snapshot, root)
 
     # ------------------------------------------------------------------
     # Public generator API used by Learn/chat
@@ -311,7 +329,7 @@ class TasksFeature:
         self._worker_ids[task_id] = worker_id
         self._worker_brains[task_id] = root
         worker.add_done_callback(lambda _task, tid=task_id: self._worker_done(tid))
-        self._snapshot(root)
+        await self._asnapshot(root)
         return True
 
     def _worker_done(self, task_id: str) -> None:
@@ -417,7 +435,7 @@ class TasksFeature:
         finally:
             heartbeat.cancel()
             await asyncio.gather(heartbeat, return_exceptions=True)
-            self._snapshot(root)
+            await self._asnapshot(root)
             if final_task and final_task.get("status") in ("done", "review", "blocked"):
                 await self._report(final_task)
 
@@ -887,7 +905,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 return {"ok": False, "error": "status không hợp lệ"}
             if not self.store.move(id, status):
                 return {"ok": False, "error": "không thể chuyển task đang chạy"}
-            self._snapshot(root)
+            await self._asnapshot(root)
             self.wake()
             return {"ok": True, "status": status}
 
@@ -901,7 +919,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 return {"ok": False, "error": "not found"}
             if not self.store.move(id, "archived", "operator archive"):
                 return {"ok": False, "error": "không thể archive task đang chạy"}
-            self._snapshot(root)
+            await self._asnapshot(root)
             return {"ok": True, "archived": True}
 
         @router.post("/kanban/purge")
@@ -915,7 +933,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
             if str(include_done).strip() in ("1", "true", "True"):
                 statuses = statuses + ("done",)
             removed = self.store.purge_terminal(root, statuses=statuses)
-            self._snapshot(root)
+            await self._asnapshot(root)
             return {"ok": True, "removed": removed}
 
         @router.post("/kanban/clear")
@@ -923,7 +941,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
             """Xoá TRẮNG bảng (trừ việc đang chạy). Dứt khoát, không hoàn tác được."""
             root = self._ensure(brain)
             removed = self.store.clear_board(root)
-            self._snapshot(root)
+            await self._asnapshot(root)
             return {"ok": True, "removed": removed}
 
         @router.post("/kanban/orchestration")
@@ -934,7 +952,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 return {"ok": False, "error": "mode không hợp lệ"}
             root = self._ensure(brain)
             self.store.set_orchestration(root, mode)
-            self._snapshot(root)
+            await self._asnapshot(root)
             self.wake()
             return {"ok": True, "orchestration": mode}
 
@@ -972,7 +990,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 return {"ok": False, "error": "not found"}
             if not self.store.move(id, "ready", "operator retry"):
                 return {"ok": False, "error": "task đang chạy"}
-            self._snapshot(root)
+            await self._asnapshot(root)
             self.wake()
             return {"ok": True, "status": "ready"}
 
@@ -990,7 +1008,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 worker.cancel()
             elif not self.store.move(id, "cancelled", "operator cancel"):
                 return {"ok": False, "error": "không thể huỷ"}
-            self._snapshot(root)
+            await self._asnapshot(root)
             return {"ok": True, "cancelled": True}
 
         @router.post("/kanban/stop")
@@ -1004,7 +1022,7 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
                 cancel_all(f"dispatch:{tid}")
                 worker.cancel()
                 cancelled += 1
-            self._snapshot(root)
+            await self._asnapshot(root)
             return {"ok": True, "orchestration": "off", "cancelled": cancelled}
 
         return router

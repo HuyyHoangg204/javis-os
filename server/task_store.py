@@ -342,6 +342,40 @@ class TaskStore:
             out.append(value)
         return out
 
+    def list_events_bulk(self, task_ids: list[str], limit: int = 20) -> dict[str, list[dict]]:
+        """{task_id: [event, ...]} cho NHIỀU task trong một truy vấn thay vì N+1.
+
+        _snapshot của Kanban trước đây lấy list_tasks(limit=5000) rồi gọi list_events cho
+        TỪNG task - đúng khuôn N+1, chi phí tăng tuyến tính theo số việc trên bảng, mà nó
+        chạy sau mỗi lần giao việc, mỗi lần worker xong và mỗi nhịp dọn dẹp.
+
+        Cắt theo lô 500 id: SQLite bản mới cho tới 32.766 tham số nhưng bản cũ chỉ 999,
+        mà kho này chạy trên cả máy người dùng lẫn image Docker nên đừng đoán.
+        Thứ tự trong mỗi task giữ nguyên như list_events: cũ -> mới.
+        """
+        out: dict[str, list[dict]] = {tid: [] for tid in task_ids}
+        if not task_ids:
+            return out
+        lim = max(1, min(500, int(limit)))
+        with self._lock:
+            for i in range(0, len(task_ids), 500):
+                lo = task_ids[i:i + 500]
+                marks = ",".join("?" * len(lo))
+                rows = self._db.execute(
+                    f"""SELECT * FROM (
+                            SELECT *, ROW_NUMBER() OVER (PARTITION BY task_id ORDER BY id DESC) AS _rn
+                            FROM task_events WHERE task_id IN ({marks})
+                        ) WHERE _rn <= ?
+                        ORDER BY task_id, id ASC""",
+                    (*lo, lim),
+                ).fetchall()
+                for row in rows:
+                    value = dict(row)
+                    value.pop("_rn", None)
+                    value["metadata"] = _loads(value.pop("metadata_json", "{}"), {})
+                    out.setdefault(value["task_id"], []).append(value)
+        return out
+
     def list_runs(self, task_id: str, limit: int = 20) -> list[dict]:
         with self._lock:
             rows = self._db.execute(
