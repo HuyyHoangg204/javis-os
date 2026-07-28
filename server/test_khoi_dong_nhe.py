@@ -65,24 +65,36 @@ for ten in ("_tts_edge", "tts_voices"):
     src = inspect.getsource(fn) if fn else ""
     check(f"{ten}() có lệnh import edge_tts cục bộ", "import edge_tts" in src)
 
-# ---- Trần thời gian nạp, đo trong tiến trình con cho sạch ----
-# Trần đặt rộng (3 giây) vì máy CI chậm và chia sẻ CPU. Mục đích KHÔNG phải bắt vài chục
-# mili giây, mà bắt cú lùi lớn kiểu ai đó kéo lại một thư viện cả giây vào đường khởi động.
-TRAN_MS = 3000
+# ---- Trần chi phí nạp, đo bằng TỈ LỆ chứ không phải mili giây ----
+# Bản đầu dùng trần tuyệt đối 3000ms và nó ĐÃ báo oan: trên máy đang bị quét virus, chỉ
+# riêng `import fastapi` đã 2,9-6,3 giây và interpreter trống mất 500ms, nên `import main`
+# vọt lên 7,6 giây mà không có dòng code nào đổi. Trần theo mili giây đo tốc độ MÁY, không
+# đo thứ ta quan tâm.
+#
+# Tỉ lệ so với `import fastapi` thì miễn nhiễm với tốc độ máy, vì cả tử lẫn mẫu cùng chậm
+# đi. Đo thực tế: hiện tại 1,93; nếu ai đó thêm lại edge_tts vào đầu file là 3,66. Ngưỡng
+# 3,0 tách sạch hai trường hợp và còn dư biên cả hai phía.
+TRAN_TI_LE = 3.0
 
 
-def do_nap(code):
+def do_nap(code, n=3):
     import time
-    t = time.perf_counter()
-    subprocess.run([sys.executable, "-c", code], cwd=HERE, capture_output=True)
-    return (time.perf_counter() - t) * 1000
+    ts = []
+    for _ in range(n):
+        t = time.perf_counter()
+        subprocess.run([sys.executable, "-c", code], cwd=HERE, capture_output=True)
+        ts.append((time.perf_counter() - t) * 1000)
+    return min(ts)      # min: nhiễu chỉ cộng thêm, không bao giờ trừ bớt
 
 
-base = min(do_nap("pass") for _ in range(3))
-full = min(do_nap("import main") for _ in range(3))
-nap_ms = full - base
-print(f"     (nạp main {nap_ms:.0f} ms, interpreter trần {base:.0f} ms)")
-check(f"nạp main dưới {TRAN_MS} ms (đang {nap_ms:.0f} ms)", nap_ms < TRAN_MS)
+base = do_nap("pass")
+chi_fastapi = do_nap("import fastapi") - base
+chi_main = do_nap("import main") - base
+ti_le = chi_main / chi_fastapi if chi_fastapi > 0 else 0
+print(f"     (interpreter trần {base:.0f} ms | fastapi {chi_fastapi:.0f} ms | "
+      f"main {chi_main:.0f} ms | tỉ lệ {ti_le:.2f})")
+check(f"nạp main không quá {TRAN_TI_LE} lần chi phí nạp fastapi (đang {ti_le:.2f} lần)",
+      0 < ti_le < TRAN_TI_LE)
 
 # ---- Không ai lén thêm lại import ở mức module ----
 src = Path(HERE, "main.py").read_text(encoding="utf-8", errors="replace")

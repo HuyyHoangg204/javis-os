@@ -115,10 +115,26 @@ finally:
     main._BRAINS_MD_CAP = that
 
 # ---- 4. Event loop vẫn thở trong lúc quét (đây là thứ đã gây 404 toàn trang trên VPS) ----
-dung_brain("Brain To", 3000)
+# Ép việc đếm CHẬM bằng cách vá _count_md thay vì đẻ hàng nghìn file thật. Lý do:
+#   - Bản đầu tạo 3000 file để làm việc đủ nặng, tốn 27 giây chỉ để dựng dữ liệu.
+#   - Mà 800 file thì CẢ HAI đường đều nhanh (15 và 16ms), nên phép đo không chứng minh
+#     được gì - nó xanh vì việc quá nhẹ, không phải vì code đúng.
+# Đĩa chậm mới là tình huống thật cần chống: vault lớn, ổ mạng, VPS I/O nghẽn.
+_count_that = main._count_md
+DO_TRE_GIA = 0.15
 
 
-async def do_do_tre():
+def _count_cham(root, cap):
+    time.sleep(DO_TRE_GIA)      # giả lập ổ đĩa chậm / vault lớn
+    return _count_that(root, cap)
+
+
+async def do_do_tre(chay):
+    """Bắn nhịp 5ms vào event loop rồi đo độ trễ LỚN NHẤT trong lúc `chay` chạy.
+
+    Đo độ trễ chứ không đo thời gian hàm: hàm chạy 100ms trong thread là vô hại, còn hàm
+    chạy 100ms trên loop là 100ms mọi request khác bị treo, kể cả healthcheck của Docker.
+    """
     tre = []
 
     async def nhip():
@@ -129,7 +145,12 @@ async def do_do_tre():
 
     t_nhip = asyncio.create_task(nhip())
     await asyncio.sleep(0.05)          # cho nhịp chạy ổn định
-    await main.list_brains()
+    await chay()
+    # BẮT BUỘC nhường loop trước khi huỷ nhịp. Hàm đồng bộ không có điểm await nào, nên
+    # `await chay()` chạy thẳng inline: nhịp tim bị chặn suốt thời gian đó và chỉ ghi được
+    # con số trễ SAU khi loop chạy lại. Huỷ ngay ở đây là mất đúng phép đo cần đo - và đó
+    # là lý do bản trước báo 16ms cho cả hai đường, tức phép đo hoàn toàn vô nghĩa.
+    await asyncio.sleep(0.02)
     t_nhip.cancel()
     try:
         await t_nhip
@@ -138,10 +159,32 @@ async def do_do_tre():
     return max(tre) if tre else 0.0
 
 
-tre_max = asyncio.run(do_do_tre())
-print(f"     (độ trễ nhịp tim lớn nhất trong lúc quét: {tre_max:.0f} ms)")
-check(f"event loop không bị khoá quá 150ms khi quét brain 3000 note ({tre_max:.0f} ms)",
-      tre_max < 150)
+async def _duong_that():
+    return await main.list_brains()
+
+
+async def _duong_dong_bo():
+    # Cố tình gọi bản đồng bộ THẲNG trên loop - đây là hành vi TRƯỚC 0.9.239.
+    return main._list_brains_sync()
+
+
+try:
+    main._count_md = _count_cham
+    tre_async = asyncio.run(do_do_tre(_duong_that))
+    tre_sync = asyncio.run(do_do_tre(_duong_dong_bo))
+finally:
+    main._count_md = _count_that
+
+nguong = DO_TRE_GIA * 1000
+print(f"     (mỗi brain đếm mất {nguong:.0f} ms | độ trễ nhịp tim: qua to_thread "
+      f"{tre_async:.0f} ms, gọi thẳng trên loop {tre_sync:.0f} ms)")
+
+# Đối chứng: không có bước này thì test trên có thể xanh vì việc quá nhẹ chứ không phải
+# vì code đúng. Bản đồng bộ PHẢI làm loop trễ ít nhất bằng một lần đếm.
+check(f"phép đo có răng: gọi thẳng trên loop khoá loop >= {nguong:.0f} ms ({tre_sync:.0f} ms)",
+      tre_sync >= nguong)
+check(f"đường thật KHÔNG khoá loop dù mỗi brain đếm mất {nguong:.0f} ms ({tre_async:.0f} ms)",
+      tre_async < nguong / 2)
 
 # ---- 5. Một brain hỏng không giết cả danh sách ----
 that_count = main._count_md

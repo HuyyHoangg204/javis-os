@@ -136,7 +136,7 @@ check(f"mỗi việc giữ đủ {N_EVENT + 1} dòng nhật ký ({N_EVENT} ghi c
       all(len(t["log"]) == N_EVENT + 1 for t in mirror["tasks"]))
 
 # ---- 6. _asnapshot không khoá event loop ----
-async def do_tre():
+async def do_tre(chay):
     tre = []
 
     async def nhip():
@@ -147,7 +147,11 @@ async def do_tre():
 
     tk = asyncio.create_task(nhip())
     await asyncio.sleep(0.05)
-    await feat._asnapshot(ROOT)
+    await chay()
+    # BẮT BUỘC nhường loop trước khi huỷ nhịp: hàm đồng bộ không có điểm await nào nên
+    # nhịp tim chỉ ghi được con số trễ SAU khi loop chạy lại. Huỷ ngay là mất đúng phép
+    # đo cần đo, và test sẽ xanh cho cả hai đường - tức vô nghĩa.
+    await asyncio.sleep(0.02)
     tk.cancel()
     try:
         await tk
@@ -156,9 +160,23 @@ async def do_tre():
     return max(tre) if tre else 0.0
 
 
-tre_max = asyncio.run(do_tre())
-print(f"     (độ trễ nhịp tim lớn nhất khi snapshot: {tre_max:.0f} ms)")
-check(f"event loop không bị khoá quá 100ms khi snapshot ({tre_max:.0f} ms)", tre_max < 100)
+async def _duong_that():
+    return await feat._asnapshot(ROOT)
+
+
+async def _duong_dong_bo():
+    return feat._snapshot(ROOT)      # hành vi TRƯỚC 0.9.240: chạy thẳng trên loop
+
+
+tre_async = asyncio.run(do_tre(_duong_that))
+tre_sync = asyncio.run(do_tre(_duong_dong_bo))
+print(f"     (độ trễ nhịp tim: qua to_thread {tre_async:.0f} ms | "
+      f"gọi thẳng trên loop {tre_sync:.0f} ms)")
+# Đối chứng: không có bước này thì con số bên trên có thể nhỏ vì việc quá nhẹ chứ không
+# phải vì code đúng.
+check(f"phép đo có răng: gọi thẳng trên loop trễ hơn hẳn ({tre_sync:.0f} so với {tre_async:.0f} ms)",
+      tre_sync > max(3 * tre_async, 25))
+check(f"đường thật KHÔNG khoá loop quá 100ms ({tre_async:.0f} ms)", tre_async < 100)
 
 # ---- 7. Snapshot song song phải NỐI TIẾP, không ghi đè ngược ----
 # Không có khoá thì lần chạy CŨ có thể hạ cánh sau lần MỚI và để lại mirror thiu.

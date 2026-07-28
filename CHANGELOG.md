@@ -4,6 +4,24 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.241] - 2026-07-28
+Bịt lỗ rò bí mật vào image Docker, và sửa ba lỗi trong chính bộ test - trong đó có một lỗi làm hai bài test đo hiệu năng luôn xanh bất kể code đúng hay sai.
+### Bảo mật
+- **`.dockerignore` để lọt khoá bí mật vào image**: `Dockerfile:64` là `COPY . .` nên đây là hàng rào DUY NHẤT, mà nó đã trôi thành bản sao cũ và yếu hơn `.gitignore` nhiều. Bốn file đang bị nướng thẳng vào image: `server/.secret_key`, `server/.hub_token`, `server/.oauth_mcp.json`, `server/usage_index.db`. Build trên GHCR chạy từ checkout sạch nên không dính, đó là lý do lỗi này sống lâu mà không ai thấy; chỉ ai `docker build` cục bộ mới bị.
+- **Bẫy cú pháp `.dockerignore`**: pattern khớp từ GỐC context, KHÔNG tự khớp mọi độ sâu như `.gitignore`. Nên dòng `.staging/` trần chưa bao giờ loại được `server/.staging` (114MB), và tương tự với `brains-backup` (1,4GB). Muốn khớp mọi độ sâu phải viết `**/`, đúng như dòng `**/__pycache__` vốn đã có trong file. Sau khi vá, **context build từ 1.239 MB xuống 6 MB**.
+### Sửa lỗi
+- **Phép đo độ trễ event loop trong test vô nghĩa**: `test_brains_dem` và `test_kanban_snapshot` (thêm ở 0.9.239-240) huỷ tác vụ nhịp tim NGAY sau khi gọi hàm. Hàm đồng bộ không có điểm nhường loop nào nên nhịp tim bị huỷ trước khi kịp ghi lại độ trễ - kết quả là cả đường đồng bộ lẫn đường qua thread đều báo 16ms, tức test luôn xanh bất kể code đúng hay sai. Nay nhường loop trước khi huỷ, và mỗi test có thêm một bước ĐỐI CHỨNG bắt buộc đường đồng bộ phải tệ hơn hẳn. Số thật sau khi vá: `/brains` đồng bộ khoá loop 456ms so với 21ms qua thread; snapshot Kanban 221ms so với 35ms.
+- **`test_khoi_dong_nhe` báo oan trên máy đang tải**: dùng trần tuyệt đối 3000ms, mà trên máy đang quét virus thì riêng `import fastapi` mất 2,9-6,3 giây và interpreter trống mất 500ms, nên `import main` vọt lên 7,6 giây dù không dòng code nào đổi. Trần theo mili giây đo tốc độ MÁY chứ không đo thứ cần đo. Nay đo bằng TỈ LỆ so với chi phí nạp `fastapi`: hiện tại 1,93, nếu ai đó thêm lại `edge_tts` vào đầu file là 3,66, ngưỡng 3,0 tách sạch và miễn nhiễm với tốc độ máy.
+### Dọn dẹp
+- **`.gitignore` phủ 7 artifact trước đây vừa không track vừa không ignore**: `kanban.sqlite3`, `tg_brain.json`, `update_state.json`, `logs/`, `brain-trash/`, `_selfupdate.bat`, `videos/`. Trước đó một cú `git add -A` là commit thẳng dữ liệu chạy và trạng thái deploy vào repo.
+- **Gỡ hai dòng `/agents` và `/workflows` khỏi `.gitignore`**: chúng sinh ra để che hai file rác 28 byte (mảnh log của một lệnh redirect hỏng), nhưng hệ quả là chặn vĩnh viễn việc tạo thư mục `agents/` hay `workflows/` THẬT ở gốc. Hai file rác đã xoá hẳn, cùng hai thư mục rỗng `memory/` và `server/utf-8/`.
+- **`test_brains_dem` từ 27 giây xuống 9,5 giây**: bỏ việc tạo 3000 file thật, đổi sang mô phỏng đĩa chậm - vừa nhanh hơn vừa đúng tình huống thật cần chống (vault lớn, ổ mạng, VPS I/O nghẽn).
+### Không làm (có chủ đích)
+- **KHÔNG dời `server/brains-backup/` (1,4GB) và `server/.staging/` (114MB) ra ngoài repo** như spec ban đầu ghi. Kiểm ra thì cả hai không phải rác: `brains-backup` là bản sao làm việc git của tính năng sao lưu brain lên GitHub (`main.py:1474`) và ĐANG có thay đổi chưa commit; `.staging` chứa file người dùng upload thật. Cả hai là nội dung của `JAVIS_STATE_DIR`, mà `STATE_DIR` mặc định chính là `server/`, nên "dời ra ngoài" thực chất là đổi `STATE_DIR` - đúng điều spec cấm ở mục 3 vì đó là bẫy mất tài khoản và connector. `server/tmp/` cũng đang được `claude_sdk_engine.py:254` dùng.
+### Kiểm thử
+- `test_ignore_files.py` mới: kiểm 28 đường dẫn bí mật/trạng thái/dữ liệu nặng đều bị cả git lẫn Docker loại, và mã nguồn cùng tầng hệ thống thì KHÔNG bị loại. Phần git dùng chính `git check-ignore` nên là chân lý; phần Docker dùng một bản mô phỏng luật khớp có tự kiểm 5 case trước khi kết luận, giá trị chính là khoá cứng cái bẫy `**/`.
+- 76/76 test xanh.
+
 ## [0.9.240] - 2026-07-28
 Giai đoạn 1 của đợt tái cấu trúc: gỡ hết các chỗ chặn event loop rẻ tiền nhất. Mỗi lượt chat từ 150,8ms xuống 37,2ms, khởi động từ 2.263ms xuống ~1.400ms. Không đổi một hành vi nào ngoài số đếm note (xem dưới).
 ### Cải thiện

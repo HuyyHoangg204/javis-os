@@ -37,6 +37,17 @@ server/connector-files/
 server/conversations.db
 server/conversations.db-wal
 server/conversations.db-shm
+# Bổ sung 0.9.241: 6 artifact dưới đây vừa KHÔNG track vừa KHÔNG ignore, nên một cú
+# `git add -A` là commit thẳng dữ liệu chạy + trạng thái deploy vào repo.
+server/kanban.sqlite3*
+server/tg_brain.json
+server/update_state.json
+server/logs/
+server/brain-trash/
+server/tmp/
+server/_selfupdate.bat
+# Video làm bằng HyperFrames (rất nặng, không thuộc mã nguồn)
+videos/
 
 # Vault mặc định in-repo (dữ liệu cá nhân, không version)
 vault/
@@ -74,8 +85,9 @@ brain/Brain Default/Javis/automations.json
 **/.claude/skills/.disabled/
 
 # File rác / script cá nhân ở gốc (không thuộc sản phẩm public)
-/agents
-/workflows
+# Đã gỡ hai dòng /agents và /workflows ở 0.9.241: chúng sinh ra để che hai file rác 28 byte
+# (mảnh log "- Move: Jarvis\agents -" do một lệnh redirect hỏng), nhưng hệ quả là chặn vĩnh
+# viễn việc tạo thư mục agents/ hay workflows/ THẬT ở gốc. Hai file rác đã xoá hẳn.
 parse_ads*.ps1
 
 # OS
