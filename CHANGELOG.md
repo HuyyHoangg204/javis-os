@@ -4,6 +4,24 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.240] - 2026-07-28
+Giai đoạn 1 của đợt tái cấu trúc: gỡ hết các chỗ chặn event loop rẻ tiền nhất. Mỗi lượt chat từ 150,8ms xuống 37,2ms, khởi động từ 2.263ms xuống ~1.400ms. Không đổi một hành vi nào ngoài số đếm note (xem dưới).
+### Cải thiện
+- **Đọc YAML bằng bộ nạp C (libyaml)**: `yaml.safe_load` chọn bản thuần Python trong khi venv đã có sẵn libyaml. Trên frontmatter SKILL.md thật thì bản C nhanh 6,2 lần, mà YAML chiếm 64% chi phí `build_system_prompt` - hàm chạy mỗi lượt chat, mỗi task Kanban, mỗi lần nhắc hẹn nổ, mỗi tick loop. `fastyaml.safe_load` thay ở đủ 9 chỗ; bộ nạp C chê thì tự thử lại bằng bộ nạp Python nên không thể thành bước lùi. **150,8 -> 52,6ms.**
+- **Quét cây skill 1 lần thay vì 2 mỗi lượt**: `_javis_capability_summary` gọi `list_skills` còn `_skill_router_block` gọi `list_enabled_meta` (vốn là `list_skills` lọc lại). **52,6 -> 43,5ms.**
+- **Cache manifest + state plugin theo mtime**: `describe()` đọc và parse lại `plugin.yaml` của mọi plugin mỗi lần gọi, và còn đọc lại `plugins.json` cho TỪNG plugin bundled. Phát hiện thêm: `plugins.json` không tồn tại trên phần lớn bản cài, nên mỗi lần gọi ném `FileNotFoundError` một lần cho mỗi plugin. Sau sửa, lần gọi thứ hai đọc 0 file (trước là 9). **43,5 -> 33,7ms.**
+- **Nạp lười `edge_tts`**: chiếm 944ms trong 2.263ms khởi động (41%) và kéo cả chuỗi aiohttp vào đường boot, dù TTS là tính năng tuỳ chọn. Trên VPS, khởi động chậm ăn thẳng vào cửa sổ healthcheck lúc deploy. **2.263 -> ~1.400ms.**
+- **Nhớ đệm bảng giá token**: `estimate_cost` quét tuyến tính cả bảng giá cho MỖI dòng - 321.009 lần so tiền tố cho 3 vòng báo cáo, trong khi chỉ có 11 model phân biệt và 6 khoá giá. Số lần quét mỗi `summary()` từ 53.496 xuống 54. Nói thẳng mức lợi: chỉ cắt 9% tổng thời gian, vì hàm vẫn bị gọi đủ số lần do `_group` chạy lại trên cùng bộ dòng cho 15 chiều.
+### Sửa lỗi
+- **Bốn chỗ chặn event loop**: `/usage/summary` và `/usage/insights` gọi thẳng truy vấn sqlite trên loop (46-65ms) dù `refresh()` ngay dòng trên đã offload đúng cách; `GET /brains` quét `rglob("*.md")` cả cây mỗi brain (136ms) và dashboard gọi nó lúc BOOT; snapshot Kanban chạy đồng bộ ở 10 route handler. Trên một tiến trình uvicorn không `--workers`, mọi cú chặn đều dồn vào cùng chỗ và có ngày cộng đủ làm healthcheck 4 giây trượt, Traefik gỡ route, ra 404 - đúng bệnh đã gặp.
+- **Kho usage thiếu WAL**: sau khi chuyển sang chạy trong thread, `summary`/`insights` đọc SONG SONG với `refresh()` đang ghi. Chế độ journal mặc định làm hai bên khoá nhau và ném "database is locked" đúng lúc user mở trang Mức dùng. `sessions.py` và `task_store.py` đã làm đúng từ lâu, riêng kho này thì chưa.
+- **Snapshot Kanban N+1**: lấy `list_tasks(limit=5000)` rồi gọi `list_events` cho TỪNG việc. Thêm `list_events_bulk` dùng một truy vấn `ROW_NUMBER() OVER (PARTITION BY task_id)`: snapshot 120 việc từ 120 truy vấn xuống 1. Kèm khoá asyncio theo từng brain, vì đẩy ra thread mà quên khoá là tự tạo bug mới - hai snapshot song song đều ghi file hợp lệ nhưng lần CŨ có thể hạ cánh sau lần MỚI và để lại mirror thiu.
+### Thay đổi
+- **Số note trên dropdown chọn brain giảm** (vd 623 -> 579): nay đếm bằng `_count_md` nên bỏ qua thư mục hệ thống. Chênh lệch đúng bằng số file trong `.claude/` - tức bản mirror skill do CHÍNH Javis sinh ra, không phải note của người dùng. Số mới đúng hơn số cũ. Chạm trần đếm thì nhãn hiện dấu "+" để không nói dối là con số chính xác.
+### Kiểm thử
+- 6 file test mới, tất cả đều khoá phần dễ hỏng ngầm chứ không chỉ phần dễ đo: `test_fastyaml` đối chiếu 295 frontmatter THẬT trong repo cộng 14 góc hiểm hai bộ nạp hay lệch; `test_prompt_scan_once` ĐẾM số lần quét đúng bằng 1 và đối chiếu nội dung sinh ra phải y hệt đường cũ; `test_plugins_cache` kiểm cả "thiu" lẫn "bẩn" (dict bị nơi gọi sửa tại chỗ rồi ghi ngược ra file); `test_usage_hotpath` đối chiếu 27 model x 4 mức token với thuật toán gốc vì rủi ro là im lặng trả sai TIỀN, và chạy thật 200 lần ghi song song 60 lần đọc; `test_brains_dem` và `test_kanban_snapshot` ĐO ĐỘ TRỄ NHỊP TIM của event loop chứ không chỉ đo thời gian hàm.
+- `test_brains_dem.py` có chốt chặn khẳng định `BRAINS_DIR` trỏ vào thư mục tạm trước khi ghi. Chốt này sinh ra từ một tai nạn thật lúc viết: đặt nhầm tên biến môi trường làm 3019 file rác rơi vào `brains/` thật, đã dọn sạch và xác nhận 4 brain thật nguyên vẹn.
+
 ## [0.9.236] - 2026-07-28
 CI xanh trở lại sau nhiều bản đỏ liên tiếp. Hai lỗi độc lập, không cái nào là lỗi logic của app.
 ### Sửa lỗi

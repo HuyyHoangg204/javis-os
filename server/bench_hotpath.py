@@ -102,18 +102,21 @@ def main_():
     print("\n== Endpoint dashboard gọi lúc boot ==")
     bench("GET /brains (list_brains)", lambda: asyncio.run(main.list_brains()))
 
-    print("\n== Truy vấn usage (đang chạy thẳng trên event loop) ==")
+    print("\n== Truy vấn usage (từ 0.9.238 chạy trong to_thread, KHÔNG còn chặn loop) ==")
     bench("usage_index.summary()", lambda: usage_index.summary())
     bench("usage_index.insights()", lambda: usage_index.insights())
 
     print("\n== Chi phí khởi động ==")
     bench_import_main()
 
-    print("\n== Ngưỡng nghiệm thu giai đoạn 1 ==")
-    print(f"  build_system_prompt < 40 ms   -> hiện {total:.1f} ms"
+    print("\n== Đối chiếu với baseline giai đoạn 1 (brain 623 md / 30 skill) ==")
+    print("  Số dưới đây là thời gian CPU/đĩa của từng hàm. Với các hàm đã chuyển sang")
+    print("  to_thread thì con số này KHÔNG còn là thời gian chặn event loop - phần đó")
+    print("  được đo riêng bằng độ trễ nhịp tim trong test_brains_dem và test_kanban_snapshot.")
+    print(f"  build_system_prompt   baseline 150,8 ms -> nay {total:.1f} ms   (đích < 60)"
           if total is not None else "  build_system_prompt: không đo được")
-    print("  GET /brains         < 10 ms")
-    print("  import main         < 1400 ms")
+    print("  GET /brains           baseline 136,1 ms  (nay chạy trong thread)")
+    print("  import main           baseline 2.263 ms  (đích < 1.400)")
 
 
 if __name__ == "__main__":

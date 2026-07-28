@@ -8,7 +8,11 @@ Tiến độ:
 - [x] Giai đoạn 0 - lưới an toàn. Kèm phát hiện ngoài dự kiến: CI đã đỏ liên tục từ 0.9.231,
       nên đã vá luôn hai lỗi chặn (guide connector vượt trần ký tự, và `test_graph_watch.py`
       segfault lúc thoát do luồng Rust của watchfiles). CI xanh toàn bộ từ 0.9.236.
-- [ ] Giai đoạn 1 - gỡ chặn event loop
+- [x] Giai đoạn 1 - gỡ chặn event loop (0.9.237 đến 0.9.240). Kết quả đo trên brain
+      623 md / 30 skill: `build_system_prompt` **150,8 -> 37,2ms**, `import main`
+      **2.263 -> ~1.400ms**, `GET /brains` 136,1ms -> chạy trong thread (48-77ms CPU,
+      độ trễ event loop đo được 18ms). Hai chỗ spec đoán sai đã sửa lại theo số đo,
+      ghi rõ ở mục 5.
 - [ ] Giai đoạn 2 - dọn dữ liệu runtime khỏi source
 - [ ] Giai đoạn 3 - tách test
 - [ ] Giai đoạn 4 - chẻ main.py
@@ -135,6 +139,22 @@ mỗi lần nhắc hẹn nổ, mỗi tick loop. Gắn cache theo `(mtime_ns, siz
 **1.4 Offload các truy vấn usage.** `main.py:3435/3449/3462` đã bọc `usage_index.refresh` bằng
 `asyncio.to_thread` đúng cách, nhưng ngay dòng sau lại gọi thẳng `usage_index.summary()`
 (`main.py:3437`, đo được 68ms) và `usage_index.insights()` (`main.py:3451`) trên loop. Bọc nốt.
+
+**Hai chỗ spec này đoán sai, đã sửa theo số đo thật (ghi lại để lần sau đừng lặp):**
+
+- Mục 1.5 dưới đây cho rằng DDL lặp lúc `_connect` là chi phí đáng kể. Đo ra `_connect`
+  chỉ tốn 1,14ms trong 65ms của `summary()`, tức chưa tới 1,5%. Thủ phạm thật là
+  `usage_parsers.estimate_cost` quét tuyến tính cả bảng giá cho MỖI dòng: 321.009 lần
+  `startswith` cho 3 vòng, trong khi chỉ có 11 model phân biệt và 6 khoá giá. Đã nhớ đệm.
+  Nhưng nói thẳng mức lợi: chỉ 9% tổng, vì hàm vẫn bị gọi đủ 53.496 lần do `_group` chạy
+  lại trên cùng bộ dòng cho 15 chiều. Sửa triệt để là đổi cấu trúc `_group` - CHƯA làm,
+  vì đây là endpoint dashboard và mục 1.4 đã gỡ phần nguy hiểm là chặn loop.
+  Thứ THẬT SỰ cần ở 1.5 là WAL, và không phải để nhanh mà để ĐÚNG: sau 1.4 thì
+  summary/insights đọc song song với `refresh()` đang ghi.
+- Mục 1.7 đặt đích `/brains` dưới 15ms dựa trên việc dùng `_MDINDEX_CACHE`. Thực tế dùng
+  `_count_md` (scandir có trần) cho 48-77ms CPU. Không đạt con số đó, nhưng tính chất quan
+  trọng thì đạt: nó chạy trong thread, độ trễ event loop đo được 18ms khi quét brain 3000
+  note. Đích 15ms là sai chỗ - cái cần chặn là thời gian KHOÁ LOOP, không phải thời gian hàm.
 
 **1.5 Vệ sinh sqlite của usage_index.** `usage_index._connect()` (`usage_index.py:60-69`) mở
 connection mới mỗi lần gọi và chạy lại 2 `CREATE TABLE IF NOT EXISTS` + 2 `CREATE INDEX IF NOT EXISTS`
