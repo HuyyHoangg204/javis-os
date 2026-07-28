@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.223] - 2026-07-28
+Đồ thị realtime chạy bằng sự kiện file của hệ điều hành: vault không đổi thì server nằm im.
+### Cải thiện
+- **`/ws/graph` bỏ hẳn poll định kỳ, chuyển sang watchfiles** (inotify Linux / FSEvents macOS / ReadDirectoryChangesW Windows - lib sẵn có theo `uvicorn[standard]`, chạy được cả VPS Docker lẫn Mac): node mọc lên NGAY khoảnh khắc file .md được ghi thay vì đợi nhịp quét 4 giây, và không có gì đổi thì không tốn CPU (poll cũ 99% số lần quét trả lời "không có gì mới"). CPU nền server đo được ~2% so với ~18% của bản 0.9.222 và nguyên một nhân của bản trước đó.
+- **Lưới an toàn quét thưa 5 phút/lần** (trong to_thread): bắt thay đổi mà sự kiện không phủ - vault trên ổ mạng NFS/SMB không bắn sự kiện, hoặc sự kiện rơi khi burst quá lớn. Thiếu watchfiles thì tự lùi về chỉ quét thưa, không chết tính năng.
+- File trong thư mục ẩn (`.git`, `.obsidian`, `.trash`...) bị lọc ở cả đường sự kiện lẫn đường quét; disconnect là dọn sạch watcher + task nền của socket đó.
+### Kiểm thử
+- `test_graph_watch.py` mới (10 case, chạy sự kiện file THẬT qua TestClient websocket): tạo file mới ra `graph_add` ngay với `isNew=true` + trích đúng wikilink, sửa file có sẵn ra `isNew=false`, file trong thư mục ẩn không lọt, disconnect không nổ exception.
+
 ## [0.9.222] - 2026-07-28
 Tăng tốc tải trang: hết nghẽn event loop do quét vault, cache asset dài hạn, thư viện tự host.
 ### Sửa lỗi

@@ -1816,32 +1816,106 @@ def _node_payload(fpath, roots):
     return node, targets
 
 
+_GRAPH_SPARSE_RESCAN = 300   # giây - lưới an toàn: ổ mạng NFS/SMB không bắn sự kiện file
+
+
+def _hidden_in_roots(fpath, roots):
+    """True nếu file nằm trong thư mục ẩn (.git, .obsidian, .trash...) tính theo root chứa nó."""
+    for root in roots:
+        try:
+            rel = os.path.relpath(fpath, root)
+        except ValueError:
+            continue
+        if not rel.startswith(".."):
+            return any(part.startswith(".") for part in rel.split(os.sep))
+    return False
+
+
 @app.websocket("/ws/graph")
 async def ws_graph(ws: WebSocket):
-    """Đẩy realtime mỗi khi brain sinh ra / cập nhật note .md (poll mtime nhẹ)."""
+    """Đẩy realtime khi note .md sinh ra / đổi. Nghe SỰ KIỆN file từ HĐH qua watchfiles
+    (inotify Linux / FSEvents macOS / ReadDirectoryChangesW Windows - lib đã có sẵn theo
+    uvicorn[standard]) thay cho poll 4s/lần: vault không đổi thì nằm im tuyệt đối, node
+    mọc lên NGAY khi file được ghi thay vì đợi nhịp quét. Poll cũ mỗi tab là một vòng
+    quét toàn vault vô hạn, 99% số lần trả lời "không có gì mới".
+    Lưới an toàn: quét thưa _GRAPH_SPARSE_RESCAN giây/lần trong to_thread - bắt các thay
+    đổi mà sự kiện không phủ (vault trên ổ mạng, sự kiện rơi khi burst quá lớn)."""
     if cfgmod.gate_active() and not cfgmod.valid_session(ws.cookies.get("javis_session", "")):
         await ws.close(code=1008)
         return
     await ws.accept()
     qp = ws.query_params
     roots = _resolve_graph_roots(qp.get("source", "all"), qp.get("path") or None)
-    # Quét LUÔN qua to_thread: quét sync trên event loop (bản cũ, 1.5s/lần) từng chặn đứng
-    # cả server - vault lớn mỗi lần quét 0.5-1.4s, mọi request tĩnh/API xếp hàng sau nó.
     known = await asyncio.to_thread(_scan_md_mtimes, roots)   # baseline lúc kết nối → chỉ báo cái sinh ra sau đó
+    stop = asyncio.Event()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def _fs_watcher():
+        live = [r for r in roots if r and os.path.isdir(r)]
+        if not live:
+            return
+        try:
+            from watchfiles import awatch, Change
+        except ImportError:   # môi trường thiếu watchfiles → còn mỗi quét thưa, vẫn chạy được
+            print("[ws_graph] thiếu watchfiles - node mọc theo nhịp quét thưa", file=__import__('sys').stderr)
+            return
+        try:
+            async for changes in awatch(*live, stop_event=stop,
+                                        watch_filter=lambda _c, p: p.endswith(".md")):
+                paths = {p for c, p in changes if c in (Change.added, Change.modified)}
+                if paths:
+                    await queue.put(paths)
+        except Exception as e:
+            print(f"[ws_graph watcher] {type(e).__name__}: {e}", file=__import__('sys').stderr)
+
+    async def _sparse_rescan():
+        while True:
+            await asyncio.sleep(_GRAPH_SPARSE_RESCAN)
+            await queue.put(None)   # None = hiệu lệnh quét lại toàn bộ
+
+    watcher = asyncio.create_task(_fs_watcher())
+    sparse = asyncio.create_task(_sparse_rescan())
+    # Client không bao giờ gửi gì lên socket này - task receive sống CHỈ để báo disconnect
+    # (mô hình poll cũ phát hiện disconnect nhờ send định kỳ lỗi; giờ im lặng dài nên phải nghe).
+    recv = asyncio.create_task(ws.receive())
+    item = asyncio.create_task(queue.get())
     try:
         while True:
-            await asyncio.sleep(4)
-            current = await asyncio.to_thread(_scan_md_mtimes, roots)
+            done, _pending = await asyncio.wait({recv, item}, return_when=asyncio.FIRST_COMPLETED)
+            if recv in done:
+                try:
+                    recv.result()   # tiêu thụ exception (nếu có) cho gọn warning
+                except Exception:
+                    pass
+                break   # disconnect / socket lỗi → dọn
+            batch = item.result()
+            item = asyncio.create_task(queue.get())
             changed = []
-            for fp, mt in current.items():
-                old = known.get(fp)
-                if old is None:
-                    changed.append((fp, True))            # note MỚI sinh
-                elif mt > old + 0.001:
-                    changed.append((fp, False))           # note đổi (vd index/log thêm link)
-            known = current
+            if batch is None:   # quét thưa: diff toàn bộ như mô hình poll cũ
+                current = await asyncio.to_thread(_scan_md_mtimes, roots)
+                for fp, mt in current.items():
+                    old = known.get(fp)
+                    if old is None:
+                        changed.append((fp, True))            # note MỚI sinh
+                    elif mt > old + 0.001:
+                        changed.append((fp, False))           # note đổi
+                known = current
+            else:               # sự kiện HĐH: chỉ đụng đúng các file được báo
+                for fp in batch:
+                    if _hidden_in_roots(fp, roots):
+                        continue
+                    try:
+                        mt = os.path.getmtime(fp)
+                    except OSError:
+                        continue   # vừa bị xoá/đổi tên giữa chừng
+                    old = known.get(fp)
+                    if old is None:
+                        changed.append((fp, True))
+                    elif mt > old + 0.001:
+                        changed.append((fp, False))
+                    known[fp] = mt
             for fp, is_new in changed[:80]:               # chặn burst
-                node, targets = _node_payload(fp, roots)
+                node, targets = await asyncio.to_thread(_node_payload, fp, roots)
                 await ws.send_text(json.dumps({
                     "type": "graph_add", "node": node,
                     "linkTargets": targets, "isNew": is_new,
@@ -1850,6 +1924,10 @@ async def ws_graph(ws: WebSocket):
         pass
     except Exception as e:
         print(f"[ws_graph] {type(e).__name__}: {e}", file=__import__('sys').stderr)
+    finally:
+        stop.set()   # tắt awatch (stop_event) rồi huỷ nốt các task nền của socket này
+        for t in (watcher, sparse, recv, item):
+            t.cancel()
 
 
 def _sanitize_filename(name: str) -> str:
