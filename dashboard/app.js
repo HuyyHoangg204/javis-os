@@ -644,7 +644,7 @@ function _ensure2DLib() {               // nạp force-graph (2D, d3-force) LAZY
   if (_lib2dPromise) return _lib2dPromise;
   _lib2dPromise = new Promise((resolve) => {
     const s = document.createElement("script");
-    s.src = "https://unpkg.com/force-graph@1.51.4/dist/force-graph.min.js";
+    s.src = "/static/vendor/force-graph-1.51.4.min.js";   // self-host: unpkg đo được ~0.7s trên đường boot
     s.onload = resolve; s.onerror = resolve;
     document.head.appendChild(s);
   });

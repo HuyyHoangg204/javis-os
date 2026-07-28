@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.222] - 2026-07-28
+Tăng tốc tải trang: hết nghẽn event loop do quét vault, cache asset dài hạn, thư viện tự host.
+### Sửa lỗi
+- **Server hết "đứng hình" từng đợt 0.3-1.4 giây**: vòng theo dõi đồ thị realtime (`/ws/graph`) quét toàn bộ file .md của vault MỖI 1.5 giây bằng code sync ngay trên event loop - vault lớn là mọi request (file tĩnh lẫn API) xếp hàng chờ, đo được P50 ~500ms cho một file JS vài KB và server ăn nguyên một nhân CPU 24/7. Nay quét qua `asyncio.to_thread`, nhịp poll giãn 1.5s → 4s, và quét bằng `os.walk` cắt tỉa thư mục ẩn ngay khi duyệt (glob cũ vẫn chui vào `.git`/`.obsidian` rồi mới lọc). `GET /graph` (nguồn `all` đo được ~10 giây sync) cũng chuyển sang to_thread.
+### Cải thiện
+- **Middleware auth/CSRF rẻ đi ~10 lần**: `read_settings()` được cache theo mtime+size của `settings.json` (trước đây MỖI request đọc file + giải mã Fernet 2 lần, ~10-16ms chỉ để check đăng nhập; nay ~1ms). File đổi là cache tự đọc lại, trả bản sao nên caller sửa không bẩn cache.
+- **Asset tĩnh có `?v=` được cache 1 năm immutable** (đổi phiên bản là đổi URL nên an toàn): mở trang lần sau không phải hỏi lại ~27 file JS/CSS.
+- **Tự host Alpine.js + force-graph** trong `dashboard/vendor/` thay vì tải từ unpkg (đo được 2.1s + 0.7s trên đường boot, lệ thuộc mạng ngoài, offline là chết UI). three.js/3d-force-graph (chỉ dùng khi bật 3D) vẫn lazy từ CDN.
+- Kết quả đo trên máy dev: TTFB trang chủ 572ms → 35ms, DOMContentLoaded 2936ms → 1114ms, file tĩnh P95 từ ~700ms → ~24ms, CPU nền server từ ~100% một nhân → ~18%.
+
 ## [0.9.221] - 2026-07-28
 Gõ nhanh task trong editor với menu gợi ý kiểu Obsidian, bản gọn.
 ### Thêm mới

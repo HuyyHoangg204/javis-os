@@ -124,6 +124,17 @@ import mimetypes
 mimetypes.add_type("image/webp", ".webp")
 app.mount("/static", StaticFiles(directory=str(DASHBOARD_PATH)), name="static")
 
+
+@app.middleware("http")
+async def _static_cache_headers(request: Request, call_next):
+    """Asset tĩnh có ?v= (cache-bust theo VERSION, index.html tự gắn) → cho cache 1 năm immutable.
+    Không có ?v= thì giữ nguyên (ETag/Last-Modified của StaticFiles vẫn lo revalidate).
+    Thiếu header này trình duyệt phải hỏi lại ~27 file JS/CSS mỗi lần mở trang."""
+    resp = await call_next(request)
+    if request.url.path.startswith("/static/") and request.query_params.get("v"):
+        resp.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+    return resp
+
 CLAUDE_MD_PATH = Path(__file__).parent.parent / "CLAUDE.md"
 SYSTEM_PROMPT = CLAUDE_MD_PATH.read_text(encoding="utf-8") if CLAUDE_MD_PATH.exists() else None
 
@@ -1730,26 +1741,35 @@ async def graph(
     path: str = Query(None, description="Đường dẫn folder tùy ý (ưu tiên nếu có)"),
     orphans: int = Query(0, description="1 = hiện cả note cô đơn (0 kết nối), như graph view Obsidian"),
 ):
-    """Lớp Graphify - dựng đồ thị kết nối note từ wikilink."""
-    return build_graph(_resolve_graph_roots(source, path), include_orphans=bool(orphans))
+    """Lớp Graphify - dựng đồ thị kết nối note từ wikilink.
+    build_graph là CPU-bound (đọc + regex toàn vault, nguồn 'all' đo được ~10s) - phải đẩy
+    sang thread, chạy sync trên event loop là đứng cả server (mọi request khác xếp hàng)."""
+    return await asyncio.to_thread(build_graph, _resolve_graph_roots(source, path),
+                                   include_orphans=bool(orphans))
 
 
 # ============================================================
 # Realtime graph - theo dõi file .md mới/đổi → đẩy node mọc lên live
 # ============================================================
 def _scan_md_mtimes(roots):
-    """Quét .md trong các root → dict {fullpath: mtime}. Bỏ qua thư mục ẩn (.git, .obsidian...)."""
+    """Quét .md trong các root → dict {fullpath: mtime}. Bỏ qua thư mục ẩn (.git, .obsidian...).
+    Dùng os.walk + cắt tỉa thư mục ẩn NGAY khi duyệt (glob cũ vẫn chui vào .git/.obsidian
+    rồi mới lọc - tốn phần lớn thời gian quét trên vault lớn) và lấy mtime từ os.scandir
+    (DirEntry.stat đã có sẵn trên Windows, khỏi getmtime từng file)."""
     out = {}
     for root in roots:
         if not root or not os.path.isdir(root):
             continue
-        for fpath in glob.glob(f"{root}/**/*.md", recursive=True):
-            # Bỏ file nằm trong thư mục ẩn
-            rel = os.path.relpath(fpath, root)
-            if any(part.startswith(".") for part in rel.split(os.sep)):
-                continue
+        for dirpath, dirnames, _files in os.walk(root):
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
             try:
-                out[fpath] = os.path.getmtime(fpath)
+                with os.scandir(dirpath) as it:
+                    for entry in it:
+                        if entry.name.endswith(".md") and entry.is_file():
+                            try:
+                                out[entry.path] = entry.stat().st_mtime
+                            except OSError:
+                                pass
             except OSError:
                 pass
     return out
@@ -1805,11 +1825,13 @@ async def ws_graph(ws: WebSocket):
     await ws.accept()
     qp = ws.query_params
     roots = _resolve_graph_roots(qp.get("source", "all"), qp.get("path") or None)
-    known = _scan_md_mtimes(roots)   # baseline lúc kết nối → chỉ báo cái sinh ra sau đó
+    # Quét LUÔN qua to_thread: quét sync trên event loop (bản cũ, 1.5s/lần) từng chặn đứng
+    # cả server - vault lớn mỗi lần quét 0.5-1.4s, mọi request tĩnh/API xếp hàng sau nó.
+    known = await asyncio.to_thread(_scan_md_mtimes, roots)   # baseline lúc kết nối → chỉ báo cái sinh ra sau đó
     try:
         while True:
-            await asyncio.sleep(1.5)
-            current = _scan_md_mtimes(roots)
+            await asyncio.sleep(4)
+            current = await asyncio.to_thread(_scan_md_mtimes, roots)
             changed = []
             for fp, mt in current.items():
                 old = known.get(fp)

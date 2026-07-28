@@ -656,6 +656,7 @@
   <script src="/static/notifications.js?v=1"></script>
   <!-- Nút đổi tông tối đậm / tối nhạt: lật data-theme trên <html>, nhớ qua localStorage -->
   <script>(function(){var b=document.getElementById('themeToggle');if(!b)return;b.addEventListener('click',function(){var dim=document.documentElement.getAttribute('data-theme')==='dim';if(dim)document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme','dim');try{localStorage.setItem('javis.theme',dim?'dark':'dim');}catch(e){}});})();</script>
-  <script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <!-- Alpine self-host (dashboard/vendor): bản unpkg đo được 2.1s lúc first load + chết khi offline -->
+  <script defer src="/static/vendor/alpinejs-3.14.1.min.js?v=1"></script>
 </body>
 </html>

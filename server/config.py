@@ -133,7 +133,21 @@ def _transform_secret_fields(cfg, fn):
     return cfg
 
 
+# Cache read_settings theo (mtime_ns, size) của settings.json: middleware auth/CSRF gọi
+# gate_active() -> read_settings() TRÊN MỌI REQUEST, mỗi lần đọc file + giải mã Fernet ~5-8ms
+# (x2 middleware = 10-16ms/request chỉ để check đăng nhập). File đổi (kể cả write_settings
+# ghi đè) thì mtime/size đổi -> tự đọc lại. Trả deep copy để caller sửa thoải mái không bẩn cache.
+_SETTINGS_CACHE = {"sig": None, "cfg": None}
+
+
 def read_settings():
+    try:
+        st = SETTINGS_PATH.stat()
+        sig = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        sig = None
+    if sig is not None and sig == _SETTINGS_CACHE["sig"] and _SETTINGS_CACHE["cfg"] is not None:
+        return json.loads(_SETTINGS_CACHE["cfg"])
     cfg = json.loads(json.dumps(_DEFAULT))   # deep copy
     try:
         if SETTINGS_PATH.exists():
@@ -150,6 +164,9 @@ def read_settings():
         _transform_secret_fields(cfg, secrets_store.decrypt)
     except Exception as e:
         print(f"[config] giải mã secret lỗi: {e}", file=__import__('sys').stderr)
+    if sig is not None:
+        _SETTINGS_CACHE["sig"] = sig
+        _SETTINGS_CACHE["cfg"] = json.dumps(cfg, ensure_ascii=False)
     return cfg
 
 
