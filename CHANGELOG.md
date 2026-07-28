@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.233] - 2026-07-28
+Javis thôi tự đẻ việc: chỉ tạo việc khi được bảo thẳng, kèm nút dọn bảng.
+### Thay đổi
+- **Vòng học KHÔNG còn tự tạo việc nền** (`capabilities.task` mặc định `false`). Lý do từ số liệu thật: 33 việc trên 4 bảng thì 33 đều do máy tự suy ra từ hội thoại, không cái nào chủ trực tiếp giao, và phần lớn chết yểu vì worker headless không làm nổi. Từ nay việc chỉ sinh khi được BẢO THẲNG trong chat (`POST /kanban/task`) - đúng mức 2 của thang điều phối. Công tắc vẫn còn trong Cài đặt cho ai muốn bật lại.
+- **Migration `task_autocreate_off`**: đổi mặc định thôi không đủ vì `read_config` để giá trị đã lưu đè lên default, máy đang chạy vẫn giữ `task: true`. Nay có cơ chế migration chạy ĐÚNG MỘT LẦN rồi ghi cờ `_migrations`, nên vừa hạ được cấu hình cũ vừa không biến công tắc thành nút chết khi chủ tự bật lại.
+### Thêm mới
+- **`TaskStore.purge_terminal` + `POST /kanban/purge`**: dọn HẲN việc đã kết thúc khỏi kho (kèm event/run/dependency), khác `archive_old_terminal` vốn chỉ ẩn khỏi bảng. Mặc định chỉ đụng archived + cancelled; `include_done=1` mới dọn cả done. Whitelist cứng `_PURGEABLE` để một lời gọi sai tham số không thể quét mất việc đang chờ hay đang chạy.
+### Kiểm thử
+- `test_learn_task_gate.py` thêm 3 case: mặc định tắt tự tạo việc, config cũ đang bật bị hạ xuống đúng một lần và ghi được xuống đĩa, chủ bật lại bằng tay thì tôn trọng.
+- `test_tasks_autonomous.py` thêm 3 case cho purge: xoá đúng archived/cancelled kèm event, không lan sang brain khác, không đụng việc đang sống dù truyền status bậy.
+
 ## [0.9.232] - 2026-07-28
 Việc nền báo gọn và thôi tự đẻ việc rác: chặn ngay ở cửa vào thứ worker headless không thể làm.
 ### Sửa lỗi

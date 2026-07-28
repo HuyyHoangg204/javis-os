@@ -245,6 +245,51 @@ def test_auto_archive_old_terminal_tasks(tmp_path):
     assert store.archive_old_terminal(root, age_days=3) == 0
 
 
+def test_purge_terminal_xoa_han_viec_da_cat(tmp_path):
+    """Dọn bảng thật sự: archived/cancelled bị XOÁ hẳn khỏi kho (kèm event + run),
+    việc đang sống và việc done không bị đụng tới. Chỉ dọn đúng brain được chỉ định."""
+    store = TaskStore(tmp_path / "queue.sqlite3")
+    root = str(tmp_path / "brain")
+    other = str(tmp_path / "brain-khac")
+    archived = store.enqueue(root, "Đã cất", "a", status="archived")
+    cancelled = store.enqueue(root, "Đã huỷ", "c", status="cancelled")
+    done = store.enqueue(root, "Đã xong", "d", status="done")
+    ready = store.enqueue(root, "Đang chờ", "r", status="ready")
+    other_archived = store.enqueue(other, "Brain khác", "x", status="archived")
+
+    n = store.purge_terminal(root)
+    assert n == 2
+    assert store.get_task(archived) is None
+    assert store.get_task(cancelled) is None
+    assert store.get_task(done) is not None
+    assert store.get_task(ready) is not None
+    assert store.get_task(other_archived) is not None, "không được dọn lan sang brain khác"
+    # event của task đã xoá cũng phải đi theo, không để lại rác mồ côi
+    assert store.list_events(archived) == []
+    # chạy lại không còn gì để dọn
+    assert store.purge_terminal(root) == 0
+
+
+def test_purge_terminal_nhan_them_done_khi_duoc_yeu_cau(tmp_path):
+    """Mặc định giữ done (lịch sử việc đã làm được); chỉ dọn khi chủ nói rõ."""
+    store = TaskStore(tmp_path / "queue.sqlite3")
+    root = str(tmp_path / "brain")
+    done = store.enqueue(root, "Đã xong", "d", status="done")
+    ready = store.enqueue(root, "Đang chờ", "r", status="ready")
+    assert store.purge_terminal(root, statuses=("done",)) == 1
+    assert store.get_task(done) is None
+    assert store.get_task(ready) is not None
+
+
+def test_purge_terminal_khong_dong_vao_viec_dang_chay(tmp_path):
+    """Chốt an toàn: dù truyền bậy status đang sống thì cũng không được xoá."""
+    store = TaskStore(tmp_path / "queue.sqlite3")
+    root = str(tmp_path / "brain")
+    running = store.enqueue(root, "Đang chạy", "run", status="running")
+    assert store.purge_terminal(root, statuses=("running", "ready", "triage")) == 0
+    assert store.get_task(running) is not None
+
+
 # ---- Kết quả worker: lấy câu chốt, không lấy dòng suy nghĩ ----
 
 # Ca thật (0.9.232): worker kể lể "Tôi sẽ lần theo...", "Lệnh shell vừa bị chặn..." rồi

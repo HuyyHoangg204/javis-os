@@ -466,6 +466,44 @@ class TaskStore:
                 self._db.rollback()
                 raise
 
+    # Chỉ những trạng thái đã KẾT THÚC mới được xoá. Whitelist cứng để một lời gọi sai
+    # tham số không thể quét mất việc đang chờ hay đang chạy.
+    _PURGEABLE = ("archived", "cancelled", "done")
+
+    def purge_terminal(
+        self, brain_root: str, statuses: tuple = ("archived", "cancelled")
+    ) -> int:
+        """XOÁ HẲN task đã kết thúc khỏi kho (kèm event/run/dependency). Trả số đã xoá.
+
+        Khác archive_old_terminal (chỉ ẩn khỏi bảng, vẫn tra được): đây là dọn thật, dùng
+        khi bảng đầy việc rác không còn giá trị tra cứu. Mặc định giữ 'done' vì đó là lịch
+        sử việc Javis làm được; muốn dọn cả thì truyền statuses vào."""
+        allowed = tuple(s for s in statuses if s in self._PURGEABLE)
+        if not allowed:
+            return 0
+        marks = ",".join("?" for _ in allowed)
+        with self._lock:
+            self._tx()
+            try:
+                rows = self._db.execute(
+                    f"SELECT id FROM tasks WHERE brain_root=? AND status IN ({marks})",
+                    (brain_root, *allowed),
+                ).fetchall()
+                ids = [str(r["id"]) for r in rows]
+                for tid in ids:
+                    self._db.execute("DELETE FROM task_events WHERE task_id=?", (tid,))
+                    self._db.execute("DELETE FROM task_runs WHERE task_id=?", (tid,))
+                    self._db.execute(
+                        "DELETE FROM task_dependencies WHERE task_id=? OR depends_on_id=?",
+                        (tid, tid),
+                    )
+                    self._db.execute("DELETE FROM tasks WHERE id=?", (tid,))
+                self._db.commit()
+                return len(ids)
+            except Exception:
+                self._db.rollback()
+                raise
+
     def next_candidate(self, brain_root: str) -> Optional[dict]:
         with self._lock:
             row = self._db.execute(

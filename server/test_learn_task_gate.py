@@ -69,3 +69,63 @@ def test_ly_do_la_tieng_viet_ngan():
     reason = _lyDo("Cập nhật cookie Facebook cá nhân")
     assert isinstance(reason, str) and 0 < len(reason) <= 120
     assert reason == reason.strip()
+
+
+# ---- Tự tạo việc: TẮT hẳn theo mặc định ----
+# Chủ chốt 2026-07-28: bảng 28 việc đều do máy tự đẻ, không cái nào chủ thật sự cần.
+# Javis chỉ tạo việc khi được BẢO THẲNG ("giao việc này cho Javis" → POST /kanban/task),
+# không tự suy ra từ hội thoại nữa. Công tắc vẫn còn trong Cài đặt để bật lại nếu muốn.
+import json as _json
+from pathlib import Path as _Path
+
+
+def _feature(tmp_path):
+    from learn import LearnDeps, LearnFeature
+
+    def _write(path, text):
+        _Path(path).parent.mkdir(parents=True, exist_ok=True)
+        _Path(path).write_text(text, encoding="utf-8")
+
+    deps = LearnDeps(
+        build_system_prompt=lambda b: "",
+        brain_root=lambda b: str(tmp_path),
+        brain_memory_dir=lambda b: tmp_path / "Memory",
+        resolve_subfolder=lambda a, b, c: str(tmp_path),
+        aux_model=lambda: None,
+        atomic_write_text=_write,
+        sessions_store=None,
+        state_dir=tmp_path,
+        readonly_tools=["Read"],
+    )
+    return LearnFeature(deps)
+
+
+def test_mac_dinh_khong_tu_tao_viec(tmp_path):
+    feature = _feature(tmp_path)
+    assert feature.DEFAULT["capabilities"]["task"] is False
+    assert feature.read_config()["capabilities"]["task"] is False
+
+
+def test_config_cu_dang_bat_duoc_ha_xuong_mot_lan(tmp_path):
+    """Máy đang chạy có learn_config.json ghi task:true - đổi DEFAULT thôi không đủ vì
+    giá trị đã lưu đè lên default. Phải có migration hạ nó xuống đúng MỘT lần."""
+    cfg_path = tmp_path / "learn_config.json"
+    cfg_path.write_text(
+        _json.dumps({"capabilities": {"memory": True, "wiki": True, "skill": True, "task": True}}),
+        encoding="utf-8",
+    )
+    feature = _feature(tmp_path)
+    assert feature.read_config()["capabilities"]["task"] is False
+    # đã ghi xuống đĩa → lần chạy sau không phải migrate lại
+    saved = _json.loads(cfg_path.read_text(encoding="utf-8"))
+    assert saved["capabilities"]["task"] is False
+
+
+def test_bat_lai_bang_tay_thi_ton_trong(tmp_path):
+    """Migration chạy MỘT lần. Sau đó chủ tự bật lại trong Cài đặt thì phải giữ nguyên,
+    không được ép tắt mỗi lần đọc config (nếu không công tắc thành nút chết)."""
+    feature = _feature(tmp_path)
+    cfg = feature.read_config()                 # lần đầu: migrate + ghi cờ
+    cfg["capabilities"]["task"] = True          # chủ bật lại
+    feature.write_config(cfg)
+    assert feature.read_config()["capabilities"]["task"] is True

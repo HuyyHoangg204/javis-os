@@ -904,6 +904,20 @@ gì, dữ liệu/file/artifact nào được tạo và cách đã kiểm chứng
             self._snapshot(root)
             return {"ok": True, "archived": True}
 
+        @router.post("/kanban/purge")
+        async def kanban_purge(
+            brain: str = Form("brain"), include_done: str = Form("0")
+        ):
+            """Dọn sạch việc đã kết thúc khỏi bảng. Mặc định chỉ archived + cancelled;
+            include_done=1 mới đụng tới done (lịch sử việc làm được)."""
+            root = self._ensure(brain)
+            statuses = ("archived", "cancelled")
+            if str(include_done).strip() in ("1", "true", "True"):
+                statuses = statuses + ("done",)
+            removed = self.store.purge_terminal(root, statuses=statuses)
+            self._snapshot(root)
+            return {"ok": True, "removed": removed}
+
         @router.post("/kanban/orchestration")
         async def kanban_orchestration(
             mode: str = Form(...), brain: str = Form("brain")

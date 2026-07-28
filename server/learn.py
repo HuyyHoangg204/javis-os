@@ -225,7 +225,12 @@ class LearnFeature:
         self.DEFAULT = {
             "enabled": True,                    # mặc định BẬT tự học ngay
             "mode": "auto",                     # dry-run | suggest | auto - mặc định tự ghi (không cần git)
-            "capabilities": {"memory": True, "wiki": True, "skill": True, "task": True},  # bật hết
+            # task=False: Javis KHÔNG tự suy ra việc nền từ hội thoại nữa. Chủ chốt 2026-07-28
+            # sau khi soi bảng thật: 28/28 việc là máy tự đẻ, phần lớn worker headless không
+            # thể làm (cookie, gửi Zalo, chờ duyệt, repo ngoài brain) nên chết yểu. Việc chỉ
+            # sinh khi được BẢO THẲNG trong chat (POST /kanban/task). Công tắc vẫn còn trong
+            # Cài đặt cho ai muốn bật lại; xem migration task_autocreate_off ở read_config.
+            "capabilities": {"memory": True, "wiki": True, "skill": True, "task": False},
             "debounce": {"k": 3, "idle_min": 10, "dense_idle_min": 3},
             "rate": {"min_interval_s": 90, "fork_day": 40, "token_day": 300000},
             # stale_days: brain im lặng quá ngần này ngày thì curator BỎ QUA (0 = không lọc).
@@ -248,6 +253,10 @@ class LearnFeature:
         self.router = self._make_router()
 
     # ── config ──
+    # Migration chạy ĐÚNG MỘT LẦN rồi ghi cờ. Không ép giá trị mỗi lần đọc: làm thế thì
+    # công tắc trong Cài đặt thành nút chết, chủ bật lại cũng vô nghĩa.
+    _MIGRATIONS = {"task_autocreate_off": ("capabilities", "task", False)}
+
     def read_config(self) -> dict:
         cfg = json.loads(json.dumps(self.DEFAULT))
         try:
@@ -260,6 +269,16 @@ class LearnFeature:
                         cfg[k] = v
         except Exception:
             pass
+        done = cfg.setdefault("_migrations", {})
+        changed = False
+        for key, (section, field, value) in self._MIGRATIONS.items():
+            if done.get(key):
+                continue
+            cfg.setdefault(section, {})[field] = value
+            done[key] = True
+            changed = True
+        if changed:
+            self.write_config(cfg)
         return cfg
 
     def write_config(self, cfg: dict) -> None:
