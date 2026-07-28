@@ -43,8 +43,11 @@ body {
   display: grid;
   /* 4 hàng: top · thân (giãn hết) · thanh đính kèm (auto, 0 khi trống) · ô chat.
      Trước đây chỉ khai báo 3 hàng nên attach-bar chiếm mất hàng 70px → chừa 1 dải trống
-     full-width phía trên khung chat. Để 'auto' cho attach-bar là nó tự co về 0 khi rỗng. */
-  grid-template-rows: 52px 1fr auto 70px;
+     full-width phía trên khung chat. Để 'auto' cho attach-bar là nó tự co về 0 khi rỗng.
+     0.9.229: hàng cuối 70px cứng thực ra rơi vào model-bar (5 con trong flow mà chỉ khai 4 hàng),
+     ô chat rớt xuống hàng ngầm dán sát mép dưới. Khai đủ 5 hàng auto, khoảng thở giao cho
+     margin/padding của từng tầng. */
+  grid-template-rows: 52px 1fr auto auto auto;
   height: 100vh;
 }
 
@@ -717,10 +720,12 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 .mcp-item.error { color: var(--red); }
 .mcp-item.dim { color: var(--text3); font-style: italic; }
 
-/* BOTTOM voice bar */
+/* BOTTOM voice bar: pill nổi có khoảng thở quanh 4 phía (đồng bộ với kiểu pill của mobile),
+   thay cho dải full-width dán sát mép dưới viewport */
 .hud-voice {
   display: flex; align-items: center; gap: 12px;
-  padding: 0 20px; border-top: 1px solid var(--border); background: var(--bg2);
+  margin: 4px 16px 16px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--bg2);
 }
 .mic-big {
   background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
@@ -1164,7 +1169,7 @@ body.chat-zoomed .chat-stage { display: flex; }
 .chat-stage-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .chat-stage-body > * { width: 100%; max-width: 980px; margin-left: auto; margin-right: auto; }
 .chat-stage-body .transcript { flex: 1 1 auto; min-height: 0; max-height: none; background: transparent; }
-.chat-stage-body .hud-voice { background: rgba(24,24,34,0.6); border: 1px solid var(--border); border-radius: 12px; }
+.chat-stage-body .hud-voice { background: rgba(24,24,34,0.6); border: 1px solid var(--border); border-radius: 12px; margin: 0 auto; }
 .chat-stage-body .attach-bar { flex: none; }
 /* xoá dải composer trống ở đáy cockpit khi đang phóng to (composer đã dời vào lớp nổi) */
 body.chat-zoomed .hud { grid-template-rows: 52px 1fr 0; }
@@ -1185,7 +1190,7 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 }
 
 /* ===== Thanh chọn model + effort ngay trên khung chat ===== */
-.model-bar { position: relative; display: flex; align-items: center; gap: 8px 16px; padding: 5px 16px 3px; }
+.model-bar { position: relative; display: flex; align-items: center; gap: 8px 16px; padding: 8px 18px 6px; }
 /* Dải HỆ THỐNG + MCP dời xuống đây, nằm NGANG bên phải ô chọn model. Một hàng, tràn thì cuộn ngang. */
 .sysbar { display: flex; align-items: center; gap: 6px 12px; flex: 1 1 auto; min-width: 0;
   flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }

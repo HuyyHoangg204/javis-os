@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.229] - 2026-07-28
+Bố cục cockpit hài hoà hơn: chuông Thông báo về góc phải, ô chat thành pill nổi có khoảng thở.
+### Cải thiện
+- **Chuông Thông báo dời từ giữa header về góc phải** (đứng đầu cụm nút, cạnh nút đổi tông): trước nó tự căn giữa phần không gian thừa nên trôi theo độ dài tên brain, nhìn như đặt đại; panel thông báo vốn ghim `right:18px` nên bấm giữa màn mà hộp bung tít góc - giờ nút và panel về cùng một góc. Mobile giữ nguyên (chuông vẫn cạnh nút menu).
+- **Ô chat desktop thành pill nổi bo tròn 18px, cách đáy 16px** thay cho dải full-width dán sát mép dưới viewport - đồng bộ với kiểu pill bản mobile đã có.
+- **Sửa gốc grid `.hud`**: 5 con trong flow mà chỉ khai 4 hàng nên hàng 70px cứng rơi nhầm vào model-bar (bị kéo giãn), ô chat rớt xuống hàng ngầm không khoảng thở. Khai đủ 5 hàng auto; hàng model/HỆ THỐNG nới padding (8px trên, 6px dưới) để 3 tầng đáy có nhịp rõ ràng thay vì dính chùm.
+
 ## [0.9.228] - 2026-07-28
 Router việc nền: chuỗi fallback nhiều mắt xích, mắt cuối là OpenRouter model free mạnh nhất.
 ### Thêm mới
