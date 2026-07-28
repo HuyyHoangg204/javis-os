@@ -59,8 +59,12 @@ def main_():
     cur = snapshot()
 
     if "--update" in sys.argv:
+        # newline="\n" cố ý: file này bị sinh lại nhiều lần trong đợt chẻ main.py, mà git
+        # chuẩn hoá về LF khi commit. Không ép ở đây thì trên Windows file ghi ra CRLF và
+        # `git status` cứ báo bẩn sau mỗi lần --update dù nội dung không đổi.
         SNAPSHOT.write_text(
-            json.dumps(cur, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
+            json.dumps(cur, ensure_ascii=False, indent=1) + "\n",
+            encoding="utf-8", newline="\n",
         )
         print(f"Đã chụp lại {len(cur)} mục vào {SNAPSHOT.name}")
         print("Nhớ commit file này CHUNG với thay đổi route, kèm lý do trong commit message.")
