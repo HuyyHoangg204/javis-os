@@ -295,12 +295,20 @@ def build_system_prompt(brain: str = "brain") -> str:
         "(xem mục 'Tạo/sửa Agent & Workflow qua chat' và 'Điều phối' trong system prompt) bằng "
         "ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. Studio/trang Tự cải thiện sẽ tự nhận file mới."
     )
+    # Quét cây skill MỘT lần cho cả hai khối dưới. Trước đây _javis_capability_summary
+    # gọi list_skills còn _skill_router_block gọi list_enabled_meta (vốn chỉ là list_skills
+    # lọc lại), nên cả cây skill bị đi và parse YAML HAI lần mỗi lượt chat - đo được 18ms
+    # mỗi lần trên brain 30 skill. Lỗi thì để None và mỗi khối tự quét như cũ.
     try:
-        base += _javis_capability_summary(brain)   # chỉ mục năng lực LIVE (mọi engine biết Javis có gì)
+        _skills = skill_router.list_skills(root)
+    except Exception:
+        _skills = None
+    try:
+        base += _javis_capability_summary(brain, _skills)   # chỉ mục năng lực LIVE (mọi engine biết Javis có gì)
     except Exception:
         pass
     try:
-        base += _skill_router_block(brain, root)   # ROUTER SKILL đa-engine: list skill + cách gọi
+        base += _skill_router_block(brain, root, _skills)   # ROUTER SKILL đa-engine: list skill + cách gọi
     except Exception:
         pass
     try:
@@ -4038,7 +4046,9 @@ async def lint(brain: str = Query("brain")):
 # có năng lực gì. SINH TỪ FILE (không sửa tay) → không bao giờ lệch. Ghi Javis/index.md CHỈ KHI
 # nội dung đổi (change-gated → không churn git). Bản LIVE gọn được chèn vào system prompt.
 # ============================================================
-def _gather_capabilities(brain: str) -> dict:
+def _gather_capabilities(brain: str, skills=None) -> dict:
+    """skills: kết quả skill_router.list_skills(root) đã quét sẵn, để nơi gọi chia sẻ được
+    một lần quét thay vì mỗi hàm tự đi lại cả cây. None = tự quét (đường cũ, vẫn đúng)."""
     root = Path(_brain_root(brain))
     caps = {"agents": [], "skills": [], "workflows": [], "loops": [], "plugins": []}
     ad = _agents_dir(brain)
@@ -4059,7 +4069,7 @@ def _gather_capabilities(brain: str) -> dict:
     # Skill: canonical <root>/skills + fallback .claude/skills + .agents (qua skill_router, de-dup).
     caps["skills"] = [{"slug": s["slug"], "name": s["name"], "description": s["description"],
                        "group": s["group"], "enabled": s["enabled"]}
-                      for s in skill_router.list_skills(root)]
+                      for s in (skills if skills is not None else skill_router.list_skills(root))]
     try:
         st = loop_feature.read_state(brain)
         for lp in loop_feature.list_loops(brain):
@@ -4186,11 +4196,12 @@ def rebuild_javis_index(brain: str) -> dict:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
-def _javis_capability_summary(brain: str) -> str:
+def _javis_capability_summary(brain: str, skills=None) -> str:
     """Bản LIVE gọn (capped) chèn vào system prompt: để engine nào cũng biết Javis có gì.
-    Skill nhiều -> chỉ đếm + nhóm (chi tiết ở Javis/index.md), tránh phình context."""
+    Skill nhiều -> chỉ đếm + nhóm (chi tiết ở Javis/index.md), tránh phình context.
+    skills: cây skill đã quét sẵn, xem _gather_capabilities."""
     try:
-        c = _gather_capabilities(brain)
+        c = _gather_capabilities(brain, skills)
     except Exception:
         return ""
     if not any(c.values()):
@@ -4214,13 +4225,16 @@ def _javis_capability_summary(brain: str) -> str:
     return "\n".join(parts)
 
 
-def _skill_router_block(brain: str, root: str) -> str:
+def _skill_router_block(brain: str, root: str, skills=None) -> str:
     """ROUTER SKILL đa-engine (chèn vào system prompt của MỌI engine). Liệt kê skill đang BẬT kèm
     mô tả (trigger) + chỉ rõ 2 cách nạp: tool javis_use_skill (engine API có tool) HOẶC mở thẳng
     file SKILL.md bằng công cụ đọc file (Claude/Codex - dùng ĐƯỜNG DẪN TUYỆT ĐỐI vì cwd có thể là
     /app). Đây là thứ giúp skill chạy trên cả ChatGPT/Codex, không phụ thuộc cơ chế native của Claude.
-    Cap skill_router.SKILL_LIST_MAX để không phình context (nhiều hơn → trỏ Javis/index.md)."""
-    metas = skill_router.list_enabled_meta(root)
+    Cap skill_router.SKILL_LIST_MAX để không phình context (nhiều hơn → trỏ Javis/index.md).
+    skills: cây skill đã quét sẵn (list_skills), lọc tại chỗ thay vì quét lại - xem
+    _gather_capabilities. None = tự quét (đường cũ)."""
+    metas = ([s for s in skills if s.get("enabled")] if skills is not None
+             else skill_router.list_enabled_meta(root))
     if not metas:
         return ""
     sk_dir = skill_router.skills_base(root, canonical=True)
