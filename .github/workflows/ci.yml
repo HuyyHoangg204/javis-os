@@ -35,21 +35,27 @@ jobs:
           cd server
           python -c "import main; print(f'ok, nap duoc main voi {len(main.app.routes)} muc route')"
 
-      - name: Chay test JS dashboard
+      # Trước 0.9.242 chỉ 4 trong 11 test JS được liệt tay ở đây, 7 cái còn lại chưa từng
+      # chạy lần nào. Nay quét cả thư mục nên thêm test mới là tự chạy.
+      - name: Chạy test JS dashboard
         run: |
-          node dashboard/test_chat_ask.js
-          node dashboard/test_chat_render.js
-          node dashboard/test_chat_slash.js
-          node dashboard/test_wikilink.js
+          status=0
+          for f in tests/js/test_*.js tests/js/test_*.mjs; do
+            echo "==== $(basename "$f") ===="
+            node "$f" || status=1
+          done
+          exit $status
 
-      - name: Chạy test (auth/secret/MCP-perm/traversal/CSRF + plugin)
+      # KHÔNG còn `cd server`: từ 0.9.242 test tự nạp đường dẫn qua tests/python/_paths.py
+      # nên chạy được từ bất kỳ thư mục làm việc nào. Trước đây chạy sai chỗ là hàng loạt
+      # test đỏ vì `import main` không thấy module, hoặc lặng lẽ đọc nhầm file.
+      - name: Chạy test Python (auth/secret/MCP-perm/traversal/CSRF + plugin)
         env:
           PYTHONIOENCODING: utf-8
         run: |
-          cd server
           status=0
-          for f in test_*.py; do
-            echo "==== $f ===="
+          for f in tests/python/test_*.py; do
+            echo "==== $(basename "$f") ===="
             python "$f" || status=1
           done
           exit $status

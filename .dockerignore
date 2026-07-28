@@ -23,6 +23,9 @@
 .pytest_cache/
 videos/
 **/.staging
+# Test không chạy trong image. Từ 0.9.242 chúng nằm gọn ở tests/ nên loại được bằng một dòng;
+# trước đó chúng rải trong server/ và dashboard/ nên không có cách nào loại mà không đụng nguồn.
+tests/
 
 # Dữ liệu brain
 Brain Default/

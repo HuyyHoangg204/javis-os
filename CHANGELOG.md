@@ -4,6 +4,20 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.242] - 2026-07-29
+Tách test ra khỏi mã nguồn. `server/` từ 126 file `.py` xuống còn 50 file nguồn thuần.
+### Thay đổi
+- **76 file test Python chuyển sang `tests/python/`, 11 file test JS sang `tests/js/`**. Trước đó test nằm xen kẽ theo thứ tự bảng chữ cái với 50 module nguồn trong cùng một thư mục phẳng, nên mọi lần tìm kiếm trong `server/` đều lẫn nhiễu và câu hỏi "file nào là nguồn" không trả lời được bằng mắt.
+- **Test không còn phụ thuộc thư mục làm việc.** Trước đây phải chạy đúng từ `server/` mới được: 62 file nạp `sys.path` theo thư mục script, 35 biểu thức `__file__` dò đường tới nguồn, 15 chỗ mở file nguồn bằng đường dẫn tương đối theo cwd. Chạy sai chỗ là hàng loạt test đỏ vì `import main` không thấy module, hoặc tệ hơn là lặng lẽ đọc nhầm file. Nay tất cả quy về `tests/python/_paths.py` (`ROOT`, `SERVER`, và import nó cũng nạp `server/` vào `sys.path`), nên chạy được từ bất kỳ đâu và lần sau có dời nữa cũng chỉ sửa một file.
+- **Test JS thôi bị phục vụ công khai**: chúng nằm trong `dashboard/` vốn được mount tĩnh, nên `/static/test_chat_render.js` truy cập được từ ngoài. Chuyển sang `tests/js/` là hết.
+### Thêm mới
+- **`tests/run.py`**: chạy toàn bộ hoặc lọc theo tên (`python tests/run.py zalo`), có `--js` / `--py` / `-v`. Tự tìm `.venv` nên không chạy nhầm python hệ thống (thiếu fastapi/yaml). In tiến độ có `flush` nên chạy nền hay qua pipe vẫn theo dõi được, thay vì im ru tới lúc kết thúc.
+- **`tests/python/conftest.py`**: để `pytest` chạy được với các file đã chuyển sang kiểu pytest. Bộ chạy chính vẫn là vòng lặp từng file, vì 61 trên 76 file gọi `sys.exit()` ngay ở mức module nên bước collect của pytest sẽ huỷ cả lượt chạy.
+### Kiểm thử
+- **7 test JS chưa từng chạy lần nào giờ đã chạy.** CI trước đây liệt tay 4 file (`test_chat_ask`, `test_chat_render`, `test_chat_slash`, `test_wikilink`), bỏ sót 7 file còn lại. Nay quét cả thư mục nên thêm test mới là tự chạy. Cả 11 đều xanh.
+- CI bỏ `cd server`, chạy thẳng `tests/python/test_*.py` và `tests/js/test_*`. 87/87 xanh.
+- `tests/` vào `.dockerignore`: image không chạy test. Trước 0.9.242 không loại được vì test rải trong `server/` và `dashboard/`, muốn loại là đụng luôn mã nguồn.
+
 ## [0.9.241] - 2026-07-28
 Bịt lỗ rò bí mật vào image Docker, và sửa ba lỗi trong chính bộ test - trong đó có một lỗi làm hai bài test đo hiệu năng luôn xanh bất kể code đúng hay sai.
 ### Bảo mật
