@@ -15,16 +15,17 @@ def check(name, cond):
         _fails.append(name)
 
 import main  # noqa: E402
+from routes import graph as graph_routes  # noqa: E402  - _hidden_in_roots bóc sang đây ở 0.9.243
 from starlette.testclient import TestClient  # noqa: E402
 
 # --- _hidden_in_roots (thuần) ---
 root = tempfile.mkdtemp(prefix="javis-graphwatch-vault-")
 check("_hidden_in_roots: file thường - False",
-      main._hidden_in_roots(os.path.join(root, "a.md"), [root]) is False)
+      graph_routes._hidden_in_roots(os.path.join(root, "a.md"), [root]) is False)
 check("_hidden_in_roots: trong .trash - True",
-      main._hidden_in_roots(os.path.join(root, ".trash", "a.md"), [root]) is True)
+      graph_routes._hidden_in_roots(os.path.join(root, ".trash", "a.md"), [root]) is True)
 check("_hidden_in_roots: ngoài root - False (không đoán bừa)",
-      main._hidden_in_roots(os.path.join(tempfile.gettempdir(), "x.md"), [root]) is False)
+      graph_routes._hidden_in_roots(os.path.join(tempfile.gettempdir(), "x.md"), [root]) is False)
 
 # --- endpoint /ws/graph với sự kiện file thật ---
 main.cfgmod.gate_active = lambda: False   # test không đụng auth thật
