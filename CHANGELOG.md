@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.227] - 2026-07-28
+Việc nền hết chết vì engine phụ hết quota: tự rơi về Claude khi Codex/API lỗi lúc chạy.
+### Sửa lỗi
+- **Nhắc hẹn/loop/kanban/tự học không chết khi "model việc nền" hết hạn mức**: ca thật - việc nền đặt chạy gói ChatGPT (Codex), tài khoản chạm limit là nhắc hẹn chỉ báo ⚠ "You've hit your usage limit" về Telegram rồi thôi, nhiệm vụ không ai làm. `aux_engine.swap()` vốn chỉ đỡ được lỗi lúc DỰNG engine (thiếu key/CLI); nay bọc thêm `_FallbackToClaude`: engine phụ lỗi LÚC CHẠY (error/exception/stream câm không final/không sẵn sàng) là tự chạy lại nguyên prompt bằng engine Claude đã dựng sẵn. Cả hai cùng chết mới trả lỗi thật cho user. Wrapper trong suốt: attr caller gán sau swap (max_wall_s...) đặt cho cả hai engine.
+### Kiểm thử
+- `test_aux_fallback.py` mới (15 case): phụ ok không đụng Claude, hết quota/nổ exception/stream câm/unavailable đều được Claude cứu, cả hai chết mới lộ error, hợp đồng attr + swap bọc đúng provider.
+
 ## [0.9.226] - 2026-07-28
 Timelapse nhanh gấp đôi: 160ms mỗi note.
 ### Cải thiện

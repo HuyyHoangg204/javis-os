@@ -158,6 +158,81 @@ class _ApiAuxEngine:
         yield {"type": "final", "content": "".join(buf)}
 
 
+class _FallbackToClaude:
+    """Bọc engine việc nền KHÔNG-phải-Claude: engine phụ chết LÚC CHẠY (hết quota ChatGPT,
+    CLI lỗi, stream câm không final) thì tự chạy lại nguyên prompt bằng engine Claude gốc
+    đã dựng sẵn ở nơi gọi. Triết lý của swap() vốn là "việc nền phải chạy chứ không chết"
+    nhưng trước đây chỉ đỡ được lỗi lúc DỰNG (thiếu key/CLI); lỗi lúc chạy thì việc nền chết
+    thật - ca thật: Codex "You've hit your usage limit" làm nhắc hẹn chỉ báo ⚠ về Telegram.
+    Trong suốt với nơi gọi: đọc attr → engine phụ; GÁN attr (max_wall_s...) → đặt cho CẢ HAI
+    để engine Claude dự phòng cũng nhận giới hạn/cấu hình mà caller đặt sau swap."""
+
+    def __init__(self, primary, claude):
+        object.__setattr__(self, "_primary", primary)
+        object.__setattr__(self, "_claude", claude)
+
+    def _pair(self):
+        return (object.__getattribute__(self, "_primary"),
+                object.__getattribute__(self, "_claude"))
+
+    def __getattr__(self, name):
+        return getattr(object.__getattribute__(self, "_primary"), name)
+
+    def __setattr__(self, name, value):
+        primary, claude = self._pair()
+        setattr(primary, name, value)
+        try:
+            setattr(claude, name, value)
+        except Exception:
+            pass
+
+    def is_available(self) -> bool:
+        for e in self._pair():
+            try:
+                if e.is_available():
+                    return True
+            except Exception:
+                pass
+        return False
+
+    def reset_session(self):
+        for e in self._pair():
+            try:
+                e.reset_session()
+            except Exception:
+                pass
+
+    async def query(self, prompt: str):
+        primary, claude = self._pair()
+        fail = None
+        try:
+            if primary.is_available():
+                async for ev in primary.query(prompt):
+                    if (ev or {}).get("type") == "error":
+                        fail = ev.get("content") or "engine phụ trả error"
+                        break
+                    yield ev
+                    if (ev or {}).get("type") == "final":
+                        return                                   # phụ chạy ngon → xong
+                if fail is None:
+                    fail = "engine phụ kết thúc mà không có final"
+            else:
+                fail = "engine phụ không sẵn sàng"
+        except Exception as e:
+            fail = f"{type(e).__name__}: {e}"
+        try:
+            claude_ok = claude.is_available()
+        except Exception:
+            claude_ok = False
+        if not claude_ok:
+            yield {"type": "error", "content": str(fail)}        # hết đường → trả lỗi thật
+            return
+        print(f"[aux fallback] Engine việc nền phụ lỗi → chạy lại bằng Claude. Lý do: {str(fail)[:300]}",
+              file=sys.stderr)
+        async for ev in claude.query(prompt):
+            yield ev
+
+
 def _build_api(spec, claude_cli_obj, mode, tag):
     return _ApiAuxEngine(
         provider=spec["provider"],
@@ -224,10 +299,12 @@ def swap(cli, mode: str = None, tag: str = None, spec: dict = None,
         if not ok:
             print(f"[aux] {why} → việc nền tạm dùng lại Claude.", file=sys.stderr)
             return cli
+        # Bọc fallback: engine phụ lỗi LÚC CHẠY (quota/CLI/stream câm) → tự chạy lại bằng
+        # chính engine Claude đã dựng - nhắc hẹn/loop/kanban không chết vì hết hạn mức phụ.
         if prov == CODEX:
-            return _build_codex(sp, cli, mode, tag, codex_profile)
+            return _FallbackToClaude(_build_codex(sp, cli, mode, tag, codex_profile), cli)
         if prov in API_PROVIDERS:
-            return _build_api(sp, cli, mode, tag)
+            return _FallbackToClaude(_build_api(sp, cli, mode, tag), cli)
     except Exception as e:
         print(f"[aux swap] {e} → giữ engine Claude.", file=sys.stderr)
     return cli
