@@ -115,6 +115,39 @@ _m = config._DEFAULT.get("media") or {}
 check("config mac dinh media.enabled", _m.get("enabled") is True)
 check("config mac dinh 30 ngay", _m.get("max_age_days") == 30)
 check("config mac dinh tran 300MB", _m.get("max_mb") == 300)
+check("config mac dinh staging 3 ngay", _m.get("staging_days") == 3)
+
+# ---- 9b. Staging: khong chua .md, chi co luat tuoi ----
+check("keep_md=False thi .md cung bi xoa",
+      media_gc.plan_deletions([muc("rac.md", 1, 40)], NOW, 30, 300, keep_md=False) == ["rac.md"])
+check("keep_md mac dinh van chua .md",
+      media_gc.plan_deletions([muc("rac.md", 1, 40)], NOW, 30, 300) == [])
+
+_stg = tempfile.mkdtemp(prefix="javis-staging-")
+
+
+def _tao_stg(ten, tuoi_ngay):
+    p = os.path.join(_stg, ten)
+    with open(p, "wb") as f:
+        f.write(b"\0" * 1024)
+    t = time.time() - tuoi_ngay * DAY
+    os.utime(p, (t, t))
+    return p
+
+
+_s_cu = _tao_stg("paste-cu.png", 5)
+_s_cu_md = _tao_stg("dan-vao.md", 5)
+_s_moi = _tao_stg("paste-moi.png", 1)
+
+kqs = media_gc.sweep_staging(_stg, max_age_days=3)
+check("staging xoa file qua 3 ngay", not os.path.exists(_s_cu))
+check("staging xoa ca .md qua han", not os.path.exists(_s_cu_md))
+check("staging giu file trong han", os.path.exists(_s_moi))
+check("staging dem dung so file", kqs["files"] == 2)
+check("staging giu lai chinh thu muc", os.path.isdir(_stg))
+check("staging chay lai khong xoa them", media_gc.sweep_staging(_stg, 3)["files"] == 0)
+check("staging khong ton tai khong no",
+      media_gc.sweep_staging(os.path.join(_stg, "khong-co")) == {"files": 0, "bytes": 0})
 
 # ---- 10. Gitignore + gỡ index ----
 import subprocess   # noqa: E402

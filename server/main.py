@@ -4287,6 +4287,13 @@ async def _start_scheduler():
                                 if kq.get("files"):
                                     print(f"[media gc] {_mb}: dọn {kq['files']} tệp, "
                                           f"{kq['bytes'] // (1024 * 1024)}MB")
+                            # Staging KHÔNG theo brain: nó là một thư mục dùng chung trong
+                            # STATE_DIR, nên quét đúng một lần ngoài vòng lặp brain.
+                            kqs = await asyncio.to_thread(media_gc.sweep_staging, str(STAGING),
+                                                          int(mcfg.get("staging_days", 3)))
+                            if kqs.get("files"):
+                                print(f"[media gc] staging: dọn {kqs['files']} tệp, "
+                                      f"{kqs['bytes'] // (1024 * 1024)}MB")
                 except Exception as me:
                     print(f"[media gc] {type(me).__name__}: {me}", file=__import__('sys').stderr)
             except Exception as e:

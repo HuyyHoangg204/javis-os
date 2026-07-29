@@ -103,6 +103,21 @@ Chuỗi hiển thị phải là tiếng Việt **có dấu** (luật dự án, �
 
 CSS ô xám thêm vào `dashboard/style.css`, nhớ bump `?v` (asset tĩnh cache theo VERSION, đã tự động từ v0.9.139).
 
+## Bổ sung sau khi triển khai: đường thứ tư
+
+Bản khảo sát ban đầu đếm ba đường media và bỏ sót đường thứ tư, vì lúc đó chỉ quét `brains/`.
+
+`STATE_DIR/.staging` (`server/main.py:1779`) là nơi file user dán hoặc tải lên khung chat rơi xuống trước khi engine đọc. Code chỉ có hai thao tác với nó: tạo thư mục và ghi file vào (`server/main.py:1848`). Không có gì dọn. Đo trên máy phát triển ngày 2026-07-29: **114MB, 62 tệp, file cũ nhất 27 ngày**, tức là to hơn cả `attachments` của brain.
+
+Nó không nằm trong vault nên không dính git (đã bị chặn sẵn ở `.gitignore:11`), nhưng vẫn ăn đĩa VPS như mọi thứ khác.
+
+Xử lý: `media_gc.sweep_staging`, hạn **3 ngày**, cấu hình qua `media.staging_days`. Khác luật của vùng cache brain ở hai điểm, cả hai đều vì staging là chỗ trung chuyển thuần:
+
+- **Không chừa `.md`.** Chat không bao giờ nhúng đường dẫn staging nên không ai cuộn lại mở nó; một file `.md` ở đây là thứ user vừa dán vào chat, không phải note. Điều này đòi `plan_deletions` thêm tham số `keep_md`, mặc định `True` để luật của brain không đổi.
+- **Chỉ có luật tuổi, không trần dung lượng.** Hạn 3 ngày đã đủ chặt.
+
+Staging là thư mục dùng chung, không theo brain, nên scheduler quét nó đúng một lần ngoài vòng lặp brain.
+
 ## Phạm vi và ranh giới
 
 - **Không** viết code đẩy Drive trong phạm vi này. Janitor là một hàm nhỏ, sau này muốn đẩy Drive thì chèn một bước ngay trước lệnh xoá. Không dựng sẵn khung hook rỗng.

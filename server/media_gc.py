@@ -21,19 +21,21 @@ import re
 import time
 
 
-def plan_deletions(entries, now, max_age_days, max_mb):
+def plan_deletions(entries, now, max_age_days, max_mb, keep_md=True):
     """Quyết định file nào phải xoá. HÀM THUẦN.
 
     entries      : list[(path, size_bytes, mtime)] - mọi file trong vùng cache của MỘT brain.
     now          : mốc thời gian tham chiếu (time.time()).
     max_age_days : file già hơn ngần này ngày thì xoá. <= 0 = tắt luật tuổi.
     max_mb       : trần dung lượng vùng cache. <= 0 = tắt luật trần.
+    keep_md      : True (mặc định) = không bao giờ xoá .md, vì vùng cache của brain có thể
+                   lạc note vào mà note là tri thức. Đặt False cho thư mục THUẦN trung chuyển
+                   (staging), nơi một file .md chỉ là thứ user vừa dán vào chat, không phải note.
 
     Trả list path theo ĐÚNG thứ tự xoá: nhóm quá hạn trước, rồi nhóm bị trần cắt (cũ tới mới).
-
-    File .md không bao giờ bị xoá: vùng cache có thể lạc note vào, mà note là tri thức.
     """
-    giu = [t for t in entries if not str(t[0]).lower().endswith(".md")]
+    giu = [t for t in entries
+           if not (keep_md and str(t[0]).lower().endswith(".md"))]
     xoa, con_lai = [], []
     if max_age_days and max_age_days > 0:
         han = now - max_age_days * 86400.0
@@ -106,21 +108,45 @@ def scan(dirs):
     return ra
 
 
+def _xoa(can_xoa, kich_thuoc):
+    """Xoá thật danh sách path, trả {"files", "bytes"}. Lỗi từng file thì bỏ qua: file vừa bị
+    xoá tay hoặc đang bị tiến trình khác giữ -> để lượt sau dọn, không làm hỏng cả lượt."""
+    n, b = 0, 0
+    for p in can_xoa:
+        try:
+            os.remove(p)
+        except OSError:
+            continue
+        n += 1
+        b += kich_thuoc.get(p, 0)
+    return {"files": n, "bytes": b}
+
+
 def sweep(brain_root, max_age_days=30, max_mb=300, now=None):
     """Dọn vùng cache của MỘT brain. CHẶN vì đụng đĩa - phải gọi qua asyncio.to_thread.
 
     Trả {"files": số file đã xoá, "bytes": tổng byte đã giải phóng}.
     """
     entries = scan(media_dirs(brain_root))
-    co = {t[0]: t[1] for t in entries}
     can_xoa = plan_deletions(entries, float(now if now is not None else time.time()),
                              max_age_days, max_mb)
-    n, b = 0, 0
-    for p in can_xoa:
-        try:
-            os.remove(p)
-        except OSError:
-            continue      # file vừa bị xoá tay hoặc đang bị khoá -> lần sau dọn
-        n += 1
-        b += co.get(p, 0)
-    return {"files": n, "bytes": b}
+    return _xoa(can_xoa, {t[0]: t[1] for t in entries})
+
+
+def sweep_staging(staging_root, max_age_days=3, now=None):
+    """Dọn thư mục stage tạm (STATE_DIR/.staging, xem main.py:1779): nơi file user dán hoặc
+    tải lên khung chat rơi xuống trước khi engine đọc.
+
+    Đây là đường phình thứ tư, và trên máy phát triển nó còn to hơn attachments (114MB / 62
+    tệp, file cũ nhất 27 ngày, lúc đo 2026-07-29). Nó không nằm trong vault nên không dính
+    git, nhưng vẫn ăn đĩa VPS y như mọi thứ khác.
+
+    Khác sweep vùng cache brain ở hai điểm, cả hai đều vì staging là chỗ TRUNG CHUYỂN thuần:
+      - KHÔNG chừa .md. Không ai cuộn lại lịch sử để mở file staging (chat không nhúng đường
+        dẫn staging bao giờ), nên .md ở đây là rác chứ không phải tri thức.
+      - Chỉ có luật tuổi, không trần dung lượng: hạn mặc định 3 ngày đã đủ chặt.
+    """
+    entries = scan([staging_root])
+    can_xoa = plan_deletions(entries, float(now if now is not None else time.time()),
+                             max_age_days, 0, keep_md=False)
+    return _xoa(can_xoa, {t[0]: t[1] for t in entries})

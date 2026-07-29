@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.248] - 2026-07-29
+Dọn nốt đường phình media bị bỏ sót ở bản trước, và nó lại là đường to nhất.
+### Cải thiện
+- **Tự dọn thư mục stage tạm**: nơi file dán vào khung chat rơi xuống trước đây không có gì dọn, trên máy phát triển đã tích 114MB với 62 tệp, file cũ nhất 27 ngày. Nay hết hạn sau 3 ngày, chỉnh qua `media.staging_days` trong `settings.json`. Hạn ngắn hơn vùng cache của brain vì đây là chỗ trung chuyển một lượt chat, không ai mở lại; cũng vì thế file `.md` lạc vào đó bị dọn luôn chứ không được chừa như trong brain.
+
 ## [0.9.247] - 2026-07-29
 Ảnh và file gửi lên thôi nằm lại vĩnh viễn trong brain. Chúng là nguyên liệu đi qua, đọc xong rút thành ghi chú là đủ dùng.
 ### Cải thiện
