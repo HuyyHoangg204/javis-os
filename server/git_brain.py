@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -71,6 +72,16 @@ _GITIGNORE = (
     "memory/conversations/\n"
     "Memory/conversations/\n"
     "*.tmp\n"
+    "# Vùng cache media: ảnh sinh ra + file user gửi lên. Là NGUYÊN LIỆU đi qua, không phải\n"
+    "# tri thức, và media_gc.py tự dọn theo hạn. Nếu commit thì mỗi tấm ảnh là một blob nằm\n"
+    "# vĩnh viễn trong lịch sử git - xoá file về sau cũng không lấy lại được dung lượng.\n"
+    "# Bốn dòng attachments vì tên thư mục có thể là attachments / Attachments / 05 - attachments\n"
+    "# (git phân biệt hoa thường trên Linux, còn dấu * phủ mọi tiền tố số thứ tự).\n"
+    "attachments/\n"
+    "Attachments/\n"
+    "*attachments/\n"
+    "*Attachments/\n"
+    "inbox/\n"
 )
 
 
@@ -104,6 +115,42 @@ def _ensure_gitignore_lines(root) -> bool:
         return False
 
 
+# Cùng luật nhận diện thư mục attachments với media_gc.py và image_gen.py:40.
+_ATTACH_RE = r"^(\d+\s*[-_.]\s*)?attachments$"
+
+
+def untrack_media(root: str) -> int:
+    """Gỡ attachments/ + inbox/ khỏi INDEX git, GIỮ NGUYÊN file trên đĩa.
+
+    Vì sao cần: .gitignore không có tác dụng với file git ĐÃ theo dõi từ trước, nên brain cũ
+    (đã lỡ commit ảnh) vẫn tiếp tục commit ảnh mới dù template ignore đã vá. Phải gỡ một lần.
+
+    Hệ quả đã được chấp nhận: commit kế tiếp ghi nhận "đã xoá ảnh", và kéo brain về máy khác
+    thì ảnh cũ không đi theo. Blob cũ vẫn nằm trong lịch sử - CỐ Ý không viết lại history.
+
+    Idempotent: brain chưa từng commit media thì không có gì để gỡ, trả 0.
+    Trả về số thư mục đã thực sự gỡ.
+    """
+    n = 0
+    try:
+        for name in sorted(os.listdir(root)):
+            if not os.path.isdir(os.path.join(root, name)):
+                continue
+            ten = name.strip()
+            if ten.lower() != "inbox" and not re.match(_ATTACH_RE, ten, re.IGNORECASE):
+                continue
+            # Hỏi trước bằng ls-files: không có gì được theo dõi thì khỏi gọi git rm, và
+            # quan trọng hơn là khỏi đếm nhầm thư mục vốn đã sạch (giữ tính idempotent).
+            r = _git(root, "ls-files", "--", name)
+            if not (r.stdout or "").strip():
+                continue
+            _git(root, "rm", "-r", "--cached", "--ignore-unmatch", "-q", "--", name)
+            n += 1
+    except Exception as e:
+        print(f"[untrack_media] {root}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
+    return n
+
+
 def ensure_git_repo(root: str) -> dict:
     """Biến brain thành git repo nếu chưa (gọi khi BẬT học). Idempotent.
     Trả {ok, created, error}. KHÔNG push (backup là việc user chủ động)."""
@@ -132,7 +179,13 @@ def ensure_git_repo(root: str) -> dict:
         # không chạy mỗi tick. Xét thêm dirty -> lần bấm sau tự lành.
         changed = _ensure_gitignore_lines(root)
         dirty = bool((_git(root, "status", "--porcelain", "--", ".gitignore").stdout or "").strip())
-        if changed or dirty:
+        # untrack_media phải nằm TRONG khoá và NGAY TRƯỚC commit_paths: commit_paths chạy
+        # `git commit` = commit CẢ INDEX, nên phần gỡ index chỉ được stage khi chắc chắn có
+        # người commit nó ngay sau. Không giành được khoá thì bỏ qua cả hai, lần bấm sau lành.
+        # Xét thêm con_theo_doi vì brain nào đã có .gitignore đúng rồi (changed và dirty đều
+        # False) mà vẫn đang theo dõi media thì nếu không có nó sẽ MÃI MÃI không được gỡ.
+        con_theo_doi = bool((_git(root, "ls-files", "--", "inbox").stdout or "").strip())
+        if changed or dirty or con_theo_doi:
             # timeout=1.0 (KHÔNG phải mặc định 30s): ensure_git_repo bị gọi THẲNG, không qua
             # asyncio.to_thread, từ 2 handler async (learn.py /learn/enable + main.py /reflect),
             # mà BrainLock.acquire() chờ bằng time.sleep(0.25) CHẶN. Chờ 30s ở đây = đóng băng
@@ -144,6 +197,7 @@ def ensure_git_repo(root: str) -> dict:
             # đó là thay đổi lớn hơn và không cần khi thời gian chờ đã bị chặn ~1s.)
             with BrainLock(root, timeout=1.0) as lk:
                 if getattr(lk, "acquired", False):
+                    untrack_media(root)
                     commit_paths(root, [".gitignore"], "chore: cập nhật .gitignore brain")
         return {"ok": True, "created": False}
     try:

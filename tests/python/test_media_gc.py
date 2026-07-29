@@ -116,6 +116,59 @@ check("config mac dinh media.enabled", _m.get("enabled") is True)
 check("config mac dinh 30 ngay", _m.get("max_age_days") == 30)
 check("config mac dinh tran 300MB", _m.get("max_mb") == 300)
 
+# ---- 10. Gitignore + gỡ index ----
+import subprocess   # noqa: E402
+
+import git_brain    # noqa: E402
+
+for _dong in ("attachments/", "Attachments/", "*attachments/", "*Attachments/", "inbox/"):
+    check(f"gitignore co dong {_dong}", _dong + "\n" in git_brain._GITIGNORE)
+
+if git_brain.has_git():
+    _repo = tempfile.mkdtemp(prefix="javis-mediagit-")
+
+    def _g(*a):
+        return subprocess.run(["git", "-C", _repo, *a], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
+
+    _g("init")
+    _g("config", "user.email", "t@t"); _g("config", "user.name", "T")
+    os.makedirs(os.path.join(_repo, "attachments"), exist_ok=True)
+    os.makedirs(os.path.join(_repo, "inbox", "telegram"), exist_ok=True)
+    os.makedirs(os.path.join(_repo, "Wiki"), exist_ok=True)
+    for _p, _noi_dung in ((("attachments", "a.png"), b"x"),
+                          (("inbox", "telegram", "b.jpg"), b"x"),
+                          (("Wiki", "note.md"), b"x")):
+        with open(os.path.join(_repo, *_p), "wb") as _f:
+            _f.write(_noi_dung)
+    _g("add", "-A"); _g("commit", "-m", "seed")
+
+    _truoc = (_g("ls-files").stdout or "")
+    check("seed co theo doi media", "attachments/a.png" in _truoc)
+
+    n = git_brain.untrack_media(_repo)
+    _sau = (_g("ls-files").stdout or "")
+    check("untrack_media go attachments", "attachments/a.png" not in _sau)
+    check("untrack_media go inbox", "inbox/telegram/b.jpg" not in _sau)
+    check("untrack_media khong dung file khac", "Wiki/note.md" in _sau)
+    check("untrack_media giu file tren dia",
+          os.path.exists(os.path.join(_repo, "attachments", "a.png")))
+    check("untrack_media dem dung so thu muc", n == 2)
+
+    _g("commit", "-m", "untrack")
+    check("untrack_media chay lai khong lam gi", git_brain.untrack_media(_repo) == 0)
+
+    # Brain cũ đã có .gitignore riêng: merge thêm dòng mới, KHÔNG mất dòng user tự đặt.
+    with open(os.path.join(_repo, ".gitignore"), "w", encoding="utf-8") as _f:
+        _f.write("# luat rieng cua user\nrac-cua-toi/\n")
+    git_brain._ensure_gitignore_lines(_repo)
+    with open(os.path.join(_repo, ".gitignore"), encoding="utf-8") as _f:
+        _gi = _f.read()
+    check("merge gitignore giu dong cu", "rac-cua-toi/" in _gi)
+    check("merge gitignore them dong media", "attachments/" in _gi and "inbox/" in _gi)
+else:
+    print("BỎ QUA test git: máy không có git trong PATH")
+
 print()
 if _fails:
     print(f"{len(_fails)} test ĐỎ: " + ", ".join(_fails))
