@@ -116,12 +116,15 @@ g._applyDepth();
 check("scene có sương mù", !!scene.fog);
 const R = g._radius();
 check("bán kính đo từ node, không phải hằng số", Math.abs(R - 100) < 1);
-check("độ dày sương suy ra từ bán kính", scene.fog && Math.abs(scene.fog.density - 0.30 / R) < 1e-9);
+// KHÔNG khoá vào con số fogK cụ thể (nó là núm chỉnh thẩm mỹ, sẽ còn vặn). Khoá vào
+// QUAN HỆ: sương phải tỉ lệ nghịch với bán kính, và nằm trong khoảng dùng được.
+const dens = scene.fog.density;
+check("độ dày sương nằm trong khoảng hợp lý", dens > 0 && dens * R > 0.05 && dens * R < 0.6);
 // Brain to gấp đôi thì sương phải loãng đi một nửa, không thì khối lớn mờ tịt
 const big = makeGraph(NODES.map(n => ({ ...n, x: n.x * 2, y: n.y * 2, z: n.z * 2 })));
 big.g._applyDepth();
 check("brain to gấp đôi thì sương loãng đi một nửa",
-      big.scene.fog.density < scene.fog.density * 0.55);
+      Math.abs(big.scene.fog.density - dens / 2) < dens * 0.06);
 
 // ---- 4. Lõi sáng + bụi vành có mặt ----------------------------------------
 const { g: g2, added: added2 } = makeGraph(NODES);
@@ -147,11 +150,14 @@ probe.forEach(n => { n.__gw = 0.45 + 1.35 * Math.pow((n.links || 0) / max, 0.6);
 check("node nhiều liên kết bị kéo vào tâm mạnh hơn node lẻ", probe[0].__gw > probe[2].__gw * 2);
 check("node lẻ vẫn còn lực hút (không văng khỏi khung)", probe[2].__gw >= 0.4);
 
-// ---- 6. Cỡ hạt: mịn cho note lẻ, to rõ cho hub ----------------------------
-const size = (links) => 2.4 + Math.min(19, Math.pow(links, 0.7) * 2.6);
-check("note lẻ là hạt bụi rất nhỏ", size(0) < 3);
+// ---- 6. Cỡ hạt: note lẻ vẫn thấy được, hub to rõ --------------------------
+// Công thức phải khớp nodeThreeObject trong graph3d.js. Điều khoá ở đây là HÌNH DẠNG
+// của dải cỡ chứ không phải con số: sàn đủ lớn để note lẻ không tàng hình (bài học từ
+// bản 2.4 - nhỏ tới mức coi như không tồn tại), và có trần để hub không nuốt cả khung.
+const size = (links) => 3.2 + Math.min(17, Math.pow(links, 0.7) * 2.4);
+check("note lẻ vẫn đủ lớn để nhìn thấy", size(0) >= 3);
 check("hub to rõ hơn note lẻ ít nhất 5 lần", size(50) > size(0) * 5);
-check("hub bị chặn trần, không nuốt cả khung", size(5000) <= 21.4);
+check("hub bị chặn trần, không nuốt cả khung", size(5000) <= 20.2);
 
 console.log(fails ? `\nFAIL ${fails} test` : "\nTẤT CẢ PASS");
 process.exit(fails ? 1 : 0);

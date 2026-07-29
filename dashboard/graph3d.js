@@ -17,27 +17,31 @@ let G3 = {
   light: false,
   additive: true,
   fallback: "#b98cff",
-  glowStops: [[0, 0.92], [0.17, 0.60], [0.46, 0.19]],
-  // 0.52 chứ không phải 0.62: đo mô phỏng cho thấy trên 0.6 thì chỉ 16 hạt chồng nhau
-  // đã dồn về trắng, màu chỉ sống ở vành. Hạ xuống thì màu giữ được sâu vào trong lõi,
-  // và phần chính giữa vẫn tự sáng lên nhờ mật độ - đó mới là lõi sáng thật.
-  baseOpacity: 0.52,
+  // Dải rất GỌN: gần như đặc tới 9% bán kính rồi tắt nhanh. Mỗi note phải là một
+  // ĐIỂM đọc được, không phải vệt loang - đó là toàn bộ ý nghĩa của đồ thị này.
+  glowStops: [[0, 1.0], [0.09, 0.88], [0.28, 0.32], [0.58, 0.05]],
+  baseOpacity: 0.9,
+  // Dây nối phải MỜ HƠN note. Bản trước để dây 0.2 còn note 0.52 nên nhìn ra mạng
+  // nhện xám, còn note thì mất tăm - ngược hẳn thứ tự quan trọng.
   link: "rgba(150,140,225,0.9)",
-  linkOpacity: 0.2,
+  linkOpacity: 0.12,
 
   // Sương mù theo chiều sâu: hạt xa mờ dần về màu nền → khối có thể tích thay vì dẹt.
   // fogK là hệ số chia theo bán kính đo được (xem _applyDepth), không phải hằng số tuyệt
   // đối - brain to nhỏ khác nhau nên sương phải co giãn theo.
-  fog: 0x05050c, fogK: 0.26,
+  fog: 0x05050c, fogK: 0.17,
 
-  // Lõi sáng ở tâm - thứ cả hai mẫu tham chiếu đều có và bản cũ thiếu hẳn.
-  core: [[0, "rgba(255,247,236,0.95)"], [0.09, "rgba(216,192,255,0.70)"],
-         [0.28, "rgba(150,110,240,0.26)"], [0.60, "rgba(96,64,190,0.07)"],
-         [1, "rgba(60,40,140,0)"]],
-  coreScale: 1.25,
+  // Lõi = một ĐỐM THAN ẤM nhỏ, không phải đèn pha. Bản trước để coreScale 1.25 (đường
+  // kính 2.5 lần bán kính khối) nên nó phủ trùm toàn bộ đồ thị thành đám sương tím và
+  // nuốt sạch node. 0.38 giữ nó gọn trong lòng khối, đọc ra "tim" chứ không phải "mù".
+  // Màu đi từ cam thương hiệu ra tím - hơi ấm của Javis nằm ở đây.
+  core: [[0, "rgba(255,216,172,0.90)"], [0.16, "rgba(255,146,74,0.43)"],
+         [0.42, "rgba(155,92,224,0.17)"], [1, "rgba(72,46,152,0)"]],
+  coreScale: 0.38,
 
-  // Bụi vành: lớp hạt rất mịn bao ngoài, tạo cảm giác tinh vân loãng dần ra rìa.
-  dust: 0xbdaced, dustOpacity: 0.5, dustSize: 1.5,
+  // Bụi vành thưa và mờ: starfield phía sau đã lo phần hạt nền rồi, lớp này chỉ thêm
+  // thị sai cho có khối. Dày quá là thành lớp sương thứ ba, đúng lỗi vừa mắc.
+  dust: 0xbdaced, dustOpacity: 0.28, dustSize: 1.4, dustCount: 260,
 
   particle: [                                     // hạt chạy dọc dây lúc đang nghĩ
     [0, "rgba(255,255,255,1)"], [0.06, "rgba(255,210,120,0.95)"],
@@ -52,24 +56,22 @@ const G3_LIGHT = {
   light: true,
   additive: false,
   fallback: "#7340c9",
-  glowStops: [[0, 0.86], [0.19, 0.50], [0.50, 0.15]],
-  // Chồng thường không có hiện tượng cộng dồn, nhưng mực chồng mực quá dày thì lõi
-  // thành vệt đen kịt trên giấy. 0.68 giữ được cảm giác mực thấm dày mà vẫn trong.
-  baseOpacity: 0.68,
+  glowStops: [[0, 1.0], [0.11, 0.93], [0.31, 0.40], [0.61, 0.06]],
+  // Trên giấy mực phải ĐẶC mới ra chấm sắc nét; để mờ là chìm nghỉm vào nền ngà.
+  baseOpacity: 0.97,
   // Dây mảnh màu sẫm trên giấy cần đậm hơn hẳn mức của nền đen mới thấy.
-  link: "rgba(96,74,150,0.9)",
+  link: "rgba(92,74,140,0.9)",
   linkOpacity: 0.26,
 
-  fog: 0xf1eae0, fogK: 0.30,
+  fog: 0xf1eae0, fogK: 0.13,
 
-  // Trên giấy KHÔNG có "nguồn sáng" - lõi đổi thành vệt loang lavender-đào rất nhạt,
-  // đọc như mực thấm dày ở giữa trang.
-  core: [[0, "rgba(124,58,237,0.26)"], [0.15, "rgba(139,92,246,0.16)"],
-         [0.40, "rgba(232,93,31,0.09)"], [0.72, "rgba(232,93,31,0.03)"],
-         [1, "rgba(255,255,255,0)"]],
-  coreScale: 1.35,
+  // Trên giấy KHÔNG có "nguồn sáng" - lõi thành vệt ửng đào-lavender rất nhạt và NHỎ,
+  // đọc như chỗ mực thấm đậm nhất giữa trang. Đậm hơn nữa là cả trang thành màn sữa.
+  core: [[0, "rgba(255,196,150,0.30)"], [0.20, "rgba(214,140,90,0.15)"],
+         [0.50, "rgba(150,110,220,0.07)"], [1, "rgba(255,255,255,0)"]],
+  coreScale: 0.36,
 
-  dust: 0x7d7398, dustOpacity: 0.4, dustSize: 1.35,
+  dust: 0x7d7398, dustOpacity: 0.22, dustSize: 1.3, dustCount: 260,
 
   particle: [
     [0, "rgba(150,44,0,0.98)"], [0.16, "rgba(200,70,10,0.85)"],
@@ -226,8 +228,9 @@ class JavisGraph3D {
           });
           const sp = new THREE.Sprite(mat);
           // Dải cỡ rộng và mịn hơn bản cũ (5..31 gần như đều nhau nên nhìn ra đám chấm
-          // cùng cỡ). Mũ 0.7 kéo note lẻ xuống hạt bụi rất nhỏ, hub vẫn to rõ.
-          const base = 2.4 + Math.min(19, Math.pow(n.links || 0, 0.7) * 2.6);
+          // cùng cỡ). Mũ 0.7 kéo note lẻ xuống hạt nhỏ, hub vẫn to rõ. Sàn 3.2 chứ
+          // không phải 2.4: dưới mức đó note lẻ nhỏ tới mức coi như không tồn tại.
+          const base = 3.2 + Math.min(17, Math.pow(n.links || 0, 0.7) * 2.4);
           sp.scale.set(base, base, 1);
           sp.__base = base;
           n.__sprite = sp;
@@ -329,7 +332,7 @@ class JavisGraph3D {
     const THREE = window.THREE, scene = this._scene();
     if (!THREE || !scene) return;
     this._disposeDust();
-    const N = 620;
+    const N = G3.dustCount || 320;
     const pos = new Float32Array(N * 3);
     for (let i = 0; i < N; i++) {
       // Điểm đều trên mặt cầu (u phân bố đều mới không dồn về hai cực), bán kính lệch

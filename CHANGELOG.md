@@ -12,6 +12,20 @@ Zalo được rút về đúng một đường MCP: nối tài khoản xong là 
 - **Một tiến trình Zalo duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool MCP.
 - Thẻ kết nối Zalo có link mở tài liệu hướng dẫn trên GitHub.
 
+## [0.9.253] - 2026-07-29
+Bản trước sửa đồ thị 3D nhưng làm nó tệ hơn: cả tối lẫn sáng đều thành một màn sương, không thấy note đâu. Lần này dựng bộ mô phỏng để NHÌN được rồi mới chỉnh.
+### Sửa lỗi
+- **Ba lớp quầng sáng chồng lên nhau ở giữa khoang não**: nền CSS, quầng của starfield, và lõi sáng thêm ở 0.9.252. Riêng cái lõi đặt đường kính bằng 2.5 lần bán kính khối nên nó phủ trùm toàn bộ đồ thị. Nay lõi thu về 0.38 (gọn trong lòng khối, đọc ra "tim" chứ không phải "mù"), và quầng nền giữ NGUYÊN không đụng tới vì dùng chung với đồ thị 2D.
+- **Note bị chìm dưới dây nối**: dây để mờ 0.20 còn note chỉ 0.52, thành ra nhìn ra mạng nhện xám mà không thấy note - ngược hẳn thứ tự quan trọng. Nay note lên 0.90 (tối) / 0.97 (sáng), dây xuống 0.12 (tối).
+- **Hạt note loang thành vệt**: dải màu quá thoải nên mỗi note là một đám mờ chứ không phải một điểm. Nay gọn hẳn, gần như đặc tới 9% bán kính rồi tắt nhanh - mỗi note là một ĐIỂM đọc được.
+- Sương mù giảm từ 0.26 xuống 0.17 (tối) và 0.30 xuống 0.13 (sáng); bụi vành giảm từ 620 hạt xuống 260 và mờ đi một nửa. Cả hai đang góp phần làm mờ thay vì tạo chiều sâu.
+- Sàn cỡ hạt nâng từ 2.4 lên 3.2: dưới mức đó note ít liên kết nhỏ tới mức coi như không tồn tại.
+### Cải thiện
+- **Lõi mang hơi ấm của Javis**: đổi từ trắng-tím sang đốm than cam thương hiệu loang ra tím. Tông sáng thành vệt ửng đào-lavender nhạt, đọc như chỗ mực thấm đậm nhất giữa trang giấy.
+### Kiểm thử
+- Dựng bộ mô phỏng dựng hình bằng PIL, chồng lớp đúng thứ tự và đúng phép trộn của app, để đối chiếu được bằng mắt trước khi sửa code. Đã kiểm ở 150, 220 và 400 note - màu giữ nguyên, không bệt lại ở mật độ dày.
+- `test_graph3d_nebula.js` đổi từ khoá hằng số sang khoá QUAN HỆ (sương tỉ lệ nghịch bán kính, dải cỡ có sàn và trần) để còn vặn được thẩm mỹ mà test không vỡ oan.
+
 ## [0.9.252] - 2026-07-29
 Đồ thị 3D trước giờ là một quả cầu lốm đốm xám trắng, dẹt và không ra chất. Nguyên nhân đo được rồi, không phải chuyện gu.
 ### Sửa lỗi
