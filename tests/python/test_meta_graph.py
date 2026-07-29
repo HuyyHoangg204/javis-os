@@ -83,6 +83,10 @@ async def oauth_tests():
         check("authorize: KHÔNG có PKCE (code_challenge)", "code_challenge" not in q)
         check("authorize: scope dấu cách đúng", q["scope"][0] == "ads_read business_management")
         check("authorize: client_id từ secrets BYO", q["client_id"][0] == "APPID")
+        # Kết nối lại mà thiếu auth_type=rerequest thì Facebook đi đường tắt "Tiếp tục với tên X"
+        # và KHÔNG hiện lại màn chọn Trang / tài khoản quảng cáo - user không thêm được Trang mới.
+        check("authorize: có auth_type=rerequest (bắt Facebook hiện lại màn chọn Trang)",
+              q.get("auth_type", [""])[0] == "rerequest")
         state = q["state"][0]
 
         cb = await oauth_mcp.handle_callback(state, "THE_CODE")

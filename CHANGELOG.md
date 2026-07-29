@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.249] - 2026-07-29
+Muốn giao thêm một fanpage cho Javis mà bấm Kết nối lại thì Facebook không hỏi lại gì cả.
+### Sửa lỗi
+- **Kết nối lại Facebook giờ hiện lại màn chọn Trang**: đã cấp quyền một lần rồi thì Facebook đi đường tắt "Tiếp tục với tên X" và bỏ qua màn "Chọn nội dung bạn cho phép", nên không có chỗ nào tick thêm fanpage mới - người dùng kẹt với đúng bộ Trang đã chọn lần đầu, xoá tài khoản đi đấu lại cũng vậy. Nay đường đăng nhập Meta luôn kèm `auth_type=rerequest` (tham số Meta khai đúng cho việc hỏi lại), nên mỗi lần Kết nối lại là hộp thoại quyền hiện đầy đủ, tick thêm Trang được. Áp dụng cho cả Facebook Trang lẫn Meta Ads (chọn lại tài khoản quảng cáo).
+- Lưu ý khi tick: **giữ nguyên các Trang cũ**, bỏ tick Trang nào là Javis mất quyền Trang đó. Hướng dẫn trong hộp Kết nối và mục Sự cố thường gặp đã ghi thêm bước này.
+### Kiểm thử
+- `test_meta_graph.py` chốt đường authorize của Meta phải mang `auth_type=rerequest`, để lần sau ai dọn tham số không lỡ tay gỡ mất.
+
 ## [0.9.248] - 2026-07-29
 Dọn nốt đường phình media bị bỏ sót ở bản trước, và nó lại là đường to nhất.
 ### Cải thiện

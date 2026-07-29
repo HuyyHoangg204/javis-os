@@ -235,6 +235,12 @@ async def start_auth(conn_id, redirect_uri):
     if not is_meta:                   # Meta classic flow KHÔNG dùng PKCE (client_secret đủ)
         q["code_challenge"] = challenge
         q["code_challenge_method"] = "S256"
+    if is_meta:
+        # Đã cấp quyền một lần rồi thì Facebook đi đường tắt "Tiếp tục với tên X" và KHÔNG hiện
+        # lại màn "Chọn nội dung bạn cho phép" - tức là không tick thêm được Trang/tài khoản mới.
+        # auth_type=rerequest là cách Meta khai để ép hiện lại đầy đủ hộp thoại quyền.
+        # https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow/
+        q["auth_type"] = "rerequest"
     if scopes:
         q[scope_param] = scope_sep.join(scopes)
     if add_resource:
