@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.247] - 2026-07-29
+Ảnh và file gửi lên thôi nằm lại vĩnh viễn trong brain. Chúng là nguyên liệu đi qua, đọc xong rút thành ghi chú là đủ dùng.
+### Cải thiện
+- **Media không lên git nữa**: `attachments/` và `inbox/` giờ nằm ngoài git của brain. Trước đây mỗi tấm ảnh là một blob nằm vĩnh viễn trong lịch sử, xoá file về sau cũng không lấy lại được dung lượng, mà bản mirror còn nhân đôi. Brain cũ đã lỡ commit thì được gỡ khỏi chỉ mục một lần; phần lịch sử đã lỡ thì giữ nguyên, không viết lại.
+- **Tự dọn vùng cache media**: ảnh quá 30 ngày tự xoá, và nếu tổng vượt 300MB thì dọn từ cũ tới mới cho tới khi xuống dưới trần. Chỉnh được qua khoá `media` trong `settings.json`, đặt `enabled: false` là thôi dọn. Ghi chú `.md` lạc vào hai thư mục đó thì được chừa ra.
+- **Ảnh đã hết hạn hiện ô xám**: chỗ ảnh không còn hiện ô viền đứt ghi "Ảnh đã hết hạn" thay cho icon vỡ, đúng cả khi file bị xoá tay hay đổi tên.
+
 ## [0.9.246] - 2026-07-29
 Nối Telegram vào kho phiên ở 0.9.244 để lộ vấn đề ngược lại: phiên Telegram không có gì chặn nó dài vô tận.
 ### Cải thiện
