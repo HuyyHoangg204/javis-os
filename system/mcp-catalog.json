@@ -120,6 +120,8 @@
       "command": "npx",
       "args": ["-y", "webcake-landing-mcp"],
       "requires": { "node": ">=18" },
+      "_env_note": "9 tool lưu trữ (list_organizations, create_page, publish_page...) cần BASE URL API. Package giải base theo thứ tự WEBCAKE_API_BASE > preset của WEBCAKE_ENV > file auth.json do lệnh `login` ghi. Không cấp gì thì user đấu xong là mọi tool lưu trữ trả missing_env WEBCAKE_API_BASE. Dùng preset prod (không ghi cứng URL) để URL đổi thì package tự lo, và user vẫn đè được bằng cách tự đặt WEBCAKE_API_BASE ở connection.",
+      "env": { "WEBCAKE_ENV": "prod" },
       "auth": {
         "type": "apikey",
         "fields": [

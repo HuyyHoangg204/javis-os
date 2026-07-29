@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.255] - 2026-07-30
+Đấu Webcake trong Javis xong là hỏng ngay: mọi tool tạo, sửa hay đăng trang đều trả `missing_env WEBCAKE_API_BASE`, vì catalog chưa hề cấp base URL của API.
+### Sửa lỗi
+- **Connector Webcake thiếu base URL API**: package `webcake-landing-mcp` giải base theo thứ tự `WEBCAKE_API_BASE` > preset của `WEBCAKE_ENV` > file `auth.json` do lệnh `login` ghi. Catalog Javis chỉ map `WEBCAKE_JWT` và `WEBCAKE_ORG_ID` từ ô đăng nhập nên không cấp gì trong ba đường đó, khiến cả 9 tool lưu trữ (`list_organizations`, `create_page`, `list_pages`, `find_pages`, `get_page`, `update_page`, `add_section`, `patch_page`, `publish_page`) chết ngay. Tool validate cũng nằm trong nhóm đó nên thẻ kết nối đỏ luôn từ lúc vừa đấu. Nay catalog cấp `WEBCAKE_ENV=prod`: dán JWT là chạy, khỏi bắt user gõ lệnh `login` ngoài Javis.
+### Thêm mới
+- **Khối `env` tĩnh mức connector trong catalog**: chỗ khai hằng số kỹ thuật KHÔNG phải secret (base URL, preset môi trường) để khỏi đẻ thêm ô nhập bắt user gõ URL. Thứ hạng: env user tự đặt ở connection > ô đăng nhập > env tĩnh catalog, nên bản staging hay self-hosted vẫn đè được bằng `WEBCAKE_API_BASE` riêng. Dùng preset thay vì ghi cứng URL để Webcake đổi tên miền thì package tự lo.
+### Kiểm thử
+- `test_webcake_env.py`: dán JWT là đủ để giải được base, không được đẻ ô nhập cho URL kỹ thuật, tool validate phải nằm trong nhóm cần base, thứ tự ưu tiên của env tĩnh so với ô đăng nhập và env connection, kèm canary chứng minh check đọc catalog thật chứ không luôn xanh.
+
 ## [0.9.251] - 2026-07-30
 Zalo được rút về đúng một đường MCP: nối tài khoản xong là tìm cuộc chat và gửi trực tiếp, không cần bật nghe hay chọn danh sách theo dõi.
 ### Cải thiện

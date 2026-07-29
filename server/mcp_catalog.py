@@ -111,8 +111,18 @@ def build_headers(connector, secrets):
 def build_env(connector, secrets):
     """Dựng env thật từ auth.fields có khai 'env' (vd WEBCAKE_JWT). Bỏ qua giá trị rỗng.
     Field 'file' (dán nội dung file, vd service account JSON) KHÔNG map ở đây -
-    mcp_store.resolved ghi ra file rồi mới gán env = đường dẫn."""
+    mcp_store.resolved ghi ra file rồi mới gán env = đường dẫn.
+
+    Connector còn khai được khối `env` TĨNH (hằng số kỹ thuật, KHÔNG phải secret) làm
+    MẶC ĐỊNH - vd webcake-landing cần WEBCAKE_ENV=prod để package tự điền base URL API.
+    Thứ hạng: ô đăng nhập user gõ > env tĩnh catalog; và env user tự đặt ở connection
+    thắng cả hai (mcp_store.resolved đặt env connection trước rồi mới setdefault).
+    Có khối này để KHỎI đẻ thêm ô nhập bắt user gõ URL kỹ thuật, cũng khỏi bắt user chạy
+    lệnh login ngoài Javis."""
     env = {}
+    for k, v in ((connector or {}).get("env") or {}).items():
+        if k and v not in (None, ""):
+            env[str(k)] = str(v)
     for f in ((connector or {}).get("auth") or {}).get("fields", []):
         ev = f.get("env")
         key = f.get("key")
