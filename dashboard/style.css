@@ -1265,6 +1265,10 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .msg-javis .bubble .task-item { list-style: none; margin-left: -16px; }
 .msg-javis .bubble .task-item input { margin-right: 6px; vertical-align: middle; }
 .chat-img { max-width: min(100%, 440px); border-radius: 8px; display: block; margin: 6px 0; cursor: zoom-in; }
+/* Anh da bi don khoi vung cache (media_gc) hoac bi xoa tay. Vien dut de nhin ra ngay day la
+   cho trong chu khong phai mot the anh that. */
+.chat-img-gone { display: inline-block; margin: 6px 0; padding: 10px 14px; border-radius: 8px;
+  border: 1px dashed var(--border); background: var(--bg3); color: var(--text3); font-size: 13px; }
 
 /* Code block: header nhan ngon ngu + nut Copy + to mau cu phap */
 .code-wrap { position: relative; margin: 8px 0; }

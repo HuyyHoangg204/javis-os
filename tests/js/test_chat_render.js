@@ -129,6 +129,13 @@ check("dataviewjs: cung vao khoi dataview (bao chua ho tro khi chay)", has(h, "j
 h = mdToHtml("```tasks\nnot done\ndue before today\n```");
 check("tasks: fence obsidian-tasks cung thanh khoi song", has(h, 'data-dv-lang="tasks"'));
 
+// ---- 23. Anh het han: the <img> phai co onerror de doi thanh o xam ----
+h = mdToHtml("![so hang](attachments/hang.png)");
+check("anh: co onerror goi jvImgGone", has(h, 'onerror="jvImgGone(this)"'));
+check("anh: van giu class chat-img", has(h, 'class="chat-img"'));
+h = mdToHtml("![ngoai](https://example.com/x.png)");
+check("anh ngoai: cung co onerror", has(h, 'onerror="jvImgGone(this)"'));
+
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));
   process.exit(1);

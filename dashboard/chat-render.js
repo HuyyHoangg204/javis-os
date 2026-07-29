@@ -168,8 +168,18 @@
   }
 
   // ---------------------------------------------------------------- anh, link, bang
+  // Anh khong tai duoc (404 vi da het han trong vung cache, bi xoa tay, hay doi ten) -> thay
+  // bang o xam co chu, thay vi de icon vo tro. Phai xuat ra window (xem cuoi file) vi chuoi
+  // onerror noi tuyen chay o pham vi toan cuc, khong thay bien trong IIFE nay.
+  function imgGone(el) {
+    var box = document.createElement("span");
+    box.className = "chat-img-gone";
+    box.textContent = "Ảnh đã hết hạn";
+    el.replaceWith(box);
+  }
   function imgHtml(u, alt, rawpath) {
-    var img = '<img class="chat-img" src="' + esc(u) + '" alt="' + esc(alt || "") + '" loading="lazy">';
+    var img = '<img class="chat-img" src="' + esc(u) + '" alt="' + esc(alt || "") + '"' +
+      ' loading="lazy" onerror="jvImgGone(this)">';
     // Anh trong vault: bam mo VI TRI trong Tep tin (thay vi tai anh tho); van hien anh inline.
     if (rawpath && isVaultRel(rawpath)) return '<a ' + vaultLoc(rawpath) + ">" + img + "</a>";
     var h = safeHref(u);
@@ -650,6 +660,7 @@
 
   if (typeof window !== "undefined") {
     window.mdToHtml = mdToHtml;
+    window.jvImgGone = imgGone;   // goi tu thuoc tinh onerror noi tuyen cua the <img>
     // get(id): cho turndown (console.js) tra artifact card ve lai dung fence ``` khi luu note WYSIWYG
     window.JavisArtifacts = { open: openArtifact, close: closePanel,
       get: function (id) { return registry[id] || null; } };
