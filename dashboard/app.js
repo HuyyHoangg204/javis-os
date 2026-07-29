@@ -722,17 +722,17 @@ let _nodeModal = null;
 function _ensureNodeModal() {
   if (_nodeModal) return _nodeModal;
   const css = `
-    .node-modal{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);padding:24px}
+    .node-modal{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:var(--scrim);backdrop-filter:blur(3px);padding:24px}
     .node-modal.open{display:flex}
-    .node-card{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column;background:#0d0f18;border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+    .node-card{width:min(820px,94vw);max-height:88vh;display:flex;flex-direction:column;background:var(--panel-solid);border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
     .node-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
     .node-title{font-family:var(--font);font-weight:700;font-size:16px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .node-actions{display:flex;align-items:center;gap:6px;flex:none}
-    .nm-btn{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:5px 11px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block;white-space:nowrap}
+    .nm-btn{background:var(--surface-2);border:1px solid var(--border);color:var(--text2);border-radius:8px;padding:5px 11px;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block;white-space:nowrap}
     .nm-btn:hover{color:var(--accent);border-color:var(--accent)}
     .node-path{padding:6px 14px;font-size:12px;color:var(--text3);border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .node-body{flex:1 1 auto;min-height:0;display:flex}
-    .node-body textarea{width:100%;min-height:56vh;flex:1;background:#070b16;color:#dce6fb;border:none;outline:none;padding:14px;font:14px/1.6 ui-monospace,Consolas,monospace;resize:none}
+    .node-body textarea{width:100%;min-height:56vh;flex:1;background:var(--field-bg);color:var(--text);border:none;outline:none;padding:14px;font:14px/1.6 ui-monospace,Consolas,monospace;resize:none}
     .node-msg{padding:22px;color:var(--text2);font-size:15px;line-height:1.6}`;
   const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   const m = document.createElement("div");
@@ -903,6 +903,18 @@ vbInit.addEventListener("click", async () => {
 
 document.getElementById("vbClose").addEventListener("click", () => vaultBanner.classList.remove("show"));
 
+// Đổi tông: bảng màu danh mục đổi theo, mà chữ "% Vault" đã gắn màu inline lúc dựng
+// nên phải tô lại, không thì nhãn giữ màu rực của tông tối và nhợt hẳn trên giấy.
+// graph.js bắn "javis-catcolors-change" SAU khi đã hoán bảng.
+window.addEventListener("javis-catcolors-change", function repaintConceptLabels() {
+  const map = window.__javisCatMap || {};
+  document.querySelectorAll("#conceptLabels .concept-label").forEach(div => {
+    const fire = div.querySelector(".cl-fire");
+    const col = map[div.dataset.cat || ""];
+    if (fire && col) fire.style.color = col;
+  });
+});
+
 // Nhãn concept (HUD brain-region) quanh orb - số liệu THẬT
 function renderConceptLabels(categories, total) {
   const container = document.getElementById("conceptLabels");
@@ -927,8 +939,10 @@ function renderConceptLabels(categories, total) {
     div.style.left = x + "%";
     div.style.top = y + "%";
     // Tô chữ "% Vault" đúng màu node của thư mục đó (lấy từ bảng màu danh mục của đồ thị) → dễ nhận màu nào của folder nào.
+    // Nhớ luôn catKey trên node để đổi tông còn tô lại được (xem repaintConceptLabels).
     const catKey = c.name.replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase();
     const catCol = (window.__javisCatMap || {})[catKey];
+    div.dataset.cat = catKey;
     div.innerHTML = `<div class="cl-name">${escapeHtml(c.name.toUpperCase())}</div>` +
       `<div class="cl-meta">${c.count} note · <span class="cl-fire"${catCol ? ` style="color:${catCol}"` : ""}>${share}% Vault</span></div>`;
     // Bấm nhãn danh mục → rọi sáng đúng cụm đó trong đồ thị (chỉ đồ thị 2D hỗ trợ; 3D bỏ qua an toàn).
@@ -1055,12 +1069,46 @@ stopBtn.addEventListener("click", stopCurrent);
 // ============================================
 let _thinkingActive = false;
 
+// Hai bảng màu nền não. Tông TỐI là vũ trụ: sao trắng cộng sáng trên nền đen.
+// Tông SÁNG là giấy: cùng bố cục (quầng giữa, lưới sàn, hạt rải) nhưng vẽ bằng
+// MỰC SẪM chồng thường lên giấy ngà. Không đảo màu được - "lighter" trên nền
+// trắng cho ra trắng bệt, còn sao trắng thì biến mất hẳn.
+const SKY_DARK = {
+  stars: ["#ffffff", "#c9b3ff", "#b8a3ff", "#d6c9ff"],
+  starOp: "lighter",          // cộng sáng: sao chồng nhau càng rực
+  starMax: 0.85,
+  haloIn: [140, 90, 230],     // quầng giữa - thở theo giọng nói
+  haloMid: [90, 60, 170],
+  haloOut: "rgba(8,6,20,0)",
+  haloBase: 0.10, haloGain: 0.12,
+  grid: [165, 115, 230], gridBase: 0.13, gridGain: 0.10,
+  ring: [70, 200, 255], ringGain: 1,
+};
+const SKY_LIGHT = {
+  // Hạt bụi giấy: xám tím và xám nâu, đủ sẫm để thấy mà không thành vết bẩn.
+  stars: ["#8e86a6", "#a79ab8", "#b9a99a", "#7e7694"],
+  starOp: "source-over",      // trên giấy phải chồng thường, không cộng sáng
+  starMax: 0.42,
+  haloIn: [124, 58, 237],
+  haloMid: [232, 93, 31],     // vành đào ấm ôm ngoài quầng lavender
+  haloOut: "rgba(255,255,255,0)",
+  haloBase: 0.05, haloGain: 0.07,
+  grid: [96, 74, 150], gridBase: 0.13, gridGain: 0.08,
+  ring: [20, 110, 160], ringGain: 1.5,
+};
+
 function initStarfield() {
   const cv = document.getElementById("starfield");
   if (!cv) return;
   const ctx = cv.getContext("2d");
   let stars = [];
-  const STAR_COLORS = ["#ffffff", "#c9b3ff", "#b8a3ff", "#d6c9ff"];
+  let sky = SKY_DARK;
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  function paintStars() {
+    // Giữ nguyên vị trí/nhịp nháy, chỉ thay màu → đổi tông không làm nền "nhảy".
+    stars.forEach(s => { s.c = sky.stars[s.ci % sky.stars.length]; });
+  }
 
   function resize() {
     const rect = cv.parentElement.getBoundingClientRect();
@@ -1074,11 +1122,18 @@ function initStarfield() {
       r: Math.random() * 1.0 + 0.2,
       tw: Math.random() * Math.PI * 2,
       sp: Math.random() * 0.04 + 0.006,
-      c: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+      ci: Math.floor(Math.random() * 4),
+      c: "#ffffff",
     }));
+    paintStars();
   }
   resize();
   window.addEventListener("resize", resize);
+  // Nghe thẳng sự kiện thay vì javisTheme.on(): hàm này có thể chạy trước khi theme.js
+  // kịp dựng window.javisTheme, khi đó đăng ký sẽ hụt im lặng và nền kẹt ở bảng tối.
+  function syncSky(light) { sky = light ? SKY_LIGHT : SKY_DARK; paintStars(); }
+  window.addEventListener("javis-theme-change", e => syncSky(!!(e && e.detail && e.detail.light)));
+  syncSky(document.documentElement.getAttribute("data-theme") === "light");
 
   function draw() {
     requestAnimationFrame(draw);
@@ -1090,21 +1145,21 @@ function initStarfield() {
     const lvl = voice.getLevel();
     ctx.clearRect(0, 0, cv.width, cv.height);
 
-    // Gradient sáng nhẹ ở TRUNG TÂM - phồng nhẹ theo giọng
+    // Quầng ở TRUNG TÂM - phồng nhẹ theo giọng
     const cx = cv.width / 2, cy = cv.height / 2;
     const rr = Math.min(cv.width, cv.height) * (0.6 + lvl * 0.15);
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
-    const a = 0.10 + lvl * 0.12;
-    g.addColorStop(0, `rgba(140,90,230,${a})`);
-    g.addColorStop(0.5, `rgba(90,60,170,${a * 0.4})`);
-    g.addColorStop(1, "rgba(8,6,20,0)");
+    const a = sky.haloBase + lvl * sky.haloGain;
+    g.addColorStop(0, rgba(sky.haloIn, a));
+    g.addColorStop(0.5, rgba(sky.haloMid, a * 0.4));
+    g.addColorStop(1, sky.haloOut);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, cv.width, cv.height);
 
     // Grid floor phối cảnh (HUD command center) - đáy màn hình
     const horizonY = cv.height * 0.72;
     const vpX = cv.width / 2;
-    ctx.strokeStyle = `rgba(165,115,230,${0.13 + lvl * 0.10})`;
+    ctx.strokeStyle = rgba(sky.grid, sky.gridBase + lvl * sky.gridGain);
     ctx.lineWidth = 1;
     const cols = 18;
     for (let i = 0; i <= cols; i++) {
@@ -1125,8 +1180,8 @@ function initStarfield() {
       for (let i = 0; i < ringCount; i++) {
         const phase = ((now / 1700) + i / ringCount) % 1;
         const r = phase * Math.min(cv.width, cv.height) * 0.5;
-        const alpha = (1 - phase) * 0.15;
-        ctx.strokeStyle = `rgba(70,200,255,${alpha})`;
+        const alpha = (1 - phase) * 0.15 * sky.ringGain;
+        ctx.strokeStyle = rgba(sky.ring, alpha);
         ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -1134,12 +1189,12 @@ function initStarfield() {
       }
     }
 
-    // Sao mờ rải đều
-    ctx.globalCompositeOperation = "lighter";
+    // Sao mờ rải đều (tông sáng: hạt bụi giấy)
+    ctx.globalCompositeOperation = sky.starOp;
     stars.forEach(s => {
       s.tw += s.sp;
       const tw = (Math.sin(s.tw) * 0.35 + 0.45) * (1 + lvl * 0.6);
-      ctx.globalAlpha = Math.min(0.85, tw);
+      ctx.globalAlpha = Math.min(sky.starMax, tw);
       ctx.fillStyle = s.c;
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
@@ -1530,7 +1585,7 @@ async function refreshUsage() {
   if ((!src || !(src.items || []).length) && d.all_time && (d.all_time.items || []).length) { src = d.all_time; scope = "tổng"; }
   const items = (src && src.items) || [];
   const tot = (src && src.total) || { in: 0, out: 0, cost: 0 };
-  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;padding:1px 0;${extra || ""}"><span style="color:#aebbd6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
+  const row = (nameHtml, tok, extra) => `<div style="display:flex;justify-content:space-between;gap:6px;font-size:11px;padding:1px 0;${extra || ""}"><span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${nameHtml}</span><span style="color:#7aa2ff;white-space:nowrap;font-variant-numeric:tabular-nums">${tok}</span></div>`;
   let html;
   if (!items.length) {
     html = `<div class="mcp-item dim">Chưa có lượt nào hôm nay</div>`;
@@ -1541,10 +1596,10 @@ async function refreshUsage() {
       const nm = `${escapeHtml(lbl)} <span class="dim">${escapeHtml(_shortModel(i.model))}</span>`;
       return row(nm, `${_fmtTok(i.in)}↑ ${_fmtTok(i.out)}↓${cost}`);
     }).join("");
-    html += row(`<b>Tổng ${scope}</b>`, `<b>${_fmtTok(tot.in)}↑ ${_fmtTok(tot.out)}↓${tot.cost > 0 ? " · $" + tot.cost.toFixed(2) : ""}</b>`, "border-top:1px solid rgba(255,255,255,.1);margin-top:2px;padding-top:3px");
+    html += row(`<b>Tổng ${scope}</b>`, `<b>${_fmtTok(tot.in)}↑ ${_fmtTok(tot.out)}↓${tot.cost > 0 ? " · $" + tot.cost.toFixed(2) : ""}</b>`, "border-top:1px solid var(--hairline);margin-top:2px;padding-top:3px");
   }
   if (d.openrouter && d.openrouter.remaining != null) {
-    html += row("OpenRouter còn", `$${(+d.openrouter.remaining).toFixed(2)}`, "margin-top:4px;color:#8fd0a0");
+    html += row("OpenRouter còn", `$${(+d.openrouter.remaining).toFixed(2)}`, "margin-top:4px;color:var(--green)");
   }
   el.innerHTML = html;
 }
@@ -1804,7 +1859,7 @@ if (document.getElementById("wzFinish")) {
   const HINTS = {
     "anthropic-cli": "Sau khi vào: đăng nhập Claude 1 lần - chạy <code>claude auth login --claudeai</code> trong terminal (Hostinger: App terminal).",
     "openai-oauth": "Sau khi vào: mục <b>Models</b> → đăng nhập ChatGPT (hoặc <code>codex login</code> trong terminal).",
-    "openrouter": "Lấy key tại <a href='https://openrouter.ai/keys' target='_blank' style='color:#bcd2ff'>openrouter.ai/keys</a> rồi dán ở trên (hoặc sau ở Models).",
+    "openrouter": "Lấy key tại <a href='https://openrouter.ai/keys' target='_blank' style='color:var(--link-ink)'>openrouter.ai/keys</a> rồi dán ở trên (hoặc sau ở Models).",
   };
   function pick(prov) {
     cards.forEach(c => c.classList.toggle("sel", c.dataset.prov === prov));

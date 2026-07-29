@@ -16,7 +16,7 @@
   var PROV_LABEL = { claude: "Claude Code", codex: "ChatGPT/Codex", api: "API (OpenRouter...)" };
   var SRC_LABEL = { manual: "Bạn gõ tay", javis: "Javis (tự chạy)" };
   var ACT_LABEL = { chat: "Chat", background: "Nền (loop/lịch)", subagent: "Subagent", manual: "Thủ công" };
-  var PROV_COLOR = { claude: "var(--accent)", codex: "#3fae86", api: "#5b8def" };
+  var PROV_COLOR = { claude: "var(--accent)", codex: "var(--green)", api: "var(--link-ink)" };
 
   var state = { period: "this_month", provider: "", el: null, busy: false };
 
@@ -44,7 +44,7 @@
       + ".tk-chips{display:flex;gap:6px;flex-wrap:wrap}"
       + ".tk-chip{padding:6px 12px;border-radius:20px;border:1px solid var(--glass-brd);background:var(--glass);color:var(--text2);font-size:13px;cursor:pointer;transition:.12s;white-space:nowrap}"
       + ".tk-chip:hover{color:var(--text)}"
-      + ".tk-chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}"
+      + ".tk-chip.on{background:var(--accent-solid);border-color:var(--accent-solid);color:var(--on-accent);font-weight:600}"
       + ".tk-seg{display:flex;border:1px solid var(--glass-brd);border-radius:9px;overflow:hidden}"
       + ".tk-seg button{padding:6px 12px;background:transparent;border:0;color:var(--text2);font-size:12.5px;cursor:pointer}"
       + ".tk-seg button.on{background:var(--glass);color:var(--text);font-weight:600}"
@@ -56,7 +56,7 @@
       + ".tk-card .v{font-size:22px;font-weight:700;color:var(--text);margin-top:5px;font-variant-numeric:tabular-nums}"
       + ".tk-card .s{font-size:12px;color:var(--text2);margin-top:3px}"
       + ".tk-card.accent .v{color:var(--accent)}"
-      + ".tk-up{color:#e0603a}.tk-down{color:#3fae86}"
+      + ".tk-up{color:var(--red)}.tk-down{color:var(--green)}"
       + ".tk-sec{font-size:11.5px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:22px 0 12px;font-weight:600}"
       + ".tk-chart{display:flex;align-items:flex-end;gap:3px;height:150px;padding:6px 2px 0;overflow-x:auto}"
       + ".tk-col{flex:0 0 auto;width:9px;display:flex;flex-direction:column-reverse;align-items:stretch;height:100%;cursor:default}"
@@ -69,17 +69,17 @@
       + "@media(max-width:640px){.tk-grid{grid-template-columns:1fr}}"
       + ".tk-blist .row{display:flex;align-items:center;gap:9px;margin-bottom:9px;font-size:13px}"
       + ".tk-blist .lab{width:120px;color:var(--text2);flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
-      + ".tk-blist .track{flex:1;height:9px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden}"
+      + ".tk-blist .track{flex:1;height:9px;background:var(--surface-2);border-radius:5px;overflow:hidden}"
       + ".tk-blist .fill{height:100%;border-radius:5px}"
       + ".tk-blist .val{width:56px;text-align:right;color:var(--text);font-variant-numeric:tabular-nums;flex:0 0 auto}"
       + ".tk-tbl{width:100%;border-collapse:collapse;font-size:13px}"
       + ".tk-tbl th{text-align:left;color:var(--text3);font-weight:600;font-size:11.5px;padding:5px 8px;border-bottom:1px solid var(--glass-brd)}"
-      + ".tk-tbl td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}"
-      + ".tk-tbl td.num{text-align:right;color:#8fb4ff}"
+      + ".tk-tbl td{padding:7px 8px;border-bottom:1px solid var(--surface-2);font-variant-numeric:tabular-nums}"
+      + ".tk-tbl td.num{text-align:right;color:var(--link-ink)}"
       + ".tk-ins{margin-top:8px}"
       + ".tk-ins .item{display:flex;gap:10px;padding:11px 13px;border:1px solid var(--glass-brd);border-radius:10px;background:var(--glass);margin-bottom:9px}"
-      + ".tk-ins .item.warn{border-left:3px solid #e0603a}"
-      + ".tk-ins .item.info{border-left:3px solid #5b8def}"
+      + ".tk-ins .item.warn{border-left:3px solid var(--red)}"
+      + ".tk-ins .item.info{border-left:3px solid var(--link-ink)}"
       + ".tk-ins .ico{font-size:16px;flex:0 0 auto}"
       + ".tk-ins .t{font-weight:600;color:var(--text);font-size:13.5px}"
       + ".tk-ins .d{color:var(--text2);font-size:12.5px;margin-top:2px;line-height:1.5}"
@@ -156,7 +156,7 @@
     } else { deltaHtml = "kỳ trước chưa có số"; }
 
     var orb = (extra && extra.openrouter && extra.openrouter.remaining != null)
-      ? card("OpenRouter còn", '<span style="color:#3fae86">' + fCost(extra.openrouter.remaining) + "</span>", "tiền thật đã dùng " + fCost(extra.openrouter.used || 0)) : "";
+      ? card("OpenRouter còn", '<span style="color:var(--green)">' + fCost(extra.openrouter.remaining) + "</span>", "tiền thật đã dùng " + fCost(extra.openrouter.used || 0)) : "";
 
     var cards = '<div class="tk-cards">'
       + card("Tổng token", fTok(k.tokens), deltaHtml, true)
@@ -186,7 +186,7 @@
     // breakdowns
     var grid = '<div class="tk-grid">'
       + "<div><div class=\"tk-sec\">Nguồn tiêu (bạn vs Javis)</div>" + barList(s.by_source, SRC_LABEL, function () { return "var(--accent)"; })
-      + "<div class=\"tk-sec\">Hoạt động</div>" + barList(s.by_activity, ACT_LABEL, function () { return "#7a8cff"; }) + "</div>"
+      + "<div class=\"tk-sec\">Hoạt động</div>" + barList(s.by_activity, ACT_LABEL, function () { return "var(--link-ink)"; }) + "</div>"
       + "<div><div class=\"tk-sec\">Provider</div>" + barList(s.by_provider, PROV_LABEL, function (kk) { return PROV_COLOR[kk] || "var(--accent)"; }) + "</div>"
       + "</div>";
 

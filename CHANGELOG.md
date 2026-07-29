@@ -4,6 +4,20 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.250] - 2026-07-29
+Nút đổi tông trước giờ chỉ lật từ đen sang xám, không phải giao diện sáng thật. Nay có tông sáng đúng nghĩa, và khoang não được vẽ lại cho hợp nền giấy.
+### Thêm mới
+- **Tông SÁNG thật sự**: nền trắng ngà ấm `#FBF9F7`, thẻ trắng, chữ gần đen, nhấn cam thương hiệu. Nút đổi tông giờ lật thẳng TỐI ↔ SÁNG (biểu tượng trăng/mặt trời báo tông đang dùng); tông "tối nhạt" cũ đã gỡ, ai đang dùng nó sẽ tự về tông tối.
+- **Khoang não vẽ lại theo lối "mực trên giấy"**: nền giấy có quầng lavender-đào rất nhạt ở giữa, nút và dây nối vẽ bằng mực sẫm cùng tông màu danh mục cũ, sao đổi thành hạt bụi giấy, vignette tối đổi thành đậm dần bằng chính màu giấy. Bảng màu danh mục có bản mực riêng, cùng thứ tự màu nên mỗi thư mục vẫn giữ đúng "màu nhận dạng" của nó khi đổi tông.
+- Đổi tông **không nạp lại đồ thị**: node giữ nguyên vị trí, cụm đang rọi sáng và node đang trỏ đều còn - chỉ đổi màu tại chỗ.
+### Cải thiện
+- **Làm lại Zalo thành một MCP duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; nay Javis dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool đọc tin mới/lịch sử, tìm cuộc chat, xem media, đánh dấu đã đọc và gửi tin. Thẻ kết nối có link hướng dẫn đầy đủ trên GitHub.
+- Gom **62 biến màu** thành một bộ token duy nhất ở đầu `style.css`, khai đủ cho cả hai tông. Ba thủ pháp mà nền sáng không có (mặt kính trắng-mờ, bóng đen tách lớp, quầng phát sáng) được tách token riêng để tông sáng thay bằng thủ pháp tương đương: tô sẫm nhẹ, bóng nâu rất nhạt, viền vòng.
+- Khai `color-scheme` cho từng tông, nên thanh cuộn hệ thống, con trỏ nhập, lịch, và nền vàng autofill của trình duyệt cũng đổi theo thay vì kẹt ở mặc định tối.
+- Khối code cũng sáng theo (có bảng màu cú pháp riêng cho nền giấy) thay vì để một mảng đen giữa trang.
+### Sửa lỗi
+- Mọi chữ trong tông sáng đạt tối thiểu 4.5:1 theo WCAG AA. Cam thương hiệu tách làm hai vai: `--accent` giữ nguyên độ rực cho chấm/viền/gạch, còn nút cam đặc mang chữ trắng dùng bản sẫm hơn - vì tương phản là đối xứng, một màu vừa nổi trên nền trắng vừa đỡ được chữ trắng là bất khả.
+
 ## [0.9.249] - 2026-07-29
 Muốn giao thêm một fanpage cho Javis mà bấm Kết nối lại thì Facebook không hỏi lại gì cả.
 ### Sửa lỗi

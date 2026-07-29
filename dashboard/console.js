@@ -278,15 +278,15 @@
     .uz-sec-h{font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:0 0 12px;font-weight:600}
     .uz-chart{display:flex;align-items:flex-end;gap:5px;height:150px;padding:6px 2px 0}
     .uz-bar-col{flex:1 1 0;display:flex;align-items:flex-end;justify-content:center;height:100%;min-width:0;cursor:default}
-    .uz-bar{width:64%;max-width:24px;background:linear-gradient(180deg,var(--accent),#a2360f);border-radius:4px 4px 0 0;transition:opacity .15s;min-height:3px}
+    .uz-bar{width:64%;max-width:24px;background:linear-gradient(180deg,var(--accent),var(--accent-ink));border-radius:4px 4px 0 0;transition:opacity .15s;min-height:3px}
     .uz-bar.empty{background:rgba(255,255,255,.07)}
     .uz-bar-col:hover .uz-bar{opacity:.75}
     .uz-xlabels{display:flex;gap:5px;border-top:1px solid var(--glass-brd);padding-top:5px;margin-bottom:26px}
     .uz-xl{flex:1 1 0;text-align:center;font-size:9.5px;color:var(--text3);white-space:nowrap;overflow:hidden}
     .uz-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
     .uz-tbl th{text-align:left;color:var(--text3);font-weight:600;font-size:12px;padding:6px 10px;border-bottom:1px solid var(--glass-brd)}
-    .uz-tbl td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums}
-    .uz-tbl td.num{text-align:right;color:#8fb4ff}
+    .uz-tbl td{padding:8px 10px;border-bottom:1px solid var(--surface-2);font-variant-numeric:tabular-nums}
+    .uz-tbl td.num{text-align:right;color:var(--link-ink)}
     .uz-tbl .uz-prov{color:var(--text)}
     .uz-tbl .uz-mdl{color:var(--text3);font-size:12px}
     .uz-note{margin-top:20px;font-size:12px;color:var(--text3);line-height:1.55;max-width:640px}`;
@@ -312,7 +312,7 @@
     const tt = today.total, at = all.total;
 
     const orCard = (d.openrouter && d.openrouter.remaining != null)
-      ? `<div class="uz-card"><div class="uz-k">OpenRouter còn</div><div class="uz-v" style="color:#8fd0a0">$${(+d.openrouter.remaining).toFixed(2)}</div><div class="uz-sub">đã dùng $${(+(d.openrouter.used || 0)).toFixed(2)}</div></div>` : "";
+      ? `<div class="uz-card"><div class="uz-k">OpenRouter còn</div><div class="uz-v" style="color:var(--green)">$${(+d.openrouter.remaining).toFixed(2)}</div><div class="uz-sub">đã dùng $${(+(d.openrouter.used || 0)).toFixed(2)}</div></div>` : "";
     const cards = `<div class="uz-cards">
       <div class="uz-card accent"><div class="uz-k">Hôm nay</div><div class="uz-v">${_uzTok(tt.in + tt.out)}</div><div class="uz-sub">${_uzTok(tt.in)}↑ ${_uzTok(tt.out)}↓ · ${tt.turns || 0} lượt${tt.cost > 0 ? " · $" + tt.cost.toFixed(2) : ""}</div></div>
       <div class="uz-card"><div class="uz-k">Tổng tích luỹ</div><div class="uz-v">${_uzTok(at.in + at.out)}</div><div class="uz-sub">${_uzTok(at.in)}↑ ${_uzTok(at.out)}↓${at.cost > 0 ? " · $" + at.cost.toFixed(2) : ""}</div></div>
@@ -355,42 +355,42 @@
     .upd-card{margin-bottom:24px;padding:18px;border:1px solid rgba(255,107,43,.28);border-radius:16px;background:linear-gradient(135deg,rgba(255,107,43,.08),rgba(124,58,237,.05))}
     .upd-card .gcard-btn{width:auto}
     .upd-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .upd-name{font-family:var(--font);font-size:17px;font-weight:700;color:#e7eefc}
-    .upd-changes{display:none;margin:10px 0;padding:10px 12px;border-left:3px solid var(--accent,#f97316);background:rgba(120,140,160,.08);border-radius:7px;font-size:13px;line-height:1.55}
+    .upd-name{font-family:var(--font);font-size:17px;font-weight:700;color:var(--text)}
+    .upd-changes{display:none;margin:10px 0;padding:10px 12px;border-left:3px solid var(--accent);background:rgba(120,140,160,.08);border-radius:7px;font-size:13px;line-height:1.55}
     .upd-progress{display:none;margin-top:10px}
-    .upd-rollback{display:none;margin-top:10px;padding:10px;border:1px solid #c55;border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6}
+    .upd-rollback{display:none;margin-top:10px;padding:10px;border:1px solid var(--red);border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6}
     .cl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
-    .cl-cur{font-size:15px;color:#cdd8ee}
+    .cl-cur{font-size:15px;color:var(--text)}
     .cl-badge{padding:3px 11px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid rgba(255,255,255,.14)}
-    .cl-badge.up{background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.5);color:#bcd2ff}
-    .cl-badge.ok{background:rgba(44,122,75,.15);border-color:#2c7a4b;color:#8fe3ad}
-    .cl-note{font-size:14px;color:#8a97b4;margin:2px 0 18px}
-    .cl-note code{background:rgba(255,255,255,.06);padding:1px 6px;border-radius:5px}
+    .cl-badge.up{background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.5);color:var(--link-ink)}
+    .cl-badge.ok{background:rgba(44,122,75,.15);border-color:var(--green);color:var(--green)}
+    .cl-note{font-size:14px;color:var(--text3);margin:2px 0 18px}
+    .cl-note code{background:var(--surface-2);padding:1px 6px;border-radius:5px}
     .cl-rel{position:relative;padding:0 0 6px 22px;border-left:2px solid rgba(120,180,255,.22);margin-left:6px}
     .cl-rel:last-child{border-left-color:transparent}
-    .cl-rel:before{content:"";position:absolute;left:-8px;top:5px;width:12px;height:12px;border-radius:50%;background:#0a0f1c;border:2px solid rgba(120,180,255,.5)}
-    .cl-rel.cur:before{background:#2c7a4b;border-color:#3fdc86;box-shadow:0 0 0 4px rgba(63,220,134,.14)}
-    .cl-rel.new:before{background:#3b6fd0;border-color:#7fb0ff}
+    .cl-rel:before{content:"";position:absolute;left:-8px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--panel-solid);border:2px solid rgba(120,180,255,.5)}
+    .cl-rel.cur:before{background:var(--green);border-color:var(--green);box-shadow:0 0 0 4px rgba(63,220,134,.14)}
+    .cl-rel.new:before{background:var(--link-ink);border-color:var(--link-ink)}
     .cl-rtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
-    .cl-ver{font-size:18px;font-weight:700;color:#e7eefc}
-    .cl-date{font-size:13px;color:#7d8aa6}
+    .cl-ver{font-size:18px;font-weight:700;color:var(--text)}
+    .cl-date{font-size:13px;color:var(--text3)}
     .cl-tag{font-size:12px;padding:2px 9px;border-radius:12px;font-weight:600}
-    .cl-tag.cur{background:rgba(63,220,134,.16);color:#8fe3ad}
-    .cl-tag.new{background:rgba(120,180,255,.16);color:#bcd2ff}
+    .cl-tag.cur{background:rgba(63,220,134,.16);color:var(--green)}
+    .cl-tag.new{background:rgba(120,180,255,.16);color:var(--link-ink)}
     .cl-sec{margin:0 0 12px}
-    .cl-sec h4{margin:8px 0 5px;font-size:14px;color:#aebbd6;font-weight:600}
+    .cl-sec h4{margin:8px 0 5px;font-size:14px;color:var(--text3);font-weight:600}
     .cl-sec ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
-    .cl-sec li{font-size:14.5px;color:#cdd8ee;line-height:1.5;padding-left:24px;position:relative}
+    .cl-sec li{font-size:14.5px;color:var(--text);line-height:1.5;padding-left:24px;position:relative}
     .cl-sec li:before{position:absolute;left:0;top:0}
     .cl-sec.feat li:before{content:"✨"} .cl-sec.fix li:before{content:"🔧"}
     .cl-sec.imp li:before{content:"⚡"} .cl-sec.sec li:before{content:"🔒"}
     .cl-sec.doc li:before{content:"📖"} .cl-sec.other li:before{content:"•"}
-    .cl-empty{color:#8a97b4;font-size:15px}
+    .cl-empty{color:var(--text3);font-size:15px}
     .cl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
-    .cl-pg{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#cdd8ee;font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-    .cl-pg:hover:not(:disabled){background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.45);color:#dce8ff}
+    .cl-pg{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text);font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+    .cl-pg:hover:not(:disabled){background:rgba(120,180,255,.14);border-color:rgba(120,180,255,.45);color:var(--text)}
     .cl-pg:disabled{opacity:.32;cursor:default}
-    .cl-pg-info{font-size:13px;color:#8a97b4;min-width:130px;text-align:center}`;
+    .cl-pg-info{font-size:13px;color:var(--text3);min-width:130px;text-align:center}`;
     const s = document.createElement("style"); s.textContent = css; document.head.appendChild(s);
   }
   function _clSecClass(title) {
@@ -512,7 +512,7 @@
       let at = UPDATE_STEPS.findIndex(x => x[0] === normalized); if (at < 0) at = 0;
       box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${
         UPDATE_STEPS.map((s, i) => `<span style="${i === at ? "font-weight:600" : "opacity:.7"}">${i < at ? "✅" : (i === at ? "⏳" : "○")} ${esc(s[1])}</span>`).join('<span style="opacity:.4"> → </span>')
-      }</div>${phase === "rolling_back" ? '<div style="margin-top:6px;color:#c55">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>' : ""}${extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : ""}`;
+      }</div>${phase === "rolling_back" ? '<div style="margin-top:6px;color:var(--red)">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>' : ""}${extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : ""}`;
     };
     const loadChanges = async () => {
       const box = q("updVerChangelog"); if (!box) return;
@@ -623,72 +623,72 @@
     if (_fmCss) return; _fmCss = true;
     const css = `
     .fm-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
-    .fm-crumb{flex:1;min-width:160px;font-size:15px;color:#9fb0cf}
-    .fm-crumb a{color:#bcd2ff;cursor:pointer;text-decoration:none} .fm-crumb a:hover{text-decoration:underline}
+    .fm-crumb{flex:1;min-width:160px;font-size:15px;color:var(--text3)}
+    .fm-crumb a{color:var(--link-ink);cursor:pointer;text-decoration:none} .fm-crumb a:hover{text-decoration:underline}
     .fm-actions{display:flex;gap:6px;flex-wrap:wrap}
     .fm-search-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
     .fm-search{flex:1 1 360px;max-width:700px;margin:0;padding:8px 11px;border-radius:10px}
     .fm-search input{font-size:14px}
     .fm-search-modes{margin:0;flex:none}
-    .fm-search-meta{min-width:130px;color:#7d8aa6;font-size:12px}
+    .fm-search-meta{min-width:130px;color:var(--text3);font-size:12px}
     .fm-search-row{cursor:pointer}
     .fm-search-main{flex:1;min-width:0}
-    .fm-search-name{display:flex;align-items:center;gap:8px;color:#e7eefc;font-size:15px}
+    .fm-search-name{display:flex;align-items:center;gap:8px;color:var(--text);font-size:15px}
     .fm-search-path,.fm-search-snip{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .fm-search-path{margin-top:2px;color:#71809b;font-size:12px}
-    .fm-search-snip{margin-top:3px;color:#9aa9c2;font-size:12px}
-    .fm-search-kind{flex:none;color:#7d8aa6;font-size:11px;border:1px solid rgba(255,255,255,.1);border-radius:99px;padding:2px 7px}
+    .fm-search-path{margin-top:2px;color:var(--text3);font-size:12px}
+    .fm-search-snip{margin-top:3px;color:var(--text3);font-size:12px}
+    .fm-search-kind{flex:none;color:var(--text3);font-size:11px;border:1px solid var(--hairline);border-radius:99px;padding:2px 7px}
     .fm-search-row .fm-row-act{opacity:1}
     .fm-uplabel{cursor:pointer}
-    .fm-list{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.08);border-radius:10px;overflow:hidden}
-    .fm-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.05);cursor:default}
+    .fm-list{display:flex;flex-direction:column;border:1px solid var(--hairline);border-radius:10px;overflow:hidden}
+    .fm-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--surface-2);cursor:default}
     .fm-row:last-child{border-bottom:none} .fm-row:hover{background:rgba(120,180,255,.06)}
-    .fm-ico{flex:none} .fm-name{flex:1;color:#e7eefc;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fm-ico{flex:none} .fm-name{flex:1;color:var(--text);font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .fm-row.is-dir .fm-ico,.fm-row.is-dir .fm-name{cursor:pointer}
-    .fm-row.fm-target{box-shadow:inset 3px 0 0 #7fb0ff;background:rgba(120,180,255,.10);animation:fmFlash 1.7s ease}
+    .fm-row.fm-target{box-shadow:inset 3px 0 0 var(--link-ink);background:rgba(120,180,255,.10);animation:fmFlash 1.7s ease}
     @keyframes fmFlash{0%,45%{background:rgba(120,180,255,.42)}100%{background:rgba(120,180,255,.10)}}
-    .fm-size{color:#7d8aa6;font-size:13px;min-width:60px;text-align:right}
+    .fm-size{color:var(--text3);font-size:13px;min-width:60px;text-align:right}
     .fm-row-act{display:flex;gap:5px;opacity:0;transition:.15s} .fm-row:hover .fm-row-act{opacity:1}
-    .fm-row-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
-    .fm-row-act button.danger:hover{color:#ff9a9a;border-color:rgba(255,120,120,.5)}
+    .fm-row-act button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text3);cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:var(--text-hi);border-color:rgba(120,180,255,.5)}
+    .fm-row-act button.danger:hover{color:var(--red);border-color:rgba(255,120,120,.5)}
     .fm-modal{position:fixed;inset:0;z-index:9999;display:none;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px}
     .fm-modal.open{display:flex}
-    .fm-modal-card{width:min(920px,94vw);max-height:86vh;display:flex;flex-direction:column;background:#0a0f1c;border:1px solid rgba(120,180,255,.3);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
-    .fm-vhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.08);color:#e7eefc;font-size:16px}
+    .fm-modal-card{width:min(920px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel-solid);border:1px solid rgba(120,180,255,.3);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
+    .fm-vhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--hairline);color:var(--text);font-size:16px}
     .fm-vhead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .fm-vhead button{background:none;border:1px solid rgba(255,255,255,.15);color:#cfe0ff;border-radius:6px;cursor:pointer;padding:4px 10px;margin-left:6px} .fm-vhead button:hover{border-color:rgba(120,180,255,.6)}
-    .fm-modal-card textarea{width:100%;flex:1;min-height:56vh;background:#070b16;color:#dce6fb;border:none;outline:none;padding:14px;font:15px/1.55 ui-monospace,Consolas,monospace;resize:none}
-    .fm-readbox{padding:16px;color:#9ab;overflow:auto;max-height:70vh}
+    .fm-vhead button{background:none;border:1px solid rgba(255,255,255,.15);color:var(--text);border-radius:6px;cursor:pointer;padding:4px 10px;margin-left:6px} .fm-vhead button:hover{border-color:rgba(120,180,255,.6)}
+    .fm-modal-card textarea{width:100%;flex:1;min-height:56vh;background:var(--field-bg);color:var(--text);border:none;outline:none;padding:14px;font:15px/1.55 ui-monospace,Consolas,monospace;resize:none}
+    .fm-readbox{padding:16px;color:var(--text3);overflow:auto;max-height:70vh}
     .si-grid{display:flex;flex-direction:column;gap:14px;max-width:640px}
-    .si-field label{display:block;font-size:14px;color:#9fb0cf;margin-bottom:5px}
-    .si-field select,.si-field input,.si-field textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#070b16;color:#dce6fb;font-size:15px;outline:none}
+    .si-field label{display:block;font-size:14px;color:var(--text3);margin-bottom:5px}
+    .si-field select,.si-field input,.si-field textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--hairline);background:var(--field-bg);color:var(--text);font-size:15px;outline:none}
     .si-field textarea{min-height:80px;resize:vertical;font-family:inherit}
     .si-row{display:flex;gap:10px;flex-wrap:wrap}
-    .si-chip{padding:7px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.14);background:rgba(15,22,40,.6);color:#cfe0ff;cursor:pointer;font-size:14px}
-    .si-chip.sel{border-color:#ff8a3c;background:rgba(255,138,60,.15);color:#ffd0a8}
+    .si-chip{padding:7px 14px;border-radius:20px;border:1px solid rgba(255,255,255,.14);background:rgba(15,22,40,.6);color:var(--text);cursor:pointer;font-size:14px}
+    .si-chip.sel{border-color:var(--accent);background:rgba(255,138,60,.15);color:var(--accent-ink)}
     .si-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
-    .si-status{margin-top:16px;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);font-size:15px;color:#cdd8ee}
-    .si-log{margin-top:16px} .si-log .le{padding:10px 12px;border-left:2px solid rgba(120,180,255,.4);background:rgba(255,255,255,.02);margin-bottom:8px;border-radius:0 8px 8px 0;font-size:14px;white-space:pre-wrap;color:#bcc8e2}
+    .si-status{margin-top:16px;padding:12px 14px;border-radius:10px;background:var(--surface-1);border:1px solid rgba(255,255,255,.07);font-size:15px;color:var(--text)}
+    .si-log{margin-top:16px} .si-log .le{padding:10px 12px;border-left:2px solid rgba(120,180,255,.4);background:rgba(255,255,255,.02);margin-bottom:8px;border-radius:0 8px 8px 0;font-size:14px;white-space:pre-wrap;color:var(--text2)}
     .kn-health{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin:16px 0}
-    .kn-kpi{padding:13px 14px;border:1px solid rgba(255,255,255,.08);border-radius:11px;background:rgba(255,255,255,.025)}
-    .kn-kpi b{display:block;font-size:22px;color:#edf3ff;margin-top:4px}.kn-kpi span{font-size:12px;color:#8290aa}
+    .kn-kpi{padding:13px 14px;border:1px solid var(--hairline);border-radius:11px;background:var(--surface-1)}
+    .kn-kpi b{display:block;font-size:22px;color:var(--text);margin-top:4px}.kn-kpi span{font-size:12px;color:var(--text3)}
     .kn-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr);gap:14px;align-items:start}
-    .kn-panel{border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(255,255,255,.018);overflow:hidden}
+    .kn-panel{border:1px solid var(--hairline);border-radius:12px;background:rgba(255,255,255,.018);overflow:hidden}
     .kn-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
-    .kn-panel-head b{font-size:14px;color:#dfe8fa}.kn-panel-head span{font-size:12px;color:#77849d}
-    .kn-list{max-height:440px;overflow:auto}.kn-empty{padding:22px;text-align:center;color:#5f6b84;font-size:13px}
+    .kn-panel-head b{font-size:14px;color:var(--text)}.kn-panel-head span{font-size:12px;color:var(--text3)}
+    .kn-list{max-height:440px;overflow:auto}.kn-empty{padding:22px;text-align:center;color:var(--text3);font-size:13px}
     .kn-task{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.055);cursor:pointer;transition:.15s}
     .kn-task:last-child{border-bottom:none}.kn-task:hover{background:rgba(127,176,255,.055)}
-    .kn-task-top{display:flex;gap:9px;align-items:flex-start}.kn-task-title{flex:1;color:#e6edfb;font-size:14px;font-weight:600;line-height:1.35}
-    .kn-pill{flex:none;border-radius:99px;padding:2px 7px;font-size:10px;border:1px solid rgba(255,255,255,.1);color:#96a6c2}
-    .kn-task-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:#6f7d97;font-size:11px}
-    .kn-task-result{margin-top:6px;color:#91a1bb;font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    .kn-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.kn-actions button{padding:3px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.11);background:rgba(255,255,255,.025);color:#aab8d0;font-size:11px;cursor:pointer}.kn-actions button:hover{border-color:#7fb0ff;color:#fff}.kn-actions button.danger{color:#e99a8a}.kn-actions button.danger:hover{border-color:#e27b68;color:#ffc0b4}
-    .kn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.kn-dot.live{background:#3fdc86;box-shadow:0 0 0 4px rgba(63,220,134,.12)}.kn-dot.off{background:#66728a}
+    .kn-task-top{display:flex;gap:9px;align-items:flex-start}.kn-task-title{flex:1;color:var(--text);font-size:14px;font-weight:600;line-height:1.35}
+    .kn-pill{flex:none;border-radius:99px;padding:2px 7px;font-size:10px;border:1px solid var(--hairline);color:var(--text3)}
+    .kn-task-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px;color:var(--text3);font-size:11px}
+    .kn-task-result{margin-top:6px;color:var(--text3);font-size:12px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .kn-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.kn-actions button{padding:3px 8px;border-radius:6px;border:1px solid var(--hairline);background:var(--surface-1);color:var(--text2);font-size:11px;cursor:pointer}.kn-actions button:hover{border-color:var(--link-ink);color:var(--text-hi)}.kn-actions button.danger{color:var(--red)}.kn-actions button.danger:hover{border-color:var(--red);color:var(--red)}
+    .kn-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.kn-dot.live{background:var(--green);box-shadow:0 0 0 4px rgba(63,220,134,.12)}.kn-dot.off{background:var(--text3)}
     .kn-drawer-backdrop{position:fixed;z-index:10000;inset:0;background:rgba(3,7,16,.58);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity .2s}.kn-drawer-backdrop.open{opacity:1;pointer-events:auto}
-    .kn-drawer{position:fixed;z-index:10001;top:0;right:0;width:min(520px,94vw);height:100vh;height:100dvh;background:#090e1a;border-left:1px solid rgba(127,176,255,.25);box-shadow:-20px 0 60px rgba(0,0,0,.45);transform:translateX(105%);transition:transform .2s;display:flex;flex-direction:column}
-    .kn-drawer.open{transform:translateX(0)}.kn-drawer-head{position:sticky;top:0;z-index:2;padding:12px 12px 12px 17px;border-bottom:1px solid rgba(255,255,255,.08);background:#090e1a;display:flex;align-items:center;gap:10px}.kn-drawer-head b{flex:1;color:#edf3ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kn-drawer-head button{width:36px;height:36px;display:grid;place-items:center;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.11);border-radius:8px;color:#b8c5dc;font-size:22px;line-height:1;cursor:pointer}.kn-drawer-head button:hover{border-color:#7fb0ff;color:#fff}
-    .kn-drawer-body{padding:16px 17px;overflow:auto;color:#aebbd2;font-size:13px;line-height:1.5}.kn-detail-block{margin-top:16px}.kn-detail-block h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#71809a;margin:0 0 7px}.kn-event{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+    .kn-drawer{position:fixed;z-index:10001;top:0;right:0;width:min(520px,94vw);height:100vh;height:100dvh;background:var(--bg2);border-left:1px solid rgba(127,176,255,.25);box-shadow:-20px 0 60px rgba(0,0,0,.45);transform:translateX(105%);transition:transform .2s;display:flex;flex-direction:column}
+    .kn-drawer.open{transform:translateX(0)}.kn-drawer-head{position:sticky;top:0;z-index:2;padding:12px 12px 12px 17px;border-bottom:1px solid var(--hairline);background:var(--bg2);display:flex;align-items:center;gap:10px}.kn-drawer-head b{flex:1;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kn-drawer-head button{width:36px;height:36px;display:grid;place-items:center;background:rgba(255,255,255,.035);border:1px solid var(--hairline);border-radius:8px;color:var(--text2);font-size:22px;line-height:1;cursor:pointer}.kn-drawer-head button:hover{border-color:var(--link-ink);color:var(--text-hi)}
+    .kn-drawer-body{padding:16px 17px;overflow:auto;color:var(--text2);font-size:13px;line-height:1.5}.kn-detail-block{margin-top:16px}.kn-detail-block h4{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin:0 0 7px}.kn-event{padding:8px 0;border-bottom:1px solid var(--surface-2)}
     @media(max-width:850px){.fm-search-tools{align-items:stretch}.fm-search{flex-basis:100%;max-width:none}.fm-search-meta{width:100%;min-width:0}.fm-search-kind{display:none}.kn-health{grid-template-columns:repeat(2,1fr)}.kn-layout{grid-template-columns:1fr}.kn-list{max-height:none}}`;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   }
@@ -752,19 +752,19 @@
       const qp = (path === undefined || path === null) ? "" : `&path=${encodeURIComponent(path)}`;
       let resp, d;
       try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`); d = await resp.json().catch(() => ({})); }
-      catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
+      catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
           ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-javis.bat → start-javis.vbs) rồi tải lại trang."
           : resp.status === 401 ? "Phiên đăng nhập hết hạn - tải lại trang & đăng nhập."
           : "Lỗi máy chủ (" + resp.status + ").");
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(msg)}</div>`; return;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">⚠ ${esc(msg)}</div>`; return;
       }
       cur = d.path || ""; upTarget = d.parent;
       const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
       crumb(d.root);
       const items = d.items || [];
-      if (!items.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:#6b7894">Thư mục trống.</div>`; return; }
+      if (!items.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:var(--text3)">Thư mục trống.</div>`; return; }
       listEl.innerHTML = ""; items.forEach(it => listEl.appendChild(row(it)));
     }
     function crumb(rootName) {
@@ -794,12 +794,12 @@
       if (!q) { await load(cur); return; }
       if (searchMode === "content" && q.length < 2) {
         searchSeq++;
-        listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:#6b7894">Nhập ít nhất 2 ký tự để tìm trong nội dung.</div>`;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:var(--text3)">Nhập ít nhất 2 ký tự để tìm trong nội dung.</div>`;
         searchMeta.textContent = "Cần ít nhất 2 ký tự";
         return;
       }
       const seq = ++searchSeq;
-      listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:#6b7894">Đang tìm trong toàn brain...</div>`;
+      listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:var(--text3)">Đang tìm trong toàn brain...</div>`;
       searchMeta.textContent = searchMode === "content" ? "Đang quét nội dung..." : "Đang tìm theo tên...";
       let resp, d;
       try {
@@ -807,20 +807,20 @@
         d = await resp.json().catch(() => ({}));
       } catch (e) {
         if (seq !== searchSeq) return;
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">Lỗi tìm kiếm: ${esc(e.message)}</div>`;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">Lỗi tìm kiếm: ${esc(e.message)}</div>`;
         searchMeta.textContent = "Tìm kiếm thất bại";
         return;
       }
       if (seq !== searchSeq) return;
       if (!resp.ok || d.error) {
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:#d98">⚠ ${esc(d.error || "Không tìm kiếm được.")}</div>`;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">⚠ ${esc(d.error || "Không tìm kiếm được.")}</div>`;
         searchMeta.textContent = "Tìm kiếm thất bại";
         return;
       }
       const items = d.items || [];
       searchMeta.textContent = `${items.length} kết quả · ${searchMode === "content" ? "nội dung" : "tên file"}`;
       if (!items.length) {
-        listEl.innerHTML = `<div class="empty" style="padding:24px;text-align:center;color:#6b7894">Không tìm thấy file phù hợp với “${esc(q)}”.</div>`;
+        listEl.innerHTML = `<div class="empty" style="padding:24px;text-align:center;color:var(--text3)">Không tìm thấy file phù hợp với “${esc(q)}”.</div>`;
         return;
       }
       listEl.innerHTML = "";
@@ -906,12 +906,12 @@
       card.querySelector("#fmVClose").onclick = closeModal;
       let resp, d;
       try { resp = await fetch(`/files/read?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`); d = await resp.json().catch(() => ({})); }
-      catch (e) { card.querySelector(".fm-readbox").innerHTML = `<span style="color:#d98">Lỗi: ${esc(e.message)}</span>`; return; }
+      catch (e) { card.querySelector(".fm-readbox").innerHTML = `<span style="color:var(--red)">Lỗi: ${esc(e.message)}</span>`; return; }
       const dlUrl = `/files/download?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`;
       if (!resp.ok || d.error) {
         const m = d.error || (resp.status === 404 ? "Server chưa có chức năng Tệp tin - khởi động lại server Javis."
           : resp.status === 401 ? "Hết phiên đăng nhập - tải lại trang." : "Lỗi (" + resp.status + ")");
-        card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${_raw}" target="_blank" style="color:#bcd2ff">Mở trong tab mới</a> · <a href="${rawUrl(rel, 1)}" style="color:#bcd2ff">Tải về</a></span>`;
+        card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${_raw}" target="_blank" style="color:var(--link-ink)">Mở trong tab mới</a> · <a href="${rawUrl(rel, 1)}" style="color:var(--link-ink)">Tải về</a></span>`;
         return;
       }
       const head = `<div class="fm-vhead"><b>${esc(d.name)}</b><span>${d.editable ? '<button id="fmSave">💾 Lưu</button>' : '<a href="' + dlUrl + '" target="_blank"><button>⤓ Tải</button></a>'}<button id="fmVClose">✕</button></span></div>`;
@@ -923,7 +923,7 @@
           const b = card.querySelector("#fmSave"); b.textContent = r.ok ? "✓ Đã lưu" : "⚠ Lỗi"; setTimeout(() => b.textContent = "💾 Lưu", 1500);
         };
       } else {
-        card.innerHTML = head + `<div class="fm-readbox"><pre style="white-space:pre-wrap;margin:0;color:#cdd8ee">${esc(d.content || "")}</pre></div>`;
+        card.innerHTML = head + `<div class="fm-readbox"><pre style="white-space:pre-wrap;margin:0;color:var(--text)">${esc(d.content || "")}</pre></div>`;
       }
       card.querySelector("#fmVClose").onclick = closeModal;
     }
@@ -1007,20 +1007,20 @@
     const myGen = _renderGen;   // chống race: đổi trang → load dở tự bỏ
     el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
 
-    const SRC = { bundled: ["Có sẵn", "#3fdc86"], user: ["Toàn cục", "#6ea8ff"], vault: ["Brain này", "#e0a04a"] };
+    const SRC = { bundled: ["Có sẵn", "var(--green)"], user: ["Toàn cục", "var(--link-ink)"], vault: ["Brain này", "var(--warn-ink)"] };
     const srcBadge = (s) => {
-      const [t, c] = SRC[s] || [s, "#9fb0cf"];
+      const [t, c] = SRC[s] || [s, "var(--text3)"];
       return `<span style="font-size:11px;padding:2px 7px;border-radius:99px;border:1px solid ${c}55;color:${c}">${esc(t)}</span>`;
     };
-    const chip = (t) => `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.06);color:#b9c6e2;margin:0 4px 4px 0;display:inline-block">${esc(t)}</span>`;
+    const chip = (t) => `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:var(--surface-2);color:var(--text2);margin:0 4px 4px 0;display:inline-block">${esc(t)}</span>`;
     const MM = { readonly: "chỉ đọc", safe: "ghi (safe)", full: "toàn quyền" };
 
     function card(p) {
-      const status = p.error ? `<span style="color:#e0664a">⚠ lỗi</span>`
-        : p.gated ? `<span style="color:#e0a04a">⚠ chờ bật env</span>`
-        : p.loaded ? `<span style="color:#3fdc86">● đang chạy</span>`
-        : p.enabled ? `<span style="color:#e0a04a">● bật (chưa nạp)</span>`
-        : `<span style="color:#6b7894">○ tắt</span>`;
+      const status = p.error ? `<span style="color:var(--red)">⚠ lỗi</span>`
+        : p.gated ? `<span style="color:var(--warn-ink)">⚠ chờ bật env</span>`
+        : p.loaded ? `<span style="color:var(--green)">● đang chạy</span>`
+        : p.enabled ? `<span style="color:var(--warn-ink)">● bật (chưa nạp)</span>`
+        : `<span style="color:var(--text3)">○ tắt</span>`;
       const meta = [MM[p.min_mode] ? `quyền tối thiểu: ${MM[p.min_mode]}` : "",
                     p.version ? `v${esc(p.version)}` : "", p.author ? esc(p.author) : ""].filter(Boolean).join(" · ");
       const chips = (p.tools || []).map(t => chip("🔧 " + t)).join("") + (p.hooks || []).map(h => chip("🪝 " + h)).join("");
@@ -1032,7 +1032,7 @@
           <div>${status}</div>
         </div>
         <div class="wf-desc">${esc(p.description || "")}</div>
-        <div class="wf-steps">${meta}${chips ? `<div style="margin-top:8px">${chips}</div>` : ""}${p.error ? `<div style="margin-top:6px;color:#e0664a">${esc(p.error)}</div>` : ""}</div>
+        <div class="wf-steps">${meta}${chips ? `<div style="margin-top:8px">${chips}</div>` : ""}${p.error ? `<div style="margin-top:6px;color:var(--red)">${esc(p.error)}</div>` : ""}</div>
         <div class="wf-actions"><button class="s-btn-ghost tgl">${p.enabled ? "Tắt" : "Bật"}</button></div>`;
       div.querySelector(".tgl").onclick = async () => {
         const fd = new FormData();
@@ -1050,9 +1050,9 @@
       let d = { plugins: [] };
       try { d = await (await fetch(`/plugins?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
       if (myGen !== _renderGen) return;
-      const intro = `<p style="color:#9fb0cf;font-size:15px;max-width:720px;margin:0 0 12px">Plugin thêm <b>tool</b> (công cụ engine gọi được) và <b>hook</b> native cho Javis mà không sửa lõi - dùng được ở MỌI engine (Claude Code, Codex, API) qua hub, tôn trọng 3 mức quyền như tool khác.</p>`;
-      const gateBanner = (!d.user_gate) ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid rgba(224,160,74,.5);border-radius:10px;background:rgba(224,160,74,.08);color:#ffd9a0;font-size:13px;line-height:1.55"><b>⚠ Plugin do bạn cài đang bị chặn.</b> Plugin toàn cục/brain chạy code Python thật trong server nên mặc định TẮT. Để bật: đặt biến môi trường <code>JAVIS_ENABLE_USER_PLUGINS=true</code> rồi khởi động lại Javis. Plugin có sẵn (bundled) vẫn chạy bình thường.</div>` : "";
-      const dirHint = `<p style="color:#6b7894;font-size:12.5px;margin:0 0 14px">Thả plugin TOÀN CỤC (dùng cho MỌI brain) vào <code>${esc(d.global_dir || "")}</code> · mỗi plugin gồm <code>plugin.yaml</code> + <code>plugin.py</code>. Hoặc bảo Javis trong khung chat: "tạo plugin ...".</p>`;
+      const intro = `<p style="color:var(--text3);font-size:15px;max-width:720px;margin:0 0 12px">Plugin thêm <b>tool</b> (công cụ engine gọi được) và <b>hook</b> native cho Javis mà không sửa lõi - dùng được ở MỌI engine (Claude Code, Codex, API) qua hub, tôn trọng 3 mức quyền như tool khác.</p>`;
+      const gateBanner = (!d.user_gate) ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid rgba(224,160,74,.5);border-radius:10px;background:rgba(224,160,74,.08);color:var(--warn-ink);font-size:13px;line-height:1.55"><b>⚠ Plugin do bạn cài đang bị chặn.</b> Plugin toàn cục/brain chạy code Python thật trong server nên mặc định TẮT. Để bật: đặt biến môi trường <code>JAVIS_ENABLE_USER_PLUGINS=true</code> rồi khởi động lại Javis. Plugin có sẵn (bundled) vẫn chạy bình thường.</div>` : "";
+      const dirHint = `<p style="color:var(--text3);font-size:12.5px;margin:0 0 14px">Thả plugin TOÀN CỤC (dùng cho MỌI brain) vào <code>${esc(d.global_dir || "")}</code> · mỗi plugin gồm <code>plugin.yaml</code> + <code>plugin.py</code>. Hoặc bảo Javis trong khung chat: "tạo plugin ...".</p>`;
       const plugins = (d.plugins || []).slice();
       const order = { bundled: 0, user: 1, vault: 2 };
       plugins.sort((a, b) => (order[a.source] ?? 9) - (order[b.source] ?? 9) || (a.name || "").localeCompare(b.name || ""));
@@ -1077,12 +1077,12 @@
     const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
+      <p style="color:var(--text3);font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
         <button class="s-btn" id="lpNew">+ Thêm việc</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
       </div>
-      <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
+      <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-1)">
         <input type="hidden" id="lpSlug">
         <div class="si-grid">
           <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
@@ -1107,23 +1107,23 @@
                 <button class="si-chip sel" data-rmode="notify">⏰ Chỉ nhắc</button>
                 <button class="si-chip" data-rmode="task">🤖 Tự làm rồi báo</button></div></div>
             </div>
-            <div class="dim" style="font-size:12px;color:#6b7894;margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
+            <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
           </div>
           <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
-          <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:#ffb59e;font-size:13px;line-height:1.5">
+          <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
             <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
           </div>
-          <div class="dim" id="lpLoopNote" style="font-size:12px;color:#6b7894;margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
-          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:#e0a04a"></span></div>
+          <div class="dim" id="lpLoopNote" style="font-size:12px;color:var(--text3);margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
+          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:var(--warn-ink)"></span></div>
         </div>
       </div>
       <div class="lp-search-row" style="margin:6px 0 10px">
         <input id="lpSearch" type="search" autocomplete="off" placeholder="🔍 Tìm việc theo tên..."
-          style="width:100%;max-width:340px;padding:8px 12px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#cdd8ee;font-size:14px;outline:none">
-        <span class="dim" id="lpSearchNote" style="display:none;font-size:12px;color:#8794ac;margin-left:8px"></span>
+          style="width:100%;max-width:340px;padding:8px 12px;border-radius:8px;border:1px solid var(--hairline);background:var(--surface-2);color:var(--text);font-size:14px;outline:none">
+        <span class="dim" id="lpSearchNote" style="display:none;font-size:12px;color:var(--text3);margin-left:8px"></span>
       </div>
       <div id="lpGroups">Đang tải...</div>
-      <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
+      <div class="si-log"><h3 style="font-size:15px;color:var(--text)">Nhật ký gần đây · <select id="lpLogFilter" class="loop-sel" style="font-size:13px"><option value="">Tất cả loop</option></select></h3><div id="lpLog">Đang tải...</div></div>
     </div>`;
 
     let fcur = { mode: "suggest" };
@@ -1316,14 +1316,14 @@
 
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
-      const dot = lp.running ? `<span style="color:#3fdc86">⏳ đang chạy</span>`
-        : paused ? `<span style="color:#e0a04a">⚠ tự tạm dừng</span>`
-        : lp.enabled ? `<span style="color:#3fdc86">● bật</span>` : `<span style="color:#6b7894">○ tắt</span>`;
+      const dot = lp.running ? `<span style="color:var(--green)">⏳ đang chạy</span>`
+        : paused ? `<span style="color:var(--warn-ink)">⚠ tự tạm dừng</span>`
+        : lp.enabled ? `<span style="color:var(--green)">● bật</span>` : `<span style="color:var(--text3)">○ tắt</span>`;
       const verify = lp.last_status && lp.last_status !== "ok"
         ? ` · ${esc(lp.last_status.slice(0, 90))}` : (lp.last_status === "ok" ? " · ok" : "");
       const last = lp.last_run ? `lần cuối ${fmtT(lp.last_run)}` : "chưa chạy";
       const next = (lp.enabled && !paused && lp.next_run) ? ` · kế tiếp ~${fmtT(lp.next_run)}` : "";
-      const modeLbl = lp.mode === "full" ? `<span style="color:#e0664a;font-weight:600">⚠ toàn quyền</span>`
+      const modeLbl = lp.mode === "full" ? `<span style="color:var(--red);font-weight:600">⚠ toàn quyền</span>`
         : lp.mode === "auto" ? "tự làm (an toàn)" : "đề xuất";
       const extra = [
         `${modeLbl} · mỗi ${lp.interval_min} phút`,
@@ -1344,7 +1344,7 @@
           <button class="s-btn-ghost tgl">${lp.enabled ? "Tắt" : "Bật"}</button>
           <button class="s-btn-ghost run">▶ Chạy ngay</button>
           <button class="s-btn-ghost edit">Sửa</button>
-          <button class="s-btn-ghost del" style="color:#e0664a">Xoá</button>
+          <button class="s-btn-ghost del" style="color:var(--red)">Xoá</button>
           <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(lp.brain_path)}</select>
         </div>`;
       // MỌI thao tác gửi brain của CHÍNH item (lp.brain_path), KHÔNG phải fbrain() - trang này gộp
@@ -1393,7 +1393,7 @@
       div.dataset.kind = "rem";
       div.dataset.search = _lpNorm(`${title} ${when} ${kind}`);
       div.innerHTML = `<b>${esc(title)}</b>
-        <div class="dim" style="font-size:12px;color:#6b7894">${esc(when)} · ${esc(kind)}</div>
+        <div class="dim" style="font-size:12px;color:var(--text3)">${esc(when)} · ${esc(kind)}</div>
         <div class="wf-actions" style="margin-top:8px">
           <button class="s-btn-ghost rmCancel">Huỷ</button>
           <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(r.brain_path)}</select>
@@ -1438,7 +1438,7 @@
           setTimeout(() => { if (myGen === _renderGen) loadAll(true); }, 1500);
           return;
         }
-        box.innerHTML = `<div class="empty">Không tải được danh sách việc (mạng chậm hoặc hết giờ). <a href="#" id="lpRetry" style="color:#6ea8fe">Thử lại</a></div>`;
+        box.innerHTML = `<div class="empty">Không tải được danh sách việc (mạng chậm hoặc hết giờ). <a href="#" id="lpRetry" style="color:var(--link-ink)">Thử lại</a></div>`;
         const rt = el.querySelector("#lpRetry");
         if (rt) rt.onclick = (ev) => { ev.preventDefault(); loadAll(); loadLog(); };
         return;
@@ -1460,10 +1460,10 @@
         const group = document.createElement("div");
         group.className = "lp-group";
         const head = document.createElement("div");
-        head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:#cdd8ee;font-weight:600;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:6px";
+        head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:var(--text);font-weight:600;border-bottom:1px solid var(--hairline);padding-bottom:6px";
         head.innerHTML = `<span>🧠 ${esc(g.name)}</span>`
-          + (cur ? `<span style="font-size:11px;color:#3fdc86;font-weight:500">đang xem</span>` : "")
-          + (g.is_default ? `<span style="font-size:11px;color:#6b7894;font-weight:400">mặc định</span>` : "");
+          + (cur ? `<span style="font-size:11px;color:var(--green);font-weight:500">đang xem</span>` : "")
+          + (g.is_default ? `<span style="font-size:11px;color:var(--text3);font-weight:400">mặc định</span>` : "");
         group.appendChild(head);
         if (!loops.length && !rems.length) {
           const e2 = document.createElement("div");
@@ -1475,7 +1475,7 @@
         loops.forEach(lp => { allLoops.push(lp); group.appendChild(loopCard(lp)); });
         if (rems.length) {
           const rh = document.createElement("div");
-          rh.style.cssText = "font-size:13px;color:#9fb0cf;margin:10px 0 6px";
+          rh.style.cssText = "font-size:13px;color:var(--text3);margin:10px 0 6px";
           rh.dataset.lp = "remhead";
           rh.textContent = "Nhắc hẹn đang chờ";
           group.appendChild(rh);
@@ -1516,7 +1516,7 @@
       const box = el.querySelector("#lpLog");
       if (!box) return;
       const total = logEntries.length;
-      if (!total) { box.innerHTML = `<div class="dim" style="color:#6b7894">Chưa có nhật ký.</div>`; return; }
+      if (!total) { box.innerHTML = `<div class="dim" style="color:var(--text3)">Chưa có nhật ký.</div>`; return; }
       const pages = Math.ceil(total / LOG_PER_PAGE);
       if (logPage >= pages) logPage = pages - 1;
       if (logPage < 0) logPage = 0;
@@ -1527,7 +1527,7 @@
       if (pages > 1) {
         pager = `<div class="lp-pager" style="display:flex;align-items:center;gap:10px;margin-top:10px">
           <button class="s-btn-ghost" id="lpLogPrev" ${logPage === 0 ? "disabled" : ""}>← Trước</button>
-          <span class="dim" style="font-size:13px;color:#8794ac">Trang ${logPage + 1}/${pages} · ${total} mục</span>
+          <span class="dim" style="font-size:13px;color:var(--text3)">Trang ${logPage + 1}/${pages} · ${total} mục</span>
           <button class="s-btn-ghost" id="lpLogNext" ${logPage >= pages - 1 ? "disabled" : ""}>Sau →</button>
         </div>`;
       }
@@ -1560,35 +1560,35 @@
     const modeDesc = (MODES.find(m => m[0] === cfg.mode) || MODES[0])[2];
     const capRow = [["memory", "Ký ức (Memory)"], ["wiki", "Tri thức (Wiki)"], ["skill", "Kỹ năng (Skill)"], ["task", "Việc (Kanban)"]]
       .map(([k, l]) => `<button class="si-chip ${caps[k] ? "sel" : ""}" data-cap="${k}">${caps[k] ? "● " : "○ "}${l}</button>`).join("");
-    const gitWarn = cfg.git_available ? "" : `<div class="dim" style="color:#7d8aa6;font-size:13px;margin-top:6px">ℹ Máy chưa có <code>git</code>: Tự học VẪN chạy bình thường, chỉ là chưa có hoàn tác 1-chạm/backup lên GitHub. Cài git để bật undo + sao lưu brain.</div>`;
+    const gitWarn = cfg.git_available ? "" : `<div class="dim" style="color:var(--text3);font-size:13px;margin-top:6px">ℹ Máy chưa có <code>git</code>: Tự học VẪN chạy bình thường, chỉ là chưa có hoàn tác 1-chạm/backup lên GitHub. Cài git để bật undo + sao lưu brain.</div>`;
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:#9fb0cf;font-size:15px;max-width:660px;margin:0 0 14px">Sau mỗi hội thoại, Javis tự rút <b>ký ức</b>, đúc <b>tri thức Wiki</b>, <b>kỹ năng</b> và <b>việc</b> - qua tiến trình học <b>chỉ-đọc, cô lập</b> (0 MCP, không xoá). Người ghi file là code tin cậy. Mặc định <b>bật sẵn + tự ghi</b>; nếu brain có git thì mỗi lần học còn được <b>git-commit để hoàn tác 1 chạm</b>.</p>
+      <p style="color:var(--text3);font-size:15px;max-width:660px;margin:0 0 14px">Sau mỗi hội thoại, Javis tự rút <b>ký ức</b>, đúc <b>tri thức Wiki</b>, <b>kỹ năng</b> và <b>việc</b> - qua tiến trình học <b>chỉ-đọc, cô lập</b> (0 MCP, không xoá). Người ghi file là code tin cậy. Mặc định <b>bật sẵn + tự ghi</b>; nếu brain có git thì mỗi lần học còn được <b>git-commit để hoàn tác 1 chạm</b>.</p>
       <div class="si-grid">
         <div class="si-field"><label>Bật tự học</label>
           <button class="si-chip ${cfg.enabled ? "sel" : ""}" id="lnEnabled">${cfg.enabled ? "● Đang bật" : "○ Đang tắt"}</button>
-          <div class="dim" id="lnEnableNote" style="font-size:13px;margin-top:6px;color:#7d8aa6">Học chạy được ngay cả khi chưa có git. Có git thì thêm undo + sao lưu.</div></div>
+          <div class="dim" id="lnEnableNote" style="font-size:13px;margin-top:6px;color:var(--text3)">Học chạy được ngay cả khi chưa có git. Có git thì thêm undo + sao lưu.</div></div>
         <div class="si-field"><label>Chế độ ghi</label><div class="si-row" id="lnModes">${modeChips}</div>
-          <div class="dim" id="lnModeDesc" style="font-size:14px;margin-top:6px;color:#7d8aa6">${esc(modeDesc)}</div>${gitWarn}</div>
+          <div class="dim" id="lnModeDesc" style="font-size:14px;margin-top:6px;color:var(--text3)">${esc(modeDesc)}</div>${gitWarn}</div>
         <div class="si-field"><label>Học cái gì</label><div class="si-row" id="lnCaps">${capRow}</div>
-          <div class="dim" style="font-size:13px;margin-top:6px;color:#7d8aa6">Wiki/Skill nên bật sau khi đã quen với Ký ức (lộ trình Phase 2/3). Việc = học xong đề xuất task nền vào bảng Việc (Kanban) - chỉ tạo thật ở chế độ Tự ghi, và task luôn chờ bạn duyệt.</div></div>
+          <div class="dim" style="font-size:13px;margin-top:6px;color:var(--text3)">Wiki/Skill nên bật sau khi đã quen với Ký ức (lộ trình Phase 2/3). Việc = học xong đề xuất task nền vào bảng Việc (Kanban) - chỉ tạo thật ở chế độ Tự ghi, và task luôn chờ bạn duyệt.</div></div>
         <div class="si-field"><label>Curator (bảo trì định kỳ)</label>
           <button class="si-chip ${(cfg.curator||{}).enabled ? "sel" : ""}" id="lnCurator">${(cfg.curator||{}).enabled ? "● Bật" : "○ Tắt"}</button>
-          <div class="dim" style="font-size:13px;margin-top:6px;color:#7d8aa6">Dọn index, LINT Wiki (chỉ đề xuất), nén MEMORY.md. Không xoá.</div></div>
+          <div class="dim" style="font-size:13px;margin-top:6px;color:var(--text3)">Dọn index, LINT Wiki (chỉ đề xuất), nén MEMORY.md. Không xoá.</div></div>
         <div class="si-actions">
           <button class="s-btn" id="lnSave">💾 Lưu cấu hình</button>
           <button class="s-btn-ghost" id="lnRun">▶ Học ngay</button>
           <button class="s-btn-ghost" id="lnCuratorRun">🧹 Curator ngay</button>
           <button class="s-btn-ghost" id="lnStop">■ Dừng</button>
-          <button class="s-btn-ghost" id="lnUndo" style="color:#e0a04a">↶ Hoàn tác lần học gần nhất</button>
+          <button class="s-btn-ghost" id="lnUndo" style="color:var(--warn-ink)">↶ Hoàn tác lần học gần nhất</button>
         </div>
       </div>
       <div class="si-status" id="lnMetrics"></div>
 
       <div class="si-log" id="lnBackupBox">
-        <h3 style="font-size:15px;color:#cdd8ee">⇅ Đồng bộ brain với GitHub (2 chiều)</h3>
-        <p style="color:#9fb0cf;font-size:14px;max-width:680px;margin:2px 0 10px">Đồng bộ <b>TẤT CẢ brain trong thư mục brains</b> (mọi bộ não, ghi chú, Wiki, ký ức) với 1 repo GitHub <b>riêng tư</b>: vừa đẩy thay đổi của máy này lên, vừa kéo thay đổi từ máy khác về (dùng chung cho máy nhà + VPS, các máy tự khớp nhau). Sửa trùng 1 file ở 2 nơi thì bản mới hơn thắng, bản kia được giữ thành file <code>.conflict-*</code> ngay cạnh. Máy mới cấu hình repo rồi bấm đồng bộ là khôi phục được toàn bộ. Hướng dẫn: <a href="https://github.com/blogminhquy/javis-os/blob/main/docs/18-sao-luu-github.md" target="_blank" style="color:#7fb0ff">docs/18-sao-luu-github.md</a>.</p>
-        <ol style="color:#9fb0cf;font-size:13.5px;line-height:1.7;max-width:680px;margin:0 0 12px;padding-left:20px">
+        <h3 style="font-size:15px;color:var(--text)">⇅ Đồng bộ brain với GitHub (2 chiều)</h3>
+        <p style="color:var(--text3);font-size:14px;max-width:680px;margin:2px 0 10px">Đồng bộ <b>TẤT CẢ brain trong thư mục brains</b> (mọi bộ não, ghi chú, Wiki, ký ức) với 1 repo GitHub <b>riêng tư</b>: vừa đẩy thay đổi của máy này lên, vừa kéo thay đổi từ máy khác về (dùng chung cho máy nhà + VPS, các máy tự khớp nhau). Sửa trùng 1 file ở 2 nơi thì bản mới hơn thắng, bản kia được giữ thành file <code>.conflict-*</code> ngay cạnh. Máy mới cấu hình repo rồi bấm đồng bộ là khôi phục được toàn bộ. Hướng dẫn: <a href="https://github.com/blogminhquy/javis-os/blob/main/docs/18-sao-luu-github.md" target="_blank" style="color:var(--link-ink)">docs/18-sao-luu-github.md</a>.</p>
+        <ol style="color:var(--text3);font-size:13.5px;line-height:1.7;max-width:680px;margin:0 0 12px;padding-left:20px">
           <li>Tạo repo GitHub <b>Private</b> (trống, KHÔNG thêm README) - vd <code>javis-brain-backup</code>.</li>
           <li>Tạo token: GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → chọn đúng repo đó → quyền <b>Contents: Read and write</b> → tạo và copy token (dạng <code>github_pat_...</code>).</li>
           <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Đồng bộ ngay</b>. Bật tự động để định kỳ tự khớp giữa các máy.</li>
@@ -1606,13 +1606,13 @@
             <button class="s-btn" id="bkNow">⇅ Đồng bộ ngay</button>
             <button class="s-btn-ghost" id="bkSave">💾 Lưu cấu hình</button>
           </div>
-          <div class="dim" id="bkStatus" style="font-size:13px;color:#7d8aa6"></div>
-          <div class="dim" id="bkWarn" style="font-size:12px;color:#e0a04a;margin-top:2px">⚠ Brain có thể chứa số liệu/thông tin cá nhân - CHỈ dùng repo Private. Token lưu nội bộ (không đẩy lên repo).</div>
+          <div class="dim" id="bkStatus" style="font-size:13px;color:var(--text3)"></div>
+          <div class="dim" id="bkWarn" style="font-size:12px;color:var(--warn-ink);margin-top:2px">⚠ Brain có thể chứa số liệu/thông tin cá nhân - CHỈ dùng repo Private. Token lưu nội bộ (không đẩy lên repo).</div>
         </div>
       </div>
 
-      <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Javis đã tự học gì (commit gần nhất)</h3><div id="lnReview">Đang tải...</div></div>
-      <div class="si-log"><h3 style="font-size:15px;color:#cdd8ee">Nhật ký học</h3><div id="lnLog">Đang tải...</div></div>
+      <div class="si-log"><h3 style="font-size:15px;color:var(--text)">Javis đã tự học gì (commit gần nhất)</h3><div id="lnReview">Đang tải...</div></div>
+      <div class="si-log"><h3 style="font-size:15px;color:var(--text)">Nhật ký học</h3><div id="lnLog">Đang tải...</div></div>
     </div>`;
 
     let cur = { enabled: !!cfg.enabled, mode: cfg.mode || "dry-run",
@@ -1687,16 +1687,16 @@
     async function loadReview() {
       let d = { commits: [] }; try { d = await (await fetch(`/learn/review?brain=${encodeURIComponent(fbrain())}&limit=12`)).json(); } catch (e) { }
       const box = el.querySelector("#lnReview");
-      if (!d.git_repo) { box.innerHTML = `<div class="dim" style="color:#e0a04a">Brain chưa phải git repo - bật Tự học để git-init (mới xem/undo được commit).</div>`; return; }
+      if (!d.git_repo) { box.innerHTML = `<div class="dim" style="color:var(--warn-ink)">Brain chưa phải git repo - bật Tự học để git-init (mới xem/undo được commit).</div>`; return; }
       box.innerHTML = (d.commits || []).length ? d.commits.map(c => {
         const when = c.ts ? new Date(c.ts * 1000).toLocaleString() : "";
         const files = (c.files || []).slice(0, 6).map(f => `<code style="font-size:11px">${esc(f)}</code>`).join(" ");
-        return `<div class="le"><b>${esc(c.subject)}</b> <span class="dim" style="color:#6b7894">${esc(c.hash)} · ${esc(when)}</span><br>${files}</div>`;
-      }).join("") : `<div class="dim" style="color:#6b7894">Chưa có commit học nào.</div>`;
+        return `<div class="le"><b>${esc(c.subject)}</b> <span class="dim" style="color:var(--text3)">${esc(c.hash)} · ${esc(when)}</span><br>${files}</div>`;
+      }).join("") : `<div class="dim" style="color:var(--text3)">Chưa có commit học nào.</div>`;
     }
     async function loadLog() {
       let d = { entries: [] }; try { d = await (await fetch(`/learn/log?brain=${encodeURIComponent(fbrain())}&limit=10`)).json(); } catch (e) { }
-      el.querySelector("#lnLog").innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:#6b7894">Chưa có nhật ký học.</div>`;
+      el.querySelector("#lnLog").innerHTML = (d.entries || []).length ? d.entries.map(e => `<div class="le">${esc(e)}</div>`).join("") : `<div class="dim" style="color:var(--text3)">Chưa có nhật ký học.</div>`;
     }
     // ── Backup GitHub ──
     let bkAutoOn = false;
@@ -1717,7 +1717,7 @@
       const b = el.querySelector("#bkTest"); b.disabled = true; b.textContent = "Đang kiểm tra..."; await bkSaveCfg();
       let r = {}; try { r = await (await fetch("/backup/test", { method: "POST" })).json(); } catch (e) { r = { error: e.message }; }
       b.disabled = false; b.textContent = "🔌 Kiểm tra kết nối";
-      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:#3fdc86">✓ Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:#e0664a">✗ ${esc(r.error || "không kết nối được")}</span>`;
+      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:var(--green)">✓ Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:var(--red)">✗ ${esc(r.error || "không kết nối được")}</span>`;
     };
     el.querySelector("#bkNow").onclick = async () => {
       const b = el.querySelector("#bkNow"); b.disabled = true; b.textContent = "Đang đồng bộ 2 chiều..."; await bkSaveCfg();
@@ -1730,10 +1730,10 @@
         if (r.pushed) bits.push("đã đẩy lên GitHub");
         if (r.restored) bits.push("khôi phục từ backup");
         const cf = (r.conflicts || []).length
-          ? ` · <span style="color:#e0a04a">⚠ ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
-        el.querySelector("#bkStatus").innerHTML = `<span style="color:#3fdc86">✓ Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
+          ? ` · <span style="color:var(--warn-ink)">⚠ ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--green)">✓ Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
       } else {
-        el.querySelector("#bkStatus").innerHTML = `<span style="color:#e0664a">✗ ${esc(r.error || "lỗi")}</span>`;
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--red)">✗ ${esc(r.error || "lỗi")}</span>`;
       }
     };
     async function loadBackup() {
@@ -1774,14 +1774,14 @@
     el.innerHTML = `<div class="cview-section">
       <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap">
         <div>
-          <div style="font-size:16px;color:#dfe8fa;font-weight:650"><span class="kn-dot off" id="knLiveDot"></span><span id="knLiveText">Dispatcher</span></div>
-          <p style="color:#8290aa;font-size:13px;max-width:680px;margin:6px 0 0">AI tự đặc tả goal, chọn capability, claim task và chạy worker nền. Màn hình này dùng để quan sát và xử lý ngoại lệ.</p>
+          <div style="font-size:16px;color:var(--text);font-weight:650"><span class="kn-dot off" id="knLiveDot"></span><span id="knLiveText">Dispatcher</span></div>
+          <p style="color:var(--text3);font-size:13px;max-width:680px;margin:6px 0 0">AI tự đặc tả goal, chọn capability, claim task và chạy worker nền. Màn hình này dùng để quan sát và xử lý ngoại lệ.</p>
         </div>
         <div class="si-actions" style="margin:0">
           <button class="s-btn" id="knAdd">+ Giao goal</button>
           <button class="s-btn-ghost" id="knNudge">Chạy nhịp ngay</button>
           <button class="s-btn-ghost" id="knRefresh">↻</button>
-          <button class="s-btn-ghost" id="knStop" style="color:#e0a04a">Tạm dừng AI</button>
+          <button class="s-btn-ghost" id="knStop" style="color:var(--warn-ink)">Tạm dừng AI</button>
         </div>
       </div>
       <div class="kn-health">
@@ -1791,7 +1791,7 @@
         <div class="kn-kpi"><span>Hoàn thành 24h</span><b id="knKpiDone">0</b></div>
       </div>
       <div class="si-field" style="margin-bottom:14px"><label>Chế độ dispatcher</label><div class="si-row" id="knOrch"></div></div>
-      <div id="knForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.03)">
+      <div id="knForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-1)">
         <div class="si-field"><label>Goal</label><input id="knTitle" placeholder="VD: Phân tích sản phẩm bán chạy tuần này và soạn 3 bài đăng"></div>
         <div class="si-field"><label>Ngữ cảnh và đầu ra mong muốn</label><textarea id="knIntent" placeholder="Có thể viết tự nhiên. AI specifier sẽ chuẩn hoá, chọn worker và điều kiện hoàn thành."></textarea></div>
         <div class="si-row" style="gap:14px;flex-wrap:wrap">
@@ -1807,7 +1807,7 @@
           <section class="kn-panel"><div class="kn-panel-head"><b>Hàng đợi AI</b><span id="knQueueCount">0 task</span></div><div class="kn-list" id="knQueue"></div></section>
         </div>
         <div style="display:flex;flex-direction:column;gap:14px">
-          <section class="kn-panel"><div class="kn-panel-head"><b style="color:#f0a080">Cần anh xử lý</b><span id="knAttentionCount">0 ngoại lệ</span></div><div class="kn-list" id="knAttention"></div></section>
+          <section class="kn-panel"><div class="kn-panel-head"><b style="color:var(--accent-ink)">Cần anh xử lý</b><span id="knAttentionCount">0 ngoại lệ</span></div><div class="kn-list" id="knAttention"></div></section>
           <section class="kn-panel"><div class="kn-panel-head"><b>Lịch sử gần đây</b><span>24 giờ và mới nhất</span></div><div class="kn-list" id="knHistory"></div></section>
         </div>
       </div>
@@ -1895,7 +1895,7 @@
 
     function taskHtml(t, area) {
       const acts = taskActions(t);
-      const reason = t.block_reason ? `<div class="kn-task-result" style="color:#dc927c">${esc(t.block_reason)}</div>` : "";
+      const reason = t.block_reason ? `<div class="kn-task-result" style="color:var(--red)">${esc(t.block_reason)}</div>` : "";
       const result = !reason && t.result ? `<div class="kn-task-result">${esc(t.result.slice(0, 240))}</div>` : "";
       return `<div class="kn-task" data-task="${esc(t.id)}">
         <div class="kn-task-top"><div class="kn-task-title">${_PRIO[t.priority] || ""} ${esc(t.title)}</div><span class="kn-pill">${esc(_KSTATUS[t.status] || t.status)}</span></div>
@@ -1943,17 +1943,17 @@
       openDrawer();
       drawerBody.innerHTML = "Đang tải...";
       let d = {}; try { d = await (await fetch(`/kanban/task/show?brain=${encodeURIComponent(fbrain())}&id=${encodeURIComponent(id)}`)).json(); } catch (e) {}
-      if (!d.ok) { drawerBody.innerHTML = `<span style="color:#e08070">${esc(d.error || "Không tải được task")}</span>`; return; }
+      if (!d.ok) { drawerBody.innerHTML = `<span style="color:var(--red)">${esc(d.error || "Không tải được task")}</span>`; return; }
       const t = d.task || {}, events = d.events || [], runs = d.runs || [];
       const acts = taskActions(t);
       drawerTitle.textContent = t.title || "Chi tiết task";
       drawerBody.innerHTML = `
-        <div style="color:#dfe8fa;white-space:pre-wrap">${esc(t.intent || "")}</div>
+        <div style="color:var(--text);white-space:pre-wrap">${esc(t.intent || "")}</div>
         <div class="kn-task-meta" style="margin-top:10px"><span>${esc(_KSTATUS[t.status] || t.status)}</span><span>${esc(t.capability || "auto")}</span><span>mode ${esc(t.execution_mode || "auto")}</span><span>ưu tiên ${Number(t.priority || 2)}</span></div>
         ${acts.length ? `<div class="kn-actions" style="margin-top:14px">${acts.join("")}</div>` : ""}
-        ${t.block_reason ? `<div class="kn-detail-block"><h4>Lý do bị chặn</h4><div style="color:#df927c">${esc(t.block_reason)}</div></div>` : ""}
+        ${t.block_reason ? `<div class="kn-detail-block"><h4>Lý do bị chặn</h4><div style="color:var(--red)">${esc(t.block_reason)}</div></div>` : ""}
         ${t.result ? `<div class="kn-detail-block"><h4>Kết quả</h4><div style="white-space:pre-wrap">${esc(t.result)}</div></div>` : ""}
-        <div class="kn-detail-block"><h4>Lần chạy (${runs.length})</h4>${runs.length ? runs.map(r => `<div class="kn-event"><b>${esc(r.status)}</b> · ${new Date(Number(r.started_at || 0) * 1000).toLocaleString()}${r.error ? `<div style="color:#d98b77">${esc(r.error)}</div>` : ""}</div>`).join("") : `<div class="dim">Chưa chạy</div>`}</div>
+        <div class="kn-detail-block"><h4>Lần chạy (${runs.length})</h4>${runs.length ? runs.map(r => `<div class="kn-event"><b>${esc(r.status)}</b> · ${new Date(Number(r.started_at || 0) * 1000).toLocaleString()}${r.error ? `<div style="color:var(--red)">${esc(r.error)}</div>` : ""}</div>`).join("") : `<div class="dim">Chưa chạy</div>`}</div>
         <div class="kn-detail-block"><h4>Nhật ký lifecycle</h4>${events.length ? events.map(v => `<div class="kn-event"><b>${esc(v.event_type)}</b> · ${new Date(Number(v.created_at || 0) * 1000).toLocaleString()}<div>${esc(v.message || "")}</div></div>`).join("") : `<div class="dim">Chưa có sự kiện</div>`}</div>`;
       bindActionButtons(drawerBody);
     }
@@ -2023,14 +2023,14 @@
         <div class="gcard" style="max-width:640px">
           <div class="gcard-top"><span class="gcard-name">Javis OS</span><span class="gcard-tag" id="ovVerTag">…</span></div>
           <div class="gcard-meta" id="ovVerMeta">Đang kiểm tra bản mới…</div>
-          <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,#6aa);background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
+          <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,var(--accent));background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
             <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
           </div>
           <div id="ovVerProgress" style="display:none;margin-top:10px"></div>
           <div class="gcard-meta" id="ovVerStatus"></div>
-          <div id="ovVerRollback" style="display:none;margin-top:10px;padding:10px;border:1px solid #c55;border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6"></div>
+          <div id="ovVerRollback" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--red);border-radius:8px;background:rgba(200,80,80,.08);font-size:13px;line-height:1.6"></div>
         </div>
       </div>
       <div class="cview-section">
@@ -2106,7 +2106,7 @@
         return `<span style="${w}">${mark} ${esc(s.label)}</span>`;
       }).join('<span style="opacity:.4"> → </span>');
       box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${dots}</div>`
-        + (phase === "rolling_back" ? `<div style="margin-top:6px;color:#c55">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>` : "")
+        + (phase === "rolling_back" ? `<div style="margin-top:6px;color:var(--red)">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>` : "")
         + (extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : "");
     }
     async function ovLoadVersion() {
@@ -2497,7 +2497,7 @@
     if (act) act.innerHTML = `
       <div class="prov-note" style="line-height:1.7">
         <b>1)</b> Mở link này để đăng nhập claude.ai:<br>
-        <a href="${esc(safeHref(r.url))}" target="_blank" rel="noopener" style="color:#7aa2ff;word-break:break-all">${esc(r.url || "(không có link)")}</a><br>
+        <a href="${esc(safeHref(r.url))}" target="_blank" rel="noopener" style="color:var(--link-ink);word-break:break-all">${esc(r.url || "(không có link)")}</a><br>
         <b>2)</b> Đăng nhập xong, nếu trang hiện <b>một mã code</b> thì dán vào đây:
         <div style="margin-top:6px;display:flex;gap:8px;max-width:520px">
           <input class="js-input" id="cliCode" placeholder="dán code (nếu có)" style="flex:1">
@@ -2710,9 +2710,9 @@
   }
   // ==== Trang Kết nối: kho connector + đa tài khoản (qua MCP hub) ====
   const PERM_META = {
-    readonly: { label: "Chỉ đọc", color: "#4da3ff" },
-    safe: { label: "Ghi nháp", color: "#d9a521" },
-    full: { label: "Toàn quyền", color: "#e06c5a" },
+    readonly: { label: "Chỉ đọc", color: "var(--link-ink)" },
+    safe: { label: "Ghi nháp", color: "var(--warn-ink)" },
+    full: { label: "Toàn quyền", color: "var(--red)" },
   };
   // Nhãn cách đăng nhập bằng tiếng người - dân thường không cần biết OAuth là gì
   const AUTH_BADGE = { apikey: "Dán key", qr: "Quét QR", oauth: "Đăng nhập tài khoản", none: "Bấm là xong" };
@@ -2806,7 +2806,7 @@
     const m = connModal(mHead("KẾT NỐI LẠI: " + esc(c.label || ""))
       + '<div class="conn-form"><div class="mp-note">Dán key/thông tin MỚI cho tài khoản này. Ô để trống sẽ giữ nguyên giá trị cũ.</div>'
       + (rows || '<div class="mp-note">Kết nối này không có trường key để thay - dùng menu Test để kiểm tra.</div>')
-      + '<div class="mp-note" id="rkErr" style="color:#e0664a"></div></div>'
+      + '<div class="mp-note" id="rkErr" style="color:var(--red)"></div></div>'
       + '<div class="mp-foot"><button class="mp-btn" data-act="close">Huỷ</button>'
       + (rows ? '<button class="mp-btn primary" id="rkGo">Lưu và kiểm tra</button>' : "") + '</div>');
     const go = m.querySelector("#rkGo");
@@ -2838,15 +2838,15 @@
   // đẩy tin về /hook/zalo → lọc từ khoá → báo Telegram. Javis KHÔNG tự trả lời khách.
   const ZL_STATE = {
     off: ["Đang tắt", ""],
-    starting: ["Đang khởi động…", "#d9a521"],
-    listening: ["● Đang nghe", "#2c7a4b"],
-    reconnecting: ["Mất kết nối, đang thử lại…", "#d9a521"],
-    duplicate: ["Trùng phiên - tài khoản này đang bị dùng ở nơi khác", "#c0392b"],
-    error: ["Lỗi", "#c0392b"],
+    starting: ["Đang khởi động…", "var(--warn-ink)"],
+    listening: ["● Đang nghe", "var(--green)"],
+    reconnecting: ["Mất kết nối, đang thử lại…", "var(--warn-ink)"],
+    duplicate: ["Trùng phiên - tài khoản này đang bị dùng ở nơi khác", "var(--red)"],
+    error: ["Lỗi", "var(--red)"],
   };
   function zaloListenerPanel(conns) {
     const opts = conns.map(c => '<option value="' + esc(c.id) + '">' + esc(c.label || c.id) + '</option>').join("");
-    return '<div class="zl-panel" style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)">'
+    return '<div class="zl-panel" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
       + '<b style="font-size:13px">Nghe tin liên tục</b>'
       + '<span id="zlState" class="mp-note">đang tải…</span>'
@@ -2859,14 +2859,14 @@
       + '<div style="display:flex;gap:6px;margin-top:4px">'
       + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="flex:1">'
       + '<button class="mp-btn" id="zlNames" style="font-size:12px;white-space:nowrap">Lấy tên nhóm</button></div>'
-      + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
+      + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid var(--hairline);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
       + '<label class="mcp-lb">Báo Telegram khi tin có chứa <span style="opacity:.6">(để trống = không báo gì)</span>'
       + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
       + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
       + '<div style="display:flex;align-items:center;gap:8px">'
       + '<button class="mp-btn primary" id="zlSave" style="font-size:12px">Lưu theo dõi</button>'
       + '<span class="mp-note" id="zlSaved"></span></div>'
-      + '<div class="mp-note" id="zlErr" style="color:#c0392b"></div>'
+      + '<div class="mp-note" id="zlErr" style="color:var(--red)"></div>'
       // Chỉ hiện khi đang trùng phiên: `zalo-agent logout` cố ý giữ lại thông tin đăng
       // nhập nên đăng xuất KHÔNG gỡ được phiên đang kẹt, phải xoá thẳng rồi quét QR lại.
       + '<button class="mp-btn" id="zlClear" style="display:none;font-size:12px">Xoá phiên đăng nhập rồi quét QR lại</button>'
@@ -2936,7 +2936,7 @@
       }
       $("zlErr").textContent = "";
       $("zlSaved").textContent = "✓ " + (r.msg || "Đã lưu.");
-      $("zlSaved").style.color = "#2c7a4b";
+      $("zlSaved").style.color = "var(--green)";
       setTimeout(() => { if ($("zlSaved")) $("zlSaved").textContent = ""; }, 6000);
       return true;
     };
@@ -2983,7 +2983,7 @@
       const hidden = showAll ? 0 : Math.max(0, rest.length - ZL_SHOW);
       const shown = showAll ? rest : rest.slice(0, ZL_SHOW);
       box.innerHTML = picked.map(row).join("")
-        + (picked.length && shown.length ? '<div style="border-top:1px solid rgba(255,255,255,.08);margin:4px 0"></div>' : "")
+        + (picked.length && shown.length ? '<div style="border-top:1px solid var(--hairline);margin:4px 0"></div>' : "")
         + shown.map(row).join("")
         + (!shown.length && q ? '<div class="mp-note">Không có cuộc chat nào khớp "' + esc(q) + '".</div>' : "")
         + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
@@ -3003,7 +3003,7 @@
       const stuck = st.enabled && st.state === "off";
       $("zlState").textContent = !st.enabled ? "Đang tắt"
         : (stuck ? "Đã bật nhưng tiến trình chưa chạy" : txt);
-      $("zlState").style.color = !st.enabled ? "" : (stuck ? "#c0392b" : color);
+      $("zlState").style.color = !st.enabled ? "" : (stuck ? "var(--red)" : color);
       $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
       $("zlToggle").classList.toggle("primary", !on);
       // Hiện lỗi KỂ CẢ khi đang tắt: bật thất bại thì cờ enabled không được đặt, mà lý do
@@ -3108,7 +3108,7 @@
       return '<div class="cat-card" data-cat="' + esc(meta.category) + '">'
         + '<div class="cat-ico">' + meta.icon + '</div>'
         + '<div class="cat-name">' + esc(meta.name) + ' <span class="prov-kind">' + byGroup[g].length + ' dịch vụ</span>'
-        + (nConn ? ' <span class="prov-kind" style="color:#3fb96a">đã nối ' + nConn + '</span>' : "") + '</div>'
+        + (nConn ? ' <span class="prov-kind" style="color:var(--green)">đã nối ' + nConn + '</span>' : "") + '</div>'
         + '<div class="cat-desc">' + esc(meta.desc) + '</div>'
         + '<button class="gcard-btn" data-groupopen="' + esc(g) + '">Chọn dịch vụ</button>'
         + '</div>';
@@ -3124,8 +3124,8 @@
       return '<button class="conn-menu-btn gp-row" data-gp="' + esc(c.id) + '">'
         + '<span class="gp-ico">' + iconInner(c) + '</span>'
         + '<span class="gp-main"><span class="gp-name">' + esc(short)
-        + (c.status === "beta" ? ' <span class="prov-kind" style="color:#d9a521">beta</span>' : "")
-        + (acc.length ? ' <span class="prov-kind" style="color:#3fb96a">đã nối ' + acc.length + '</span>' : "")
+        + (c.status === "beta" ? ' <span class="prov-kind" style="color:var(--warn-ink)">beta</span>' : "")
+        + (acc.length ? ' <span class="prov-kind" style="color:var(--green)">đã nối ' + acc.length + '</span>' : "")
         + '</span><span class="mp-note">' + esc(c.group_line || c.description || "") + '</span></span>'
         + '<span class="prov-kind">' + badge + '</span></button>';
     }).join("");
@@ -3143,7 +3143,7 @@
   function catalogCard(con) {
     const soon = con.status === "soon";
     const badge = '<span class="prov-kind">' + (AUTH_BADGE[con.auth_type] || con.auth_type || "") + '</span>'
-      + (con.status === "beta" ? ' <span class="prov-kind" style="color:#d9a521">beta</span>' : "")
+      + (con.status === "beta" ? ' <span class="prov-kind" style="color:var(--warn-ink)">beta</span>' : "")
       + (soon ? ' <span class="prov-kind">sắp có</span>' : "");
     return '<div class="cat-card' + (soon ? " soon" : "") + '" data-cat="' + esc(con.category || "Khác") + '">'
       + '<div class="cat-ico">' + iconInner(con) + '</div>'
@@ -3527,11 +3527,11 @@
     const mainLabel = (provs.find(p => p.id === main.provider) || {}).label || main.provider || "-";
     let warn = "";
     if (main.provider === "openai-oauth") {
-      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy kho Kết nối sang Codex qua hub, nên vẫn dùng được đầy đủ.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy kho Kết nối sang Codex qua hub, nên vẫn dùng được đầy đủ.</div></div>`;
     } else if (!MCP_PROVIDERS.includes(main.provider)) {
-      warn = `<div class="gcard" style="border:1px solid #b9821f;background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - chưa hỗ trợ gọi công cụ. Đổi ở trang <b>Models</b>.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--warn-ink);background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - chưa hỗ trợ gọi công cụ. Đổi ở trang <b>Models</b>.</div></div>`;
     } else if (main.provider !== "anthropic-cli") {
-      warn = `<div class="gcard" style="border:1px solid #2c7a4b;background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được kho Kết nối (qua vòng gọi tool + hub), kèm cả tool file và skill.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được kho Kết nối (qua vòng gọi tool + hub), kèm cả tool file và skill.</div></div>`;
     }
     const groups = {};
     conns.forEach(c => { const k = c.connector_id || "custom"; (groups[k] = groups[k] || []).push(c); });

@@ -5,9 +5,44 @@
 // lúc nghỉ, nhãn chỉ hiện khi hover / zoom sát / vài hub lớn. Cùng interface JavisGraph3D.
 // ============================================
 
-// --- Bảng màu danh mục: rực nhưng hài hoà trên nền tối; gán theo tên danh mục (ổn định) ---
-const CAT_COLORS = ["#8b93ff", "#3fdc9a", "#f0a24a", "#ff7a9c", "#4aa8ff", "#b98cff",
+// --- Bảng màu danh mục: gán theo tên danh mục (ổn định, cùng thứ tự cho 2D và 3D) ---
+// Hai bảng CÙNG THỨ TỰ HUE nên một thư mục giữ nguyên "màu nhận dạng" khi đổi tông:
+// chàm vẫn là chàm, lục vẫn là lục - chỉ đổi độ đậm cho hợp nền.
+// Tối: màu rực để nổi trên nền đen. Sáng: mực sẫm cùng hue, đều đạt >=4.5:1 trên
+// giấy ngà - bê nguyên bảng rực sang nền trắng thì chấm nào cũng nhợt như nhau.
+const CAT_COLORS_DARK = ["#8b93ff", "#3fdc9a", "#f0a24a", "#ff7a9c", "#4aa8ff", "#b98cff",
   "#f0c853", "#5ad1c4", "#e07ad1", "#7ed957", "#ff9f6b", "#9fb0cf"];
+const CAT_COLORS_LIGHT = ["#4a52c9", "#0f8f63", "#b46a10", "#c93b62", "#1668c4", "#7340c9",
+  "#96760a", "#0e8b81", "#a83c95", "#3e8f22", "#c9551f", "#5a688a"];
+
+// Bảng đang dùng + các màu phụ thuộc tông của lớp vẽ. Đổi tông thì hoán bảng rồi
+// vẽ lại; không rebuild đồ thị nên vị trí node và trạng thái hover giữ nguyên.
+let CAT_COLORS = CAT_COLORS_DARK;
+let INK = {
+  hoverCore: "#ffffff",                      // lõi node đang trỏ - "nóng nhất"
+  fallback: "#b98cff",
+  glowCore: "rgba(255,255,255,0.95)",        // lõi trắng nóng của quầng sáng
+  glowStops: [[0.28, 0.9], [0.6, 0.32]],
+  linkIdle: "rgba(150,140,220,0.07)",
+  linkOn: "rgba(175,155,255,0.4)",
+  linkOff: "rgba(140,140,200,0.02)",
+  labelHalo: "rgba(4,6,12,0.85)",
+  labelText: "rgba(233,235,246,0.96)",
+};
+const INK_LIGHT = {
+  hoverCore: "#2a2138",
+  fallback: "#7340c9",
+  // Trên giấy KHÔNG có "lõi trắng nóng": quầng sáng đổi thành vệt mực loang,
+  // đậm ở tâm rồi thấm nhạt ra - cùng hue với node.
+  glowCore: null,
+  glowStops: [[0.0, 0.55], [0.30, 0.30], [0.62, 0.11]],
+  linkIdle: "rgba(120,100,170,0.16)",
+  linkOn: "rgba(96,60,180,0.55)",
+  linkOff: "rgba(140,140,200,0.05)",
+  labelHalo: "rgba(251,249,247,0.92)",
+  labelText: "rgba(32,28,44,0.97)",
+};
+const INK_DARK = INK;
 
 function _catOf(node) {
   const segs = (node.path || "").split("/");
@@ -19,16 +54,31 @@ function _hash(s) { let h = 0; s = String(s || ""); for (let i = 0; i < s.length
 
 // Dùng CHUNG cho bản 3D: gán màu danh mục (tuần tự theo danh mục) vào n.color của từng node.
 // Cùng thứ tự data.nodes như 2D → màu 2D và 3D khớp nhau.
+// Nhớ CHỈ SỐ danh mục (không phải màu) để đổi tông chỉ là tra lại bảng khác.
 window.JavisCatColorize = function (nodes) {
-  const map = {}; let next = 0;
+  const idx = {}; let next = 0;
   (nodes || []).forEach(n => {
     const segs = (n.path || "").split("/");
     let cat = (segs.length >= 2 ? segs[segs.length - 2] : "root").replace(/^\d+\s*[-_.]\s*/, "").trim().toLowerCase() || "root";
-    if (!(cat in map)) { map[cat] = CAT_COLORS[next % CAT_COLORS.length]; next++; }
-    n.color = map[cat];   // ghi đè màu tím backend bằng màu danh mục
+    if (!(cat in idx)) { idx[cat] = next; next++; }
+    n.__catIdx = idx[cat];
+    n.color = CAT_COLORS[idx[cat] % CAT_COLORS.length];   // ghi đè màu tím backend bằng màu danh mục
   });
-  window.__javisCatMap = map;   // để nhãn danh mục tô chữ khớp màu (bản 3D)
+  window.__javisCatIdx = idx;
+  window.__javisCatMap = _mapFromIdx(idx);   // để nhãn danh mục tô chữ khớp màu (bản 3D)
+  return window.__javisCatMap;
+};
+
+function _mapFromIdx(idx) {
+  const map = {};
+  Object.keys(idx || {}).forEach(k => { map[k] = CAT_COLORS[idx[k] % CAT_COLORS.length]; });
   return map;
+}
+
+// Bản 3D nằm ở file khác nên không thấy CAT_COLORS (biến module) - mở một lối tra
+// để nó lấy đúng bảng màu của tông đang bật.
+window.JavisCatColorAt = function (idx) {
+  return CAT_COLORS[(idx || 0) % CAT_COLORS.length];
 };
 
 // --- Sprite quầng sáng (cache theo màu) → vẽ bằng drawImage (rẻ), tạo hiệu ứng tinh vân ---
@@ -39,17 +89,44 @@ function _hexA(hex, a) {
   return `rgba(${r || 157},${g || 122},${b || 255},${a})`;
 }
 function _glowSprite(color) {
-  if (_glowCache[color]) return _glowCache[color];
+  const key = color + (INK === INK_LIGHT ? "|L" : "|D");
+  if (_glowCache[key]) return _glowCache[key];
   const s = 64, cv = document.createElement("canvas"); cv.width = cv.height = s;
   const ctx = cv.getContext("2d");
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,0.95)");   // lõi trắng nóng
-  g.addColorStop(0.28, _hexA(color, 0.9));
-  g.addColorStop(0.6, _hexA(color, 0.32));
-  g.addColorStop(1, _hexA(color, 0));            // viền tan vào nền
+  if (INK.glowCore) g.addColorStop(0, INK.glowCore);   // lõi trắng nóng (chỉ tông tối)
+  INK.glowStops.forEach(([at, a]) => g.addColorStop(at, _hexA(color, a)));
+  g.addColorStop(1, _hexA(color, 0));                  // viền tan vào nền
   ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
-  _glowCache[color] = cv; return cv;
+  _glowCache[key] = cv; return cv;
 }
+
+// Đổi tông: hoán bảng màu + bảng mực, gán lại màu cho node đang có, rồi vẽ lại.
+// Không nạp lại dữ liệu nên toạ độ node, cụm đang rọi sáng và node đang trỏ giữ nguyên.
+function _applyGraphTheme(light) {
+  CAT_COLORS = light ? CAT_COLORS_LIGHT : CAT_COLORS_DARK;
+  INK = light ? INK_LIGHT : INK_DARK;
+  if (window.__javisCatIdx) window.__javisCatMap = _mapFromIdx(window.__javisCatIdx);
+  const g = window.__javisGraph;
+  if (g && g._recolor) g._recolor();
+  try { window.dispatchEvent(new Event("javis-catcolors-change")); } catch (e) {}
+}
+// Đọc tông hiện tại từ thuộc tính trên <html>. Bọc typeof vì file này còn được nạp
+// trong Node (test JS ở tests/js/) với DOM giả lập tối thiểu, không có documentElement.
+function _themeIsLight() {
+  return typeof document !== "undefined" && document.documentElement
+    ? document.documentElement.getAttribute("data-theme") === "light"
+    : false;
+}
+// KHÔNG dùng window.javisTheme.on() ở đây: file này có lúc nạp trước theme.js, khi đó
+// window.javisTheme chưa tồn tại nên đăng ký hụt IM LẶNG và đồ thị kẹt ở bảng màu tối.
+// Nghe thẳng sự kiện + tự đọc thuộc tính thì đúng ở mọi thứ tự nạp.
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+  window.addEventListener("javis-theme-change", function (e) {
+    _applyGraphTheme(!!(e && e.detail && e.detail.light));
+  });
+}
+_applyGraphTheme(_themeIsLight());
 
 // Lực kéo mọi node về tâm (0,0) tỉ lệ khoảng cách → cả mạng co lại thành hình tròn ở giữa,
 // node bị kéo ra sẽ tự trôi về. (d3 custom force: hàm(alpha) + initialize(nodes)).
@@ -89,9 +166,11 @@ class JavisGraph {
     nodes.forEach(n => {
       const cat = _catOf(n);
       // Gán màu TUẦN TỰ theo danh mục (mỗi danh mục một màu khác nhau) - không hash để tránh trùng.
-      if (!(cat in this._catMap)) { this._catMap[cat] = CAT_COLORS[this._catNext % CAT_COLORS.length]; this._catNext++; }
+      // Lưu CHỈ SỐ để đổi tông chỉ cần tra lại bảng màu khác, khỏi gán lại từ đầu.
+      if (!(cat in this._catMap)) { this._catMap[cat] = this._catNext; this._catNext++; }
       n.__cat = cat;
-      n.__c = this._catMap[cat];
+      n.__catIdx = this._catMap[cat];
+      n.__c = CAT_COLORS[n.__catIdx % CAT_COLORS.length];
       n.__r = 3 + Math.sqrt(Math.min(55, n.links || 0)) * 1.9;   // chấm sáng vừa (glow tinh linh)
       n.__ph = (_hash(n.id) % 628) / 100;                       // pha thở lệch nhau
       if (markHubs) n.__hub = hubIds.has(n.id);
@@ -103,7 +182,8 @@ class JavisGraph {
     const data = await res.json();
     this._catMap = null;                     // gán lại màu danh mục tươi cho mỗi lần nạp
     this._prep(data.nodes || []);
-    window.__javisCatMap = this._catMap;     // để nhãn danh mục (app.js) tô chữ khớp màu node
+    window.__javisCatIdx = this._catMap;                    // danh mục → chỉ số
+    window.__javisCatMap = _mapFromIdx(this._catMap);       // để nhãn danh mục (app.js) tô chữ khớp màu node
     const links = (data.edges || []).map(e => ({ source: e.source, target: e.target }));
 
     if (!this.graph) {
@@ -120,9 +200,9 @@ class JavisGraph {
         .linkColor(l => {
           if (self._hoverId != null) {
             const s = (l.source && l.source.id) || l.source, t = (l.target && l.target.id) || l.target;
-            return (s === self._hoverId || t === self._hoverId) ? "rgba(175,155,255,0.4)" : "rgba(140,140,200,0.02)";
+            return (s === self._hoverId || t === self._hoverId) ? INK.linkOn : INK.linkOff;
           }
-          return "rgba(150,140,220,0.07)";          // dây nối mờ hơn (đỡ đậm)
+          return INK.linkIdle;                      // dây nối mờ hơn (đỡ đậm)
         })
         .linkWidth(l => {
           if (self._hoverId != null) {
@@ -190,15 +270,15 @@ class JavisGraph {
     const r = (n.__r || 5) * (isHover ? 1.35 : 1) * breathe * pulse * (0.4 + 0.6 * born);
     const alpha = (dim ? 0.14 : 1) * ent * (0.4 + 0.6 * born);
 
-    // Quầng sáng
+    // Quầng sáng (tông sáng: vệt mực loang quanh chấm)
     ctx.globalAlpha = alpha;
-    const spr = _glowSprite(n.__c || "#9d7aff");
+    const spr = _glowSprite(n.__c || INK.fallback);
     const gsz = r * 2.4;                       // quầng sáng tinh linh (to hơn) nhưng vẫn tách chấm
     ctx.drawImage(spr, n.x - gsz / 2, n.y - gsz / 2, gsz, gsz);
     // Lõi đặc
     ctx.globalAlpha = Math.min(1, alpha + 0.15);
     ctx.beginPath(); ctx.arc(n.x, n.y, r * 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = isHover ? "#ffffff" : (n.__c || "#b98cff");
+    ctx.fillStyle = isHover ? INK.hoverCore : (n.__c || INK.fallback);
     ctx.fill();
     ctx.globalAlpha = 1;
 
@@ -212,12 +292,26 @@ class JavisGraph {
       ctx.textAlign = "center"; ctx.textBaseline = "top";
       const ly = n.y + r + 2;
       ctx.globalAlpha = la;
-      ctx.lineWidth = 3 / scale; ctx.strokeStyle = "rgba(4,6,12,0.85)";
+      ctx.lineWidth = 3 / scale; ctx.strokeStyle = INK.labelHalo;
       ctx.strokeText(n.label, n.x, ly);
-      ctx.fillStyle = "rgba(233,235,246,0.96)";
+      ctx.fillStyle = INK.labelText;
       ctx.fillText(n.label, n.x, ly);
       ctx.globalAlpha = 1;
     }
+  }
+
+  // Đổi tông: gán lại màu node theo bảng mới rồi ép vẽ lại một frame.
+  // Không đụng graphData().nodes/links nên d3-force không bị khởi động lại - đồ thị
+  // đứng yên tại chỗ, chỉ đổi màu. (Đổ lại graphData sẽ làm mạng giật và fit lại camera.)
+  _recolor() {
+    if (!this.graph) return;
+    const d = this.graph.graphData();
+    (d.nodes || []).forEach(n => {
+      if (n.__catIdx != null) n.__c = CAT_COLORS[n.__catIdx % CAT_COLORS.length];
+      if (n.color) n.color = n.__c || n.color;
+    });
+    // Ép force-graph vẽ lại dây nối (linkColor là hàm nên chỉ cần đánh thức vòng vẽ).
+    try { this.graph.linkColor(this.graph.linkColor()); } catch (e) {}
   }
 
   resize() {

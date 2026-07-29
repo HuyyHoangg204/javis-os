@@ -336,33 +336,33 @@
     editor.classList.add("open");
   }
 
-  // ===== Skills (quản lý kiểu Hermes: cột nhóm + tìm kiếm + bật/tắt) =====
+  // ===== Skills (cột nhóm + tìm kiếm + bật/tắt) =====
   const _skState = { cat: "ALL", q: "", skills: [] };
   function _injectSkillCss() {
     if (window._skCss) return; window._skCss = true;
     const css = `
     .sk2{display:flex;gap:16px;align-items:flex-start}
-    .sk2-side{width:210px;flex:none;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:8px;max-height:72vh;overflow:auto}
-    .sk2-side .sec{font-size:12px;letter-spacing:.08em;color:#6b7894;padding:8px 10px 4px;text-transform:uppercase}
-    .sk2-side .cat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:15px;color:#cdd8ee}
-    .sk2-side .cat:hover{background:rgba(120,180,255,.08)} .sk2-side .cat.sel{background:rgba(120,180,255,.16);color:#fff}
-    .sk2-side .cat .n{color:#7d8aa6;font-size:13px;flex:none}
+    .sk2-side{width:210px;flex:none;border:1px solid var(--hairline);border-radius:10px;padding:8px;max-height:72vh;overflow:auto}
+    .sk2-side .sec{font-size:12px;letter-spacing:.08em;color:var(--text3);padding:8px 10px 4px;text-transform:uppercase}
+    .sk2-side .cat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:15px;color:var(--text)}
+    .sk2-side .cat:hover{background:rgba(120,180,255,.08)} .sk2-side .cat.sel{background:var(--info-wash);color:var(--info-ink)}
+    .sk2-side .cat .n{color:var(--text3);font-size:13px;flex:none}
     .sk2-main{flex:1;min-width:0}
     .sk2-bar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-    .sk2-bar h4{margin:0;font-size:17px;color:#e7eefc} .sk2-bar .cnt{color:#7d8aa6;font-size:14px}
-    .sk2-bar input{flex:1;min-width:160px;max-width:340px;padding:7px 11px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:#070b16;color:#dce6fb;font-size:15px;outline:none}
+    .sk2-bar h4{margin:0;font-size:17px;color:var(--text)} .sk2-bar .cnt{color:var(--text3);font-size:14px}
+    .sk2-bar input{flex:1;min-width:160px;max-width:340px;padding:7px 11px;border-radius:8px;border:1px solid var(--hairline);background:var(--field-bg);color:var(--text);font-size:15px;outline:none}
     .sk2-list{display:flex;flex-direction:column;gap:8px}
-    .sk2-card{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border:1px solid rgba(255,255,255,.08);border-radius:10px}
-    .sk2-card:hover{border-color:rgba(120,180,255,.25);background:rgba(120,180,255,.04)}
-    .sk2-card.off{opacity:.5} .sk2-tog{flex:none;margin-top:3px;width:16px;height:16px;cursor:pointer;accent-color:#ff8a3c}
-    .sk2-info{flex:1;min-width:0} .sk2-info .nm{color:#e7eefc;font-size:15px;font-weight:600}
-    .sk2-info .ds{color:#9fb0cf;font-size:14px;margin-top:3px;line-height:1.45}
-    .sk2-info .gp{color:#6b7894;font-size:13px;margin-top:4px}
+    .sk2-card{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border:1px solid var(--hairline);border-radius:10px}
+    .sk2-card:hover{border-color:var(--info-line);background:var(--info-wash)}
+    .sk2-card.off{opacity:.5} .sk2-tog{flex:none;margin-top:3px;width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}
+    .sk2-info{flex:1;min-width:0} .sk2-info .nm{color:var(--text);font-size:15px;font-weight:600}
+    .sk2-info .ds{color:var(--text3);font-size:14px;margin-top:3px;line-height:1.45}
+    .sk2-info .gp{color:var(--text3);font-size:13px;margin-top:4px}
     .sk2-act{display:flex;gap:5px;opacity:0;transition:.15s;flex:none} .sk2-card:hover .sk2-act{opacity:1}
-    .sk2-act button{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);color:#aebbd6;border-radius:6px;cursor:pointer;font-size:13px;padding:3px 9px} .sk2-act button:hover{color:#fff;border-color:rgba(120,180,255,.5)}
-    .sk2-act button.danger:hover{color:#ff9a9a;border-color:rgba(255,120,120,.5)}
-    .sysb{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;color:#8fd0ff;background:rgba(90,170,255,.12);border:1px solid rgba(90,170,255,.35);vertical-align:2px}
-    .sk-usage{font-size:11px;color:var(--muted,#888);margin-left:8px}
+    .sk2-act button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text2);border-radius:6px;cursor:pointer;font-size:13px;padding:3px 9px} .sk2-act button:hover{color:var(--text-hi);border-color:rgba(120,180,255,.5)}
+    .sk2-act button.danger:hover{color:var(--red);border-color:rgba(255,120,120,.5)}
+    .sysb{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--link-ink);background:var(--info-wash);border:1px solid var(--info-line);vertical-align:2px}
+    .sk-usage{font-size:11px;color:var(--text3);margin-left:8px}
     .sk-stale{opacity:.75;font-style:italic;cursor:help}
     /* ===== Mobile (<=860px) ===== xep DOC: nhom thanh dai chip cuon ngang o tren, danh sach
        skill full-width ben duoi (truoc day cot nhom 210px bop cot skill con ~150px -> chu vo
@@ -374,16 +374,16 @@
         overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
       .sk2-side::-webkit-scrollbar{height:0}
       .sk2-side .sec{display:none}
-      .sk2-side .cat{flex:none;padding:8px 13px;border:1px solid rgba(255,255,255,.1);
+      .sk2-side .cat{flex:none;padding:8px 13px;border:1px solid var(--hairline);
         border-radius:999px;white-space:nowrap}
-      .sk2-side .cat .n{padding:1px 6px;border-radius:9px;background:rgba(255,255,255,.07)}
-      .sk2-side .cat.sel{border-color:rgba(120,180,255,.4)}
+      .sk2-side .cat .n{padding:1px 6px;border-radius:9px;background:var(--surface-3)}
+      .sk2-side .cat.sel{border-color:var(--info-line)}
       .sk2-bar input{max-width:none;font-size:16px}   /* 16px: chan iOS tu zoom khi focus */
       .sk2-tog{width:20px;height:20px;margin-top:2px}  /* vung cham lon hon */
       .sk2-card{flex-wrap:wrap;padding:12px 13px}
       .sk2-info .nm{font-size:16px}
       .sk2-act{flex:1 1 100%;opacity:1;margin-top:11px;padding-top:11px;gap:8px;
-        border-top:1px solid rgba(255,255,255,.06);justify-content:flex-end}
+        border-top:1px solid var(--surface-2);justify-content:flex-end}
       .sk2-act button{padding:7px 14px;font-size:14px}
     }`;
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);

@@ -4,39 +4,74 @@
 // Dùng window.THREE global (load trước 3d-force-graph) + ForceGraph3D UMD.
 // ============================================
 
+// Hai bảng mực cho tinh vân 3D.
+// TỐI: sprite cộng sáng (AdditiveBlending) - node chồng nhau càng rực, đúng chất tinh vân.
+// SÁNG: cộng sáng trên nền giấy cho ra TRẮNG BỆT (r+g+b dồn lên 255), cả khối não biến
+// mất. Nên tông sáng chuyển sang chồng thường + mực sẫm, đọc như vệt màu nước trên giấy.
+let G3 = {
+  light: false,
+  additive: true,
+  fallback: "#b98cff",
+  glowCore: "rgba(255,255,255,0.7)",              // lõi trắng DỊU
+  glowStops: [[0.12, 0.9], [0.42, 0.4]],
+  link: "rgba(170,150,255,0.5)",
+  linkOpacity: 0.11,
+  particle: [                                     // hạt chạy dọc dây lúc đang nghĩ
+    [0, "rgba(255,255,255,1)"], [0.06, "rgba(255,210,120,0.95)"],
+    [0.18, "rgba(255,140,40,0.75)"], [0.40, "rgba(255,90,10,0.30)"],
+    [0.70, "rgba(200,60,0,0.08)"], [1, "rgba(180,40,0,0)"],
+  ],
+  particleColor: "rgba(255,165,50,0.95)",
+  particleOpacity: 0.8,
+};
+const G3_DARK = G3;
+const G3_LIGHT = {
+  light: true,
+  additive: false,
+  fallback: "#7340c9",
+  glowCore: null,
+  glowStops: [[0.0, 0.62], [0.34, 0.34], [0.66, 0.12]],
+  // Dây mảnh màu sẫm trên giấy cần đậm hơn hẳn mức 0.11 của nền đen mới thấy.
+  link: "rgba(96,74,150,0.55)",
+  linkOpacity: 0.24,
+  particle: [
+    [0, "rgba(150,44,0,0.98)"], [0.16, "rgba(200,70,10,0.85)"],
+    [0.38, "rgba(232,93,31,0.42)"], [0.68, "rgba(232,120,60,0.12)"],
+    [1, "rgba(232,140,80,0)"],
+  ],
+  particleColor: "rgba(190,64,8,0.95)",
+  particleOpacity: 0.9,
+};
+
 const _texCache = {};
 function glowTexture(THREE, hex) {
-  if (_texCache[hex]) return _texCache[hex];
+  const key = hex + (G3.light ? "|L" : "|D");
+  if (_texCache[key]) return _texCache[key];
   const s = 96;
   const cv = document.createElement("canvas");
   cv.width = cv.height = s;
   const ctx = cv.getContext("2d");
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0, "rgba(255,255,255,0.7)");    // lõi trắng DỊU (bớt gắt để đa màu không cộng dồn thành trắng)
-  g.addColorStop(0.12, hexA(hex, 0.9));          // màu danh mục ra sớm → giữ đúng hue thay vì cháy trắng
-  g.addColorStop(0.42, hexA(hex, 0.4));
+  if (G3.glowCore) g.addColorStop(0, G3.glowCore);
+  // Màu danh mục ra sớm → giữ đúng hue thay vì cháy trắng
+  G3.glowStops.forEach(([at, a]) => g.addColorStop(at, hexA(hex, a)));
   g.addColorStop(1, hexA(hex, 0));               // viền tan vào nền
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   const tex = new THREE.CanvasTexture(cv);
-  _texCache[hex] = tex;
+  _texCache[key] = tex;
   return tex;
 }
 
 function particleGlowTexture(THREE) {
-  const key = "__particle_orange";
+  const key = "__particle" + (G3.light ? "|L" : "|D");
   if (_texCache[key]) return _texCache[key];
   const s = 128;
   const cv = document.createElement("canvas");
   cv.width = cv.height = s;
   const ctx = cv.getContext("2d");
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  g.addColorStop(0,    "rgba(255,255,255,1)");    // lõi trắng nóng - rất nhỏ
-  g.addColorStop(0.06, "rgba(255,210,120,0.95)"); // cam sáng ấm
-  g.addColorStop(0.18, "rgba(255,140,40,0.75)");  // cam đậm
-  g.addColorStop(0.40, "rgba(255,90,10,0.30)");   // cam mờ
-  g.addColorStop(0.70, "rgba(200,60,0,0.08)");    // đỏ cam tan dần
-  g.addColorStop(1,    "rgba(180,40,0,0)");       // trong suốt
+  G3.particle.forEach(([at, c]) => g.addColorStop(at, c));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   const tex = new THREE.CanvasTexture(cv);
@@ -49,6 +84,17 @@ function hexA(hex, a) {
   const g = parseInt(m.substring(2, 4), 16);
   const b = parseInt(m.substring(4, 6), 16);
   return `rgba(${r},${g},${b},${a})`;
+}
+
+// Đồng bộ bảng mực với tông đang bật. Gọi ở đầu _recolor() và trong load() thay vì
+// đăng ký listener riêng: graph.js nạp TRƯỚC file này nên listener của nó chạy trước,
+// và nó gọi thẳng __javisGraph._recolor() - nếu G3 chờ listener của mình thì lúc đó
+// vẫn còn là bảng cũ. Tự đọc tông ngay tại chỗ dùng là hết phụ thuộc thứ tự.
+function _syncG3() {
+  const light = typeof document !== "undefined" && document.documentElement
+    ? document.documentElement.getAttribute("data-theme") === "light"
+    : false;
+  G3 = light ? G3_LIGHT : G3_DARK;
 }
 
 // Lực hút về tâm 3D (x,y,z) → cả tinh vân co tròn lại, node lẻ/cụm xa bị kéo vào gần.
@@ -82,6 +128,7 @@ class JavisGraph3D {
   }
 
   async load(query = "source=all") {
+    _syncG3();   // vào 3D sau khi đã đổi tông ở 2D → bắt kịp bảng mực trước khi dựng sprite
     const res = await fetch(`/graph?${query}`);
     const data = await res.json();
     if (window.JavisCatColorize) window.JavisCatColorize(data.nodes);   // tô màu theo danh mục như 2D
@@ -104,8 +151,8 @@ class JavisGraph3D {
         })
         .nodeThreeObject(n => {
           const mat = new THREE.SpriteMaterial({
-            map: glowTexture(THREE, n.color || "#b98cff"),
-            blending: THREE.AdditiveBlending,
+            map: glowTexture(THREE, n.color || G3.fallback),
+            blending: G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
             depthWrite: false,
             transparent: true,
           });
@@ -117,12 +164,12 @@ class JavisGraph3D {
           return sp;
         })
         .nodeThreeObjectExtend(false)
-        .linkColor(() => "rgba(170,150,255,0.5)")
+        .linkColor(() => G3.link)
         .linkWidth(0)
-        .linkOpacity(0.11)
+        .linkOpacity(G3.linkOpacity)
         .linkDirectionalParticles(0)
         .linkDirectionalParticleWidth(4)
-        .linkDirectionalParticleColor(() => "rgba(255,165,50,0.95)")
+        .linkDirectionalParticleColor(() => G3.particleColor)
         .linkDirectionalParticleSpeed(0.007)
         .onNodeHover(n => {
           this.container.style.cursor = n ? "pointer" : "grab";
@@ -184,6 +231,42 @@ class JavisGraph3D {
     if (!this.graph) return { nodes: 0, links: 0 };
     const d = this.graph.graphData();
     return { nodes: d.nodes.length, links: d.links.length };
+  }
+
+  // Đổi tông. Sprite của three.js đã dựng xong không tự đổi theo bảng màu, nên phải
+  // thay TẬN NƠI: gán texture mới + đổi kiểu chồng lớp (cộng sáng ↔ chồng thường) cho
+  // từng material đang sống. Bỏ qua bước này thì tông sáng chỉ thấy một khối trắng bệt.
+  // Vẫn giữ nguyên graphData nên camera, góc quay và vị trí node không bị đặt lại.
+  _recolor() {
+    const THREE = window.THREE;
+    _syncG3();
+    if (!this.graph || !THREE) return;
+    const blending = G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending;
+    const at = window.JavisCatColorAt;
+
+    (this.graph.graphData().nodes || []).forEach(n => {
+      if (at && n.__catIdx != null) n.color = at(n.__catIdx);
+      const sp = n.__sprite;
+      if (!sp || !sp.material) return;
+      sp.material.map = glowTexture(THREE, n.color || G3.fallback);
+      sp.material.blending = blending;
+      sp.material.needsUpdate = true;
+    });
+
+    // Hạt "đang nghĩ" đang bay: đổi texture + kiểu chồng lớp tại chỗ cho khỏi dựng lại.
+    (this._thinkSprites || []).forEach(({ sp }) => {
+      if (!sp || !sp.material) return;
+      sp.material.map = particleGlowTexture(THREE);
+      sp.material.blending = blending;
+      sp.material.opacity = G3.particleOpacity;
+      sp.material.needsUpdate = true;
+    });
+
+    try {
+      this.graph.linkColor(() => G3.link)
+        .linkOpacity(G3.linkOpacity)
+        .linkDirectionalParticleColor(() => G3.particleColor);
+    } catch (e) {}
   }
 
   // Thêm/cập nhật 1 node realtime (brain vừa sinh ra hoặc sửa note).
@@ -267,10 +350,10 @@ class JavisGraph3D {
       for (let i = 0; i < count; i++) {
         const mat = new THREE.SpriteMaterial({
           map: particleGlowTexture(THREE),
-          blending: THREE.AdditiveBlending,
+          blending: G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
           depthWrite: false,
           transparent: true,
-          opacity: 0.8,
+          opacity: G3.particleOpacity,
         });
         const sp = new THREE.Sprite(mat);
         const size = 3.5 + Math.random() * 3;

@@ -57,32 +57,32 @@
       ".jvfe-modal.open{display:flex;animation:jvfeIn .16s ease}" +
       "@keyframes jvfeIn{from{opacity:.3}to{opacity:1}}" +
       ".jvfe-card{width:min(920px,94vw);max-height:88vh;display:flex;flex-direction:column;" +
-      "background:var(--bg2,#151521);border:1px solid var(--border,#36364c);border-radius:14px;" +
+      "background:var(--bg2);border:1px solid var(--border);border-radius:14px;" +
       "box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}" +
-      ".jvfe-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border,#36364c)}" +
-      ".jvfe-title{font-weight:600;font-size:14px;color:var(--text,#f3f3fb);flex:1;overflow:hidden;" +
+      ".jvfe-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border)}" +
+      ".jvfe-title{font-weight:600;font-size:14px;color:var(--text);flex:1;overflow:hidden;" +
       "text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:7px}" +
       ".jvfe-actions{display:flex;gap:6px;flex:none;align-items:center}" +
       ".jvfe-seg{display:flex;gap:4px;margin-right:4px}" +
-      ".jvfe-btn{background:var(--bg3,#20202e);border:1px solid var(--border,#36364c);color:var(--text2,#c7c9d6);" +
+      ".jvfe-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);" +
       "border-radius:7px;padding:5px 11px;font-size:13px;cursor:pointer;font-family:inherit}" +
-      ".jvfe-btn:hover{color:#fff;border-color:var(--accent,#ff7a3c)}" +
-      ".jvfe-btn.active{color:var(--accent,#ff7a3c);border-color:var(--accent,#ff7a3c)}" +
+      ".jvfe-btn:hover{color:var(--text-hi);border-color:var(--accent)}" +
+      ".jvfe-btn.active{color:var(--accent);border-color:var(--accent)}" +
       ".jvfe-btn.icon{width:32px;height:32px;padding:0;font-size:14px}" +
-      ".jvfe-btn.saved{color:#5fd08a;border-color:#5fd08a}" +
-      ".jvfe-body{flex:1;min-height:0;overflow:auto;background:var(--bg,#0e0e16);display:flex;flex-direction:column}" +
+      ".jvfe-btn.saved{color:var(--green);border-color:var(--green)}" +
+      ".jvfe-body{flex:1;min-height:0;overflow:auto;background:var(--bg);display:flex;flex-direction:column}" +
       ".jvfe-text{flex:1;min-height:52vh;width:100%;box-sizing:border-box;border:0;outline:none;resize:none;" +
-      "background:var(--bg,#0e0e16);color:var(--text,#f3f3fb);font-family:ui-monospace,Menlo,Consolas,monospace;" +
+      "background:var(--bg);color:var(--text);font-family:ui-monospace,Menlo,Consolas,monospace;" +
       "font-size:13.5px;line-height:1.6;padding:16px}" +
-      ".jvfe-prev{padding:16px 20px;color:var(--text,#f3f3fb);line-height:1.7;overflow:auto}" +
+      ".jvfe-prev{padding:16px 20px;color:var(--text);line-height:1.7;overflow:auto}" +
       ".jvfe-prev h1,.jvfe-prev h2,.jvfe-prev h3,.jvfe-prev h4{margin:.7em 0 .35em;line-height:1.3}" +
-      ".jvfe-prev pre{background:var(--bg2,#151521);padding:10px 12px;border-radius:8px;overflow:auto}" +
-      ".jvfe-prev code{background:var(--bg2,#151521);padding:1px 5px;border-radius:4px;font-size:.92em}" +
+      ".jvfe-prev pre{background:var(--bg2);padding:10px 12px;border-radius:8px;overflow:auto}" +
+      ".jvfe-prev code{background:var(--bg2);padding:1px 5px;border-radius:4px;font-size:.92em}" +
       ".jvfe-prev pre code{background:none;padding:0}" +
       ".jvfe-prev img{max-width:100%;height:auto;border-radius:8px}" +
-      ".jvfe-prev table{border-collapse:collapse}.jvfe-prev th,.jvfe-prev td{border:1px solid var(--border,#36364c);padding:5px 9px}" +
-      ".jvfe-note{padding:18px;color:var(--text3,#8b8fa0);font-size:14px;line-height:1.6}" +
-      ".jvfe-note a{color:var(--accent,#ff7a3c)}" +
+      ".jvfe-prev table{border-collapse:collapse}.jvfe-prev th,.jvfe-prev td{border:1px solid var(--border);padding:5px 9px}" +
+      ".jvfe-note{padding:18px;color:var(--text3);font-size:14px;line-height:1.6}" +
+      ".jvfe-note a{color:var(--accent)}" +
       ".jvfe-img{padding:16px;text-align:center;overflow:auto}" +
       ".jvfe-img img{max-width:100%;height:auto;border-radius:8px}" +
       ".jvfe-frame{width:100%;height:72vh;border:0;background:#fff}";
