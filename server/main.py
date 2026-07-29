@@ -52,6 +52,7 @@ import cred_exchange   # đổi credential hộ user (vd App Password -> Google 
 import plugins_host   # hệ PLUGIN: thư mục Python thả vào, tự thêm tool/hook cho mọi engine qua hub
 import web_security   # chống CSRF-to-localhost + DNS-rebinding cho web API cục bộ
 import image_gen      # tạo ảnh bằng gói ChatGPT (OAuth) - Codex Responses + tool image_generation
+import media_gc       # dọn vùng cache media (attachments/ + inbox/) theo hạn tuổi + trần dung lượng
 import zalo_login
 import oauth_mcp
 import system_sync   # tầng năng lực HỆ THỐNG (skill/loop mặc định) - update theo phiên bản app
@@ -4169,6 +4170,11 @@ async def plugins_toggle(slug: str = Form(...), enabled: str = Form(...), brain:
     return res
 
 
+# Mốc lần dọn media gần nhất. Dùng list 1 phần tử để hàm lồng bên trong _scheduler_loop
+# gán được mà không cần `global`. Khởi tạo 0.0 -> chạy ngay ở tick đầu sau khi server lên.
+_MEDIA_GC_LAST = [0.0]
+
+
 @app.on_event("startup")
 async def _start_scheduler():
     # Bootstrap bảo mật cho deploy public: (1) tạo admin từ env nếu có; (2) nếu vẫn chưa có admin
@@ -4264,6 +4270,25 @@ async def _start_scheduler():
                         await asyncio.to_thread(rebuild_javis_index, _ib)
                 except Exception as ie:
                     print(f"[javis index tick] {type(ie).__name__}: {ie}", file=__import__('sys').stderr)
+                # 6) Dọn media quá hạn: attachments/ + inbox/ là VÙNG CACHE chứ không phải
+                #    tri thức. Nhịp riêng 6 TIẾNG (không theo nhịp 30s của vòng lặp) vì đây là
+                #    quét đĩa, và to_thread vì quét đồng bộ trong event loop từng làm container
+                #    unhealthy tới mức Traefik gỡ route. Đặt mốc TRƯỚC khi chạy: lỡ có hỏng thì
+                #    đợi lượt sau chứ không quay vòng nóng.
+                try:
+                    if time.time() - _MEDIA_GC_LAST[0] >= 6 * 3600:
+                        _MEDIA_GC_LAST[0] = time.time()
+                        mcfg = cfgmod.read_settings().get("media", {}) or {}
+                        if mcfg.get("enabled", True):
+                            tuoi = int(mcfg.get("max_age_days", 30))
+                            tran = int(mcfg.get("max_mb", 300))
+                            for _mb in loop_feature.scheduler_brains():
+                                kq = await asyncio.to_thread(media_gc.sweep, _mb, tuoi, tran)
+                                if kq.get("files"):
+                                    print(f"[media gc] {_mb}: dọn {kq['files']} tệp, "
+                                          f"{kq['bytes'] // (1024 * 1024)}MB")
+                except Exception as me:
+                    print(f"[media gc] {type(me).__name__}: {me}", file=__import__('sys').stderr)
             except Exception as e:
                 print(f"[scheduler] {type(e).__name__}: {e}", file=__import__('sys').stderr)
     asyncio.create_task(_scheduler_loop())
