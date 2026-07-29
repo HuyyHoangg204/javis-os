@@ -12,6 +12,22 @@ Zalo được rút về đúng một đường MCP: nối tài khoản xong là 
 - **Một tiến trình Zalo duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool MCP.
 - Thẻ kết nối Zalo có link mở tài liệu hướng dẫn trên GitHub.
 
+## [0.9.252] - 2026-07-29
+Đồ thị 3D trước giờ là một quả cầu lốm đốm xám trắng, dẹt và không ra chất. Nguyên nhân đo được rồi, không phải chuyện gu.
+### Sửa lỗi
+- **Màu thư mục trong đồ thị 3D bị bạc thành xám**: mỗi hạt có một chấm TRẮNG ở tâm trước khi tới màu danh mục. Đo pixel tâm của một hạt đơn lẻ: chàm `#8b93ff` ra `rgb(177,178,190)`, lục `#3fdc9a` ra `rgb(171,184,181)`, cam `#f0a24a` ra `rgb(186,179,174)` - tức mất khoảng **90% màu ngay khi chưa chồng lớp nào**. Cộng thêm vài trăm hạt cộng sáng chồng nhau thì cả khối thành trắng bệt. Nay dải màu của hạt chỉ còn MỘT hue từ tâm ra viền: ba màu trên lần lượt ra `rgb(125,132,230)`, `rgb(57,197,139)`, `rgb(215,145,68)` - mất dưới 11%.
+- Hạ độ mờ nền của hạt xuống 0.52 (trước 0.62): mô phỏng phép cộng sáng cho thấy trên 0.6 thì chỉ 16 hạt chồng nhau đã dồn về trắng, màu chỉ sống được ở vành.
+### Thêm mới
+- **Lõi sáng ở tâm tinh vân**: thứ mà mọi tham chiếu đẹp đều có và bản cũ thiếu hẳn. Thở theo giọng nói, không chịu sương mù vì nó là nguồn sáng. Tông sáng đổi thành vệt loang lavender-đào, đọc như mực thấm dày giữa trang giấy.
+- **Sương mù theo chiều sâu**: hạt ở xa mờ dần về màu nền nên khối có thể tích thay vì dẹt như ảnh dán. Độ dày suy ra từ bán kính khối đo được, brain to nhỏ đều hợp cỡ.
+- **Lớp bụi vành**: 620 hạt rất mịn bao ngoài, trôi ngược chiều rất chậm để sinh thị sai - mắt đọc ra khối 3D thật thay vì một tấm ảnh đang quay.
+### Cải thiện
+- **Lõi đặc, vành thưa**: lực hút về tâm giờ tỉ lệ theo số liên kết, note nhiều liên kết bị kéo vào giữa còn note lẻ trôi ra rìa. Vừa đẹp hơn quả cầu đều tăm tắp, vừa mang nghĩa - cái gì quan trọng thì nằm giữa.
+- **Dải cỡ hạt rộng và mịn hơn**: note lẻ thành hạt bụi nhỏ, hub to rõ gấp nhiều lần. Trước đây mọi hạt gần như cùng cỡ nên nhìn ra một đám chấm đều.
+- Dây nối nâng từ mờ 0.11 lên 0.20 nên thấy được cấu trúc mạng, và tự mờ theo chiều sâu cùng với hạt.
+### Kiểm thử
+- `test_graph3d_nebula.js` khoá 20 điểm: hạt không được có điểm dừng trắng, tông sáng phải đổi kiểu chồng lớp, sương suy ra từ bán kính, lõi/bụi đúng thứ tự vẽ và không nhân bản khi dựng lại. Đã đối chiếu mọi API dùng tới với three.js r159 thật.
+
 ## [0.9.250] - 2026-07-29
 Nút đổi tông trước giờ chỉ lật từ đen sang xám, không phải giao diện sáng thật. Nay có tông sáng đúng nghĩa, và khoang não được vẽ lại cho hợp nền giấy.
 ### Thêm mới

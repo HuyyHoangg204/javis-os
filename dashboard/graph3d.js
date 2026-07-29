@@ -5,17 +5,40 @@
 // ============================================
 
 // Hai bảng mực cho tinh vân 3D.
-// TỐI: sprite cộng sáng (AdditiveBlending) - node chồng nhau càng rực, đúng chất tinh vân.
+// TỐI: sprite cộng sáng (AdditiveBlending) - mật độ đọc thành độ sáng, đúng chất tinh vân.
 // SÁNG: cộng sáng trên nền giấy cho ra TRẮNG BỆT (r+g+b dồn lên 255), cả khối não biến
 // mất. Nên tông sáng chuyển sang chồng thường + mực sẫm, đọc như vệt màu nước trên giấy.
+//
+// KHÔNG CÒN LÕI TRẮNG trong hạt. Bản cũ để mỗi sprite một chấm trắng ở tâm; vài trăm
+// sprite cộng sáng chồng nhau trong khối cầu đặc thì tổng dồn hết về trắng, màu danh mục
+// biến mất sạch và cả quả cầu thành đám lốm đốm xám. Giữ đúng hue ngay từ tâm hạt rồi hạ
+// alpha xuống thì chồng bao nhiêu lớp vẫn ra màu, chỉ sáng dần lên.
 let G3 = {
   light: false,
   additive: true,
   fallback: "#b98cff",
-  glowCore: "rgba(255,255,255,0.7)",              // lõi trắng DỊU
-  glowStops: [[0.12, 0.9], [0.42, 0.4]],
-  link: "rgba(170,150,255,0.5)",
-  linkOpacity: 0.11,
+  glowStops: [[0, 0.92], [0.17, 0.60], [0.46, 0.19]],
+  // 0.52 chứ không phải 0.62: đo mô phỏng cho thấy trên 0.6 thì chỉ 16 hạt chồng nhau
+  // đã dồn về trắng, màu chỉ sống ở vành. Hạ xuống thì màu giữ được sâu vào trong lõi,
+  // và phần chính giữa vẫn tự sáng lên nhờ mật độ - đó mới là lõi sáng thật.
+  baseOpacity: 0.52,
+  link: "rgba(150,140,225,0.9)",
+  linkOpacity: 0.2,
+
+  // Sương mù theo chiều sâu: hạt xa mờ dần về màu nền → khối có thể tích thay vì dẹt.
+  // fogK là hệ số chia theo bán kính đo được (xem _applyDepth), không phải hằng số tuyệt
+  // đối - brain to nhỏ khác nhau nên sương phải co giãn theo.
+  fog: 0x05050c, fogK: 0.26,
+
+  // Lõi sáng ở tâm - thứ cả hai mẫu tham chiếu đều có và bản cũ thiếu hẳn.
+  core: [[0, "rgba(255,247,236,0.95)"], [0.09, "rgba(216,192,255,0.70)"],
+         [0.28, "rgba(150,110,240,0.26)"], [0.60, "rgba(96,64,190,0.07)"],
+         [1, "rgba(60,40,140,0)"]],
+  coreScale: 1.25,
+
+  // Bụi vành: lớp hạt rất mịn bao ngoài, tạo cảm giác tinh vân loãng dần ra rìa.
+  dust: 0xbdaced, dustOpacity: 0.5, dustSize: 1.5,
+
   particle: [                                     // hạt chạy dọc dây lúc đang nghĩ
     [0, "rgba(255,255,255,1)"], [0.06, "rgba(255,210,120,0.95)"],
     [0.18, "rgba(255,140,40,0.75)"], [0.40, "rgba(255,90,10,0.30)"],
@@ -29,11 +52,25 @@ const G3_LIGHT = {
   light: true,
   additive: false,
   fallback: "#7340c9",
-  glowCore: null,
-  glowStops: [[0.0, 0.62], [0.34, 0.34], [0.66, 0.12]],
-  // Dây mảnh màu sẫm trên giấy cần đậm hơn hẳn mức 0.11 của nền đen mới thấy.
-  link: "rgba(96,74,150,0.55)",
-  linkOpacity: 0.24,
+  glowStops: [[0, 0.86], [0.19, 0.50], [0.50, 0.15]],
+  // Chồng thường không có hiện tượng cộng dồn, nhưng mực chồng mực quá dày thì lõi
+  // thành vệt đen kịt trên giấy. 0.68 giữ được cảm giác mực thấm dày mà vẫn trong.
+  baseOpacity: 0.68,
+  // Dây mảnh màu sẫm trên giấy cần đậm hơn hẳn mức của nền đen mới thấy.
+  link: "rgba(96,74,150,0.9)",
+  linkOpacity: 0.26,
+
+  fog: 0xf1eae0, fogK: 0.30,
+
+  // Trên giấy KHÔNG có "nguồn sáng" - lõi đổi thành vệt loang lavender-đào rất nhạt,
+  // đọc như mực thấm dày ở giữa trang.
+  core: [[0, "rgba(124,58,237,0.26)"], [0.15, "rgba(139,92,246,0.16)"],
+         [0.40, "rgba(232,93,31,0.09)"], [0.72, "rgba(232,93,31,0.03)"],
+         [1, "rgba(255,255,255,0)"]],
+  coreScale: 1.35,
+
+  dust: 0x7d7398, dustOpacity: 0.4, dustSize: 1.35,
+
   particle: [
     [0, "rgba(150,44,0,0.98)"], [0.16, "rgba(200,70,10,0.85)"],
     [0.38, "rgba(232,93,31,0.42)"], [0.68, "rgba(232,120,60,0.12)"],
@@ -52,10 +89,26 @@ function glowTexture(THREE, hex) {
   cv.width = cv.height = s;
   const ctx = cv.getContext("2d");
   const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-  if (G3.glowCore) g.addColorStop(0, G3.glowCore);
-  // Màu danh mục ra sớm → giữ đúng hue thay vì cháy trắng
+  // Toàn bộ dải là MỘT hue - không chen màu trắng vào tâm (xem ghi chú ở bảng G3).
   G3.glowStops.forEach(([at, a]) => g.addColorStop(at, hexA(hex, a)));
   g.addColorStop(1, hexA(hex, 0));               // viền tan vào nền
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, s, s);
+  const tex = new THREE.CanvasTexture(cv);
+  _texCache[key] = tex;
+  return tex;
+}
+
+// Lõi sáng ở tâm tinh vân. Vẽ to (256px) vì nó được phóng lên cỡ cả khối não.
+function coreTexture(THREE) {
+  const key = "__core" + (G3.light ? "|L" : "|D");
+  if (_texCache[key]) return _texCache[key];
+  const s = 256;
+  const cv = document.createElement("canvas");
+  cv.width = cv.height = s;
+  const ctx = cv.getContext("2d");
+  const g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  G3.core.forEach(([at, c]) => g.addColorStop(at, c));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, s, s);
   const tex = new THREE.CanvasTexture(cv);
@@ -98,13 +151,27 @@ function _syncG3() {
 }
 
 // Lực hút về tâm 3D (x,y,z) → cả tinh vân co tròn lại, node lẻ/cụm xa bị kéo vào gần.
+// Sức hút TỈ LỆ THEO SỐ LIÊN KẾT: note nhiều liên kết bị kéo vào tâm mạnh hơn, note lẻ
+// trôi ra vành. Nhờ đó khối có lõi đặc rồi loãng dần ra rìa thay vì là quả cầu đều tăm
+// tắp - vừa đẹp hơn vừa mang nghĩa: cái gì quan trọng thì nằm giữa.
 function centerGravity3D(strength) {
   let _nodes = [];
   const force = (alpha) => {
     const k = strength * alpha;
-    for (let i = 0; i < _nodes.length; i++) { const n = _nodes[i]; n.vx -= n.x * k; n.vy -= n.y * k; n.vz -= (n.z || 0) * k; }
+    for (let i = 0; i < _nodes.length; i++) {
+      const n = _nodes[i];
+      const w = n.__gw || 1;
+      n.vx -= n.x * k * w; n.vy -= n.y * k * w; n.vz -= (n.z || 0) * k * w;
+    }
   };
-  force.initialize = (ns) => { _nodes = ns; };
+  force.initialize = (ns) => {
+    _nodes = ns || [];
+    let max = 1;
+    for (const n of _nodes) max = Math.max(max, n.links || 0);
+    // Mũ 0.6 để hub không hút quá gắt: chênh lệch liên kết thường rất lệch (vài hub
+    // trăm link, phần lớn 0-2), lấy tuyến tính là hub dính chặt thành một cục ở tâm.
+    for (const n of _nodes) n.__gw = 0.45 + 1.35 * Math.pow((n.links || 0) / max, 0.6);
+  };
   return force;
 }
 
@@ -155,9 +222,12 @@ class JavisGraph3D {
             blending: G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
             depthWrite: false,
             transparent: true,
+            fog: true,            // chịu sương mù → hạt ở xa mờ đi, khối có chiều sâu
           });
           const sp = new THREE.Sprite(mat);
-          const base = 5 + Math.min(26, (n.links || 0) * 1.8);
+          // Dải cỡ rộng và mịn hơn bản cũ (5..31 gần như đều nhau nên nhìn ra đám chấm
+          // cùng cỡ). Mũ 0.7 kéo note lẻ xuống hạt bụi rất nhỏ, hub vẫn to rõ.
+          const base = 2.4 + Math.min(19, Math.pow(n.links || 0, 0.7) * 2.6);
           sp.scale.set(base, base, 1);
           sp.__base = base;
           n.__sprite = sp;
@@ -193,6 +263,10 @@ class JavisGraph3D {
       if (linkForce) linkForce.distance(28);
       this.graph.d3Force("gravity", centerGravity3D(0.06));
 
+      // Sương đặt NGAY tại đây, trước lần graphData() đầu tiên (là lúc sprite node được
+      // dựng và shader biên dịch). Xem ghi chú ở _ensureFog.
+      this._ensureFog();
+
       const controls = this.graph.controls();
       controls.autoRotate = true;
       controls.autoRotateSpeed = 0.6;   // quay nhẹ liên tục - luôn "sống"
@@ -204,10 +278,127 @@ class JavisGraph3D {
     if (this._fitTimer) clearTimeout(this._fitTimer);
     this._slowFrame = 0;
     this.graph.graphData({ nodes: data.nodes, links });
-    // Gom sprite refs + dựng adjacency (để lan truyền firing theo synapse)
-    setTimeout(() => this._rebuildRefs(), 200);
+    this._buildCore();
+    this._buildDust();
+    // Gom sprite refs + dựng adjacency (để lan truyền firing theo synapse).
+    // _applyDepth phải chạy SAU khi physics đã đẩy node ra khỏi gốc, không thì bán kính
+    // đo được bằng 0 và sương dày vô hạn. Đo lại lần nữa lúc lắng cho khớp cỡ thật.
+    setTimeout(() => { this._rebuildRefs(); this._applyDepth(); }, 200);
+    setTimeout(() => this._applyDepth(), 2200);
     this.resize();
     return data;
+  }
+
+  // ---- Lõi sáng + bụi vành + sương mù ----------------------------------------
+  // Ba lớp này quyết định phần lớn "chất" của tinh vân, và đều phải dựng lại khi đổi tông.
+
+  _scene() {
+    return this.graph && this.graph.scene ? this.graph.scene() : null;
+  }
+
+  // Bán kính đặc trưng của khối = khoảng cách trung bình từ tâm tới node. Mọi thứ khác
+  // (cỡ lõi, cỡ vỏ bụi, độ dày sương) đều suy ra từ số này nên brain to nhỏ đều hợp cỡ.
+  _radius() {
+    const ns = (this.graph && this.graph.graphData().nodes) || [];
+    let sum = 0, k = 0;
+    for (const n of ns) {
+      if (n.x == null) continue;
+      sum += Math.hypot(n.x, n.y, n.z || 0); k++;
+    }
+    return k ? Math.max(30, sum / k) : 80;
+  }
+
+  _buildCore() {
+    const THREE = window.THREE, scene = this._scene();
+    if (!THREE || !scene) return;
+    this._disposeCore();
+    const mat = new THREE.SpriteMaterial({
+      map: coreTexture(THREE),
+      blending: G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      depthWrite: false,
+      transparent: true,
+      fog: false,       // lõi LÀ nguồn sáng, không để sương ăn mất nó
+    });
+    const sp = new THREE.Sprite(mat);
+    sp.renderOrder = -1;             // vẽ trước node để node nổi lên trên nền lõi
+    scene.add(sp);
+    this._core = sp;
+  }
+
+  _buildDust() {
+    const THREE = window.THREE, scene = this._scene();
+    if (!THREE || !scene) return;
+    this._disposeDust();
+    const N = 620;
+    const pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) {
+      // Điểm đều trên mặt cầu (u phân bố đều mới không dồn về hai cực), bán kính lệch
+      // ngẫu nhiên trong [0.95, 2.15] để thành lớp vỏ dày chứ không phải vòng mỏng.
+      const u = Math.random() * 2 - 1;
+      const th = Math.random() * Math.PI * 2;
+      const sq = Math.sqrt(1 - u * u);
+      const rr = 0.95 + Math.pow(Math.random(), 0.7) * 1.2;
+      pos[i * 3] = sq * Math.cos(th) * rr;
+      pos[i * 3 + 1] = sq * Math.sin(th) * rr;
+      pos[i * 3 + 2] = u * rr;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: G3.dust, size: G3.dustSize, sizeAttenuation: true,
+      transparent: true, opacity: G3.dustOpacity, depthWrite: false,
+      blending: G3.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      fog: true,
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.renderOrder = -2;
+    scene.add(pts);
+    this._dust = pts;
+  }
+
+  // Sương phải TỒN TẠI TRƯỚC khi bất kỳ material nào được biên dịch. three.js nướng
+  // việc "có dùng sương hay không" vào shader lúc dựng chương trình; gán scene.fog sau
+  // khi sprite đã tạo thì shader cũ không có đoạn sương, và sương coi như vô hiệu (trừ
+  // khi ép needsUpdate cho từng material - tốn hơn và dễ sót). Nên tạo ngay lúc dựng
+  // graph, về sau chỉ sửa .color/.density (đều là uniform, không phải biên dịch lại).
+  _ensureFog() {
+    const THREE = window.THREE, scene = this._scene();
+    if (!THREE || !scene || scene.fog) return;
+    scene.fog = new THREE.FogExp2(G3.fog, G3.fogK / 80);
+  }
+
+  // Cỡ lõi/bụi + độ dày sương theo bán kính thật. Gọi lại khi dữ liệu hoặc tông đổi.
+  _applyDepth() {
+    const scene = this._scene();
+    if (!scene) return;
+    this._ensureFog();
+    const R = this._radius();
+    this._R = R;
+    if (scene.fog) {
+      // FogExp2: độ mờ = 1 - exp(-(density*depth)^2). Camera thường cách tâm ~2.5R nên
+      // node trải từ ~1.5R tới ~3.5R; density = fogK/R cho mặt gần mờ nhẹ, mặt xa mờ rõ.
+      scene.fog.density = G3.fogK / R;
+      if (scene.fog.color && scene.fog.color.setHex) scene.fog.color.setHex(G3.fog);
+    }
+    if (this._dust) this._dust.scale.setScalar(R);
+    this._coreR = R * G3.coreScale * 2;
+  }
+
+  _disposeCore() {
+    if (!this._core) return;
+    const scene = this._scene();
+    if (scene) scene.remove(this._core);
+    if (this._core.material) this._core.material.dispose();
+    this._core = null;
+  }
+
+  _disposeDust() {
+    if (!this._dust) return;
+    const scene = this._scene();
+    if (scene) scene.remove(this._dust);
+    if (this._dust.geometry) this._dust.geometry.dispose();
+    if (this._dust.material) this._dust.material.dispose();
+    this._dust = null;
   }
 
   // Gom lại sprite refs + adjacency từ graphData hiện tại (gọi sau mỗi lần đổi data)
@@ -267,6 +458,11 @@ class JavisGraph3D {
         .linkOpacity(G3.linkOpacity)
         .linkDirectionalParticleColor(() => G3.particleColor);
     } catch (e) {}
+
+    // Lõi, bụi và sương đều mang màu của tông nên phải dựng lại hẳn, không chỉ đổi map.
+    this._buildCore();
+    this._buildDust();
+    this._applyDepth();
   }
 
   // Thêm/cập nhật 1 node realtime (brain vừa sinh ra hoặc sửa note).
@@ -393,9 +589,8 @@ class JavisGraph3D {
 
       // Pulse từng sprite: phồng + sáng theo nhịp giọng
       const pulse = 1 + lvl * 1.6;
-      // Nền để DỊU (0.5) - vừa hết chói (đa màu cộng dồn không còn cháy trắng),
-      // vừa cho node "suy nghĩ" loé lên nổi bật trở lại (tương phản với nền tối).
-      const op = Math.min(1, 0.5 + lvl * 0.6);
+      // Nền dịu, chừa khoảng trống cho node "suy nghĩ" loé lên nổi bật hẳn lên.
+      const op = Math.min(1, G3.baseOpacity + lvl * 0.5);
       for (const sp of this._sprites) {
         if (!sp) continue;
         const b = sp.__base;
@@ -421,6 +616,20 @@ class JavisGraph3D {
       // Quay tròn nhẹ liên tục - tự xoay scene
       const scene = this.graph.scene && this.graph.scene();
       if (scene) scene.rotation.y += 0.0018 + lvl * 0.012;
+
+      // Lõi thở theo giọng nói. Sprite luôn quay mặt về camera nên nó là quầng sáng
+      // phẳng ở tâm, đúng ý: một nguồn sáng chứ không phải một quả cầu đặc.
+      if (this._core) {
+        const R = (this._coreR || 100) * (1 + lvl * 0.22);
+        this._core.scale.set(R, R, 1);
+        if (this._core.material) this._core.material.opacity = 0.85 + lvl * 0.15;
+      }
+      // Bụi vành trôi NGƯỢC chiều scene rất chậm → sinh thị sai, mắt đọc ra khối 3D
+      // thay vì một tấm ảnh phẳng đang quay.
+      if (this._dust) {
+        this._dust.rotation.y -= 0.0006;
+        this._dust.rotation.x += 0.00018;
+      }
 
       this._frame = (this._frame || 0) + 1;
 
