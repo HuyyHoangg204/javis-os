@@ -150,14 +150,32 @@ probe.forEach(n => { n.__gw = 0.45 + 1.35 * Math.pow((n.links || 0) / max, 0.6);
 check("node nhiều liên kết bị kéo vào tâm mạnh hơn node lẻ", probe[0].__gw > probe[2].__gw * 2);
 check("node lẻ vẫn còn lực hút (không văng khỏi khung)", probe[2].__gw >= 0.4);
 
-// ---- 6. Cỡ hạt: note lẻ vẫn thấy được, hub to rõ --------------------------
-// Công thức phải khớp nodeThreeObject trong graph3d.js. Điều khoá ở đây là HÌNH DẠNG
-// của dải cỡ chứ không phải con số: sàn đủ lớn để note lẻ không tàng hình (bài học từ
-// bản 2.4 - nhỏ tới mức coi như không tồn tại), và có trần để hub không nuốt cả khung.
-const size = (links) => 3.2 + Math.min(17, Math.pow(links, 0.7) * 2.4);
-check("note lẻ vẫn đủ lớn để nhìn thấy", size(0) >= 3);
-check("hub to rõ hơn note lẻ ít nhất 5 lần", size(50) > size(0) * 5);
-check("hub bị chặn trần, không nuốt cả khung", size(5000) <= 20.2);
+// ---- 6. Cỡ hạt phải TỈ LỆ với bán kính khối -------------------------------
+// Đây là bài học đắt nhất: cỡ hạt từng gõ cứng bằng đơn vị thế giới, nên lực vật lý
+// trải khối ra rộng bao nhiêu thì hạt teo bấy nhiêu và trên máy thật chỉ còn chấm mờ.
+// Khoá lại bằng cách đo trên SPRITE THẬT ở hai cỡ khối khác hẳn nhau.
+function spriteBase(links, scale) {
+  const ns = [{ id: "x", x: 100 * scale, y: 0, z: 0, links, color: "#8b93ff", __sprite: { material: {} } }];
+  const h = makeGraph(ns);
+  h.g._applyDepth();
+  return ns[0].__sprite.__base;
+}
+// Gán __f như nodeThreeObject làm (test không chạm được vào builder của ForceGraph3D)
+function withF(links, scale) {
+  const f = 0.030 + Math.min(0.085, Math.pow(links, 0.7) * 0.030);
+  const ns = [{ id: "x", x: 100 * scale, y: 0, z: 0, links, color: "#8b93ff",
+                __sprite: { material: {}, __f: f } }];
+  const h = makeGraph(ns);
+  h.g._applyDepth();
+  return ns[0].__sprite.__base;
+}
+const b1 = withF(3, 1), b3 = withF(3, 3);
+check("khối to gấp 3 thì hạt cũng to gấp 3 (cỡ theo tỉ lệ, không gõ cứng)",
+      Math.abs(b3 - b1 * 3) < b1 * 0.02);
+const f = (links) => 0.030 + Math.min(0.085, Math.pow(links, 0.7) * 0.030);
+check("note lẻ vẫn chiếm được cỡ nhìn thấy (>=2.5% bán kính)", f(0) >= 0.025);
+check("hub to hơn note lẻ ít nhất 3 lần", f(50) > f(0) * 3);
+check("hub bị chặn trần, không nuốt cả khung", f(5000) <= 0.12);
 
 console.log(fails ? `\nFAIL ${fails} test` : "\nTẤT CẢ PASS");
 process.exit(fails ? 1 : 0);

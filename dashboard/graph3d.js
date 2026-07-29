@@ -17,19 +17,20 @@ let G3 = {
   light: false,
   additive: true,
   fallback: "#b98cff",
-  // Dải rất GỌN: gần như đặc tới 9% bán kính rồi tắt nhanh. Mỗi note phải là một
-  // ĐIỂM đọc được, không phải vệt loang - đó là toàn bộ ý nghĩa của đồ thị này.
-  glowStops: [[0, 1.0], [0.09, 0.88], [0.28, 0.32], [0.58, 0.05]],
-  baseOpacity: 0.9,
+  // ĐĨA ĐẶC viền mềm, không phải điểm-có-đuôi. Bản trước để đặc tới 9% bán kính rồi
+  // tắt ngay; ở cỡ màn hình thật cái lõi đặc đó bé hơn 1 pixel nên chỉ còn quầng mờ -
+  // ra đúng mấy đốm nhoè không đọc được. Đặc tới 34% thì hạt luôn là một CHẤM thật.
+  glowStops: [[0, 1.0], [0.34, 0.96], [0.52, 0.45], [0.78, 0.10]],
+  baseOpacity: 0.95,
   // Dây nối phải MỜ HƠN note. Bản trước để dây 0.2 còn note 0.52 nên nhìn ra mạng
   // nhện xám, còn note thì mất tăm - ngược hẳn thứ tự quan trọng.
   link: "rgba(150,140,225,0.9)",
-  linkOpacity: 0.12,
+  linkOpacity: 0.11,
 
   // Sương mù theo chiều sâu: hạt xa mờ dần về màu nền → khối có thể tích thay vì dẹt.
   // fogK là hệ số chia theo bán kính đo được (xem _applyDepth), không phải hằng số tuyệt
   // đối - brain to nhỏ khác nhau nên sương phải co giãn theo.
-  fog: 0x05050c, fogK: 0.17,
+  fog: 0x05050c, fogK: 0.13,
 
   // Lõi = một ĐỐM THAN ẤM nhỏ, không phải đèn pha. Bản trước để coreScale 1.25 (đường
   // kính 2.5 lần bán kính khối) nên nó phủ trùm toàn bộ đồ thị thành đám sương tím và
@@ -56,14 +57,14 @@ const G3_LIGHT = {
   light: true,
   additive: false,
   fallback: "#7340c9",
-  glowStops: [[0, 1.0], [0.11, 0.93], [0.31, 0.40], [0.61, 0.06]],
+  glowStops: [[0, 1.0], [0.34, 0.96], [0.52, 0.45], [0.78, 0.10]],
   // Trên giấy mực phải ĐẶC mới ra chấm sắc nét; để mờ là chìm nghỉm vào nền ngà.
-  baseOpacity: 0.97,
+  baseOpacity: 1.0,
   // Dây mảnh màu sẫm trên giấy cần đậm hơn hẳn mức của nền đen mới thấy.
   link: "rgba(92,74,140,0.9)",
-  linkOpacity: 0.26,
+  linkOpacity: 0.16,
 
-  fog: 0xf1eae0, fogK: 0.13,
+  fog: 0xf1eae0, fogK: 0.10,
 
   // Trên giấy KHÔNG có "nguồn sáng" - lõi thành vệt ửng đào-lavender rất nhạt và NHỎ,
   // đọc như chỗ mực thấm đậm nhất giữa trang. Đậm hơn nữa là cả trang thành màn sữa.
@@ -81,6 +82,9 @@ const G3_LIGHT = {
   particleColor: "rgba(190,64,8,0.95)",
   particleOpacity: 0.9,
 };
+
+// Cỡ hạt tính theo TỈ LỆ bán kính khối: note lẻ 0.030R, hub tối đa 0.115R.
+const NODE_F0 = 0.030, NODE_FK = 0.030, NODE_FMAX = 0.085;
 
 const _texCache = {};
 function glowTexture(THREE, hex) {
@@ -227,12 +231,15 @@ class JavisGraph3D {
             fog: true,            // chịu sương mù → hạt ở xa mờ đi, khối có chiều sâu
           });
           const sp = new THREE.Sprite(mat);
-          // Dải cỡ rộng và mịn hơn bản cũ (5..31 gần như đều nhau nên nhìn ra đám chấm
-          // cùng cỡ). Mũ 0.7 kéo note lẻ xuống hạt nhỏ, hub vẫn to rõ. Sàn 3.2 chứ
-          // không phải 2.4: dưới mức đó note lẻ nhỏ tới mức coi như không tồn tại.
-          const base = 3.2 + Math.min(17, Math.pow(n.links || 0, 0.7) * 2.4);
-          sp.scale.set(base, base, 1);
-          sp.__base = base;
+          // Cỡ hạt là TỈ LỆ của bán kính khối, không phải số tuyệt đối. Bản trước gõ
+          // cứng 3.2..20 đơn vị thế giới; lực vật lý trải khối ra rộng bao nhiêu thì hạt
+          // teo tương ứng bấy nhiêu, nên trên máy thật chỉ còn mấy chấm mờ. Nhân theo
+          // bán kính thì khối to nhỏ thế nào hạt cũng giữ đúng tỉ lệ nhìn thấy được.
+          // Bán kính thật đo được sau khi physics lắng - _applyDepth sẽ chỉnh lại.
+          const f = NODE_F0 + Math.min(NODE_FMAX, Math.pow(n.links || 0, 0.7) * NODE_FK);
+          sp.__f = f;
+          sp.__base = (this._R || 80) * f;
+          sp.scale.set(sp.__base, sp.__base, 1);
           n.__sprite = sp;
           return sp;
         })
@@ -385,6 +392,12 @@ class JavisGraph3D {
     }
     if (this._dust) this._dust.scale.setScalar(R);
     this._coreR = R * G3.coreScale * 2;
+    // Sprite dựng lúc chưa biết bán kính thật nên phải chỉnh lại cỡ tại đây.
+    // Vòng vẽ đọc sp.__base nên chỉ cần cập nhật nó, không đụng scale trực tiếp.
+    for (const n of (this.graph.graphData().nodes || [])) {
+      const sp = n.__sprite;
+      if (sp && sp.__f) sp.__base = R * sp.__f;
+    }
   }
 
   _disposeCore() {

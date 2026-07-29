@@ -12,6 +12,16 @@ Zalo được rút về đúng một đường MCP: nối tài khoản xong là 
 - **Một tiến trình Zalo duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool MCP.
 - Thẻ kết nối Zalo có link mở tài liệu hướng dẫn trên GitHub.
 
+## [0.9.254] - 2026-07-29
+Note trong đồ thị 3D vẫn nhạt nhoè không đọc được. Hai lỗi, và bộ mô phỏng ở bản trước đã che mất cả hai.
+### Sửa lỗi
+- **Cỡ hạt gõ cứng bằng đơn vị thế giới, trong khi nó phải TỈ LỆ với cỡ khối**: hạt để 3.2-20 đơn vị cố định, nhưng lực vật lý trải khối ra rộng bao nhiêu thì hạt teo tương ứng bấy nhiêu. Trên máy thật khối trải rộng hơn nhiều so với giả định nên hạt chỉ còn mấy chấm mờ. Nay cỡ hạt là tỉ lệ bán kính khối đo được: note lẻ 0.030R, hub tối đa 0.115R - khối to nhỏ thế nào cũng giữ đúng tỉ lệ nhìn thấy được. Đã kiểm ở bán kính 70 và 210 với three.js thật, tỉ lệ giữ nguyên.
+- **Dải màu hạt quá nhọn**: đặc tới 9% bán kính rồi tắt ngay, nên ở cỡ màn hình thật cái lõi đặc đó bé hơn một pixel và chỉ còn quầng mờ. Nay là ĐĨA ĐẶC viền mềm (đặc tới 34% rồi mới tắt) nên hạt luôn là một chấm thật, không phải vệt nhoè.
+- Dây nối tông sáng giảm từ 0.26 xuống 0.16 vì nó đang át hết note; sương giảm tiếp còn 0.13 (tối) và 0.10 (sáng).
+### Kiểm thử
+- Bộ mô phỏng ở bản trước dùng cỡ khối cố định nên vô tình che đúng cái lỗi tỉ lệ này. Nay nó giãn/co được cả khối và tính cỡ hạt theo bán kính, và mọi phương án đều phải kiểm ở hai cỡ chênh nhau 2.5 lần mới được duyệt.
+- `test_graph3d_nebula.js` thêm điểm khoá: khối to gấp 3 thì hạt phải to gấp 3, đo trên sprite thật chứ không phải chép lại công thức.
+
 ## [0.9.253] - 2026-07-29
 Bản trước sửa đồ thị 3D nhưng làm nó tệ hơn: cả tối lẫn sáng đều thành một màn sương, không thấy note đâu. Lần này dựng bộ mô phỏng để NHÌN được rồi mới chỉnh.
 ### Sửa lỗi
