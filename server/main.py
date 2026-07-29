@@ -5329,6 +5329,9 @@ async def websocket_endpoint(ws: WebSocket):
                 cli.system_prompt = sysprompt
                 cli.model = api_model or mcfg.get("claude_model") or None   # alias opus/sonnet/haiku/fable
                 _apply_mcp(cli, brain=brain)   # gắn MCP do Javis quản lý (nhiều shop POSCake...)
+                _streamed = ""      # phần đã stream - phương án dự phòng khi luồng đứt trước 'final'
+                _cli_sid = None
+                _cost = None
                 async for event in cli.query(_cli_think(reasoning, user_message)):
                     etype = event["type"]
                     if etype == "tool_call":
@@ -5336,16 +5339,24 @@ async def websocket_endpoint(ws: WebSocket):
                     elif etype == "tool_result":
                         await ws.send_text(json.dumps({"type": "tool_result", "content": event["content"][:200]}))
                     elif etype == "text":
+                        _streamed += event["content"]
                         await ws.send_text(json.dumps({"type": "stream", "content": event["content"]}))
                     elif etype == "final":
                         final_text = event.get("content") or final_text
-                        if event.get("session_id"):
-                            store.set_cli_session_id(conv_sid, event["session_id"])
+                        _cli_sid = event.get("session_id")
+                        _cost = event.get("cost_usd")
+                        if _cli_sid:
+                            store.set_cli_session_id(conv_sid, _cli_sid)
                         usage_store.record("cli", cli.model or mcfg.get("claude_model") or "mặc định",
                                            event.get("tokens_in", 0), event.get("tokens_out", 0), event.get("cost_usd") or 0)
-                        await ws.send_text(json.dumps({"type": "response", "content": final_text, "session_id": conv_sid, "cli_session_id": event.get("session_id"), "cost_usd": event.get("cost_usd"), "engine": "cli", "model": (mcfg.get("claude_model") or "mặc định")}))
                     elif etype == "error":
                         await ws.send_text(json.dumps({"type": "error", "content": event["content"]}))
+                # Khung `response` PHẢI nằm NGOÀI vòng lặp. Trước đây nó nằm trong nhánh
+                # `final`, nên luồng đứt trước khi có `final` (engine chết, mạng rớt) là client
+                # không nhận `response` nào cả và bong bóng chat treo mãi - trong khi phần chữ
+                # đã stream ra thì vẫn còn đó. Ba nhánh engine kia vốn đã gửi ngoài vòng lặp.
+                final_text = final_text or _streamed
+                await ws.send_text(json.dumps({"type": "response", "content": final_text, "session_id": conv_sid, "cli_session_id": _cli_sid, "cost_usd": _cost, "engine": "cli", "model": (mcfg.get("claude_model") or "mặc định")}))
 
             # Lưu lượt assistant: kho phiên + title + log Memory + hàng đợi tự học.
             # Đường lưu DÙNG CHUNG với Telegram (_persist_turn) - nó tự bóc khối điều khiển.
@@ -5556,6 +5567,39 @@ def _javis_port() -> int:
         return 7777
 
 
+def _tg_compact_bg(sess, prov, api_key, api_model):
+    """Đẩy vòng nén lịch sử in-memory của phiên Telegram sang chạy NỀN.
+
+    Trước đây `compact_mem` được await thẳng trong đường request: phiên đủ dài là user phải
+    ngồi chờ xong một vòng tóm tắt (một request LLM nữa) rồi mới thấy câu trả lời của mình.
+    Dashboard vốn đã nén nền qua `compaction.maybe_compact`; đây là bản tương ứng.
+
+    Chỉ ÁP kết quả khi lịch sử chưa đổi kể từ lúc bắt đầu nén. Có lượt chen vào giữa thì bản
+    nén đã lỗi thời - đè vào là nuốt mất lượt vừa nói; bỏ đi, lượt sau nén lại.
+    """
+    msgs = sess.get("or")
+    if not msgs or sess.get("dang_nen"):
+        return
+    n = len(msgs)
+    sess["dang_nen"] = True
+
+    async def _chay():
+        try:
+            moi = await compaction.compact_mem(list(msgs), prov, api_key, api_model, _api_stream)
+            if sess.get("or") is msgs and len(msgs) == n:
+                sess["or"] = moi
+        except Exception as _e:
+            print(f"[compact_mem nền] {_e}", file=__import__('sys').stderr)
+        finally:
+            sess["dang_nen"] = False
+
+    try:
+        asyncio.create_task(_chay())
+    except Exception as _e:
+        sess["dang_nen"] = False
+        print(f"[compact_mem nền] {_e}", file=__import__('sys').stderr)
+
+
 async def _tg_answer(text, meta=None, progress=None):
     """Vỏ ngoài một lượt Telegram: khớp phiên trong kho -> chạy engine -> LƯU lượt.
 
@@ -5578,6 +5622,16 @@ async def _tg_answer(text, meta=None, progress=None):
                     else prov if ((kind == "api" and api_key) or kind == "oauth")
                     else "cli")
 
+    if engine_label != "codex" and sess.get("codex") is not None:
+        # Bản tương ứng của `store.clear_codex_thread_id` bên dashboard: provider khác vừa chen
+        # một lượt, thread Codex cũ KHÔNG chứa lượt đó. Quay lại Codex mà cứ resume thread cũ là
+        # nó mù các lượt ở giữa. Xoá liên kết thôi, giữ nguyên đối tượng (cwd/instructions vẫn
+        # dùng lại được); lượt Codex kế tiếp sẽ bootstrap từ kho phiên.
+        try:
+            sess["codex"].session_id = None
+        except Exception:
+            sess["codex"] = None
+
     store = get_store()
     conv_sid = ""
     try:
@@ -5592,7 +5646,8 @@ async def _tg_answer(text, meta=None, progress=None):
 
     out = await _tg_answer_engine(
         text, meta, progress, chat_id=chat_id, sess=sess, brain=brain, mcfg=mcfg,
-        prov=prov, kind=kind, api_key=api_key, api_model=api_model)
+        prov=prov, kind=kind, api_key=api_key, api_model=api_model,
+        store=store, conv_sid=conv_sid)
 
     if conv_sid and isinstance(out, dict):
         try:
@@ -5602,8 +5657,19 @@ async def _tg_answer(text, meta=None, progress=None):
     return out
 
 
+def _tg_ket(clean_out, files, canh_bao="", loi=()):
+    """Gói câu trả lời Telegram: cảnh báo hệ thống lên đầu, lỗi giữa lượt xuống cuối.
+
+    Lỗi giữa lượt KHÔNG huỷ câu trả lời (dashboard vốn coi lỗi là không chí mạng), nhưng cũng
+    không được giấu: giấu đi thì user tưởng lượt chạy sạch trong khi có tool đã hỏng."""
+    txt = (canh_bao or "") + (clean_out or "")
+    if loi:
+        txt += "\n\n⚠ Có lỗi giữa lượt: " + str(loi[0])
+    return {"text": txt, "files": files or []}
+
+
 async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
-                            prov, kind, api_key, api_model):
+                            prov, kind, api_key, api_model, store=None, conv_sid=""):
     """Lõi 4 nhánh engine của một lượt Telegram. Trả dict khi có câu trả lời thật,
     trả CHUỖI khi là thông báo lỗi (vỏ `_tg_answer` dựa vào đó để biết lượt nào đáng lưu)."""
     sess["last"] = text
@@ -5632,6 +5698,18 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         # Telegram dùng cùng Codex CLI + MCP native như dashboard. Trước đây nhánh OAuth
         # rơi vào Responses chat-thuần nên model nói đúng là phiên không có tool.
         actual_model = _codex_safe_model(api_model)
+        canh_bao = ""
+        if api_model and actual_model != api_model:
+            # Tự chữa như dashboard: ghi lại model đúng để lượt sau khỏi ép lại nữa, VÀ nói cho
+            # user biết. Trước đây Telegram lặng lẽ đổi, user cứ tưởng đang chạy model mình chọn.
+            try:
+                _fix = cfgmod.read_settings()
+                _set_main_model(_fix, "openai-oauth", actual_model)
+                cfgmod.write_settings(_fix)
+            except Exception as _e:
+                print(f"[codex model self-heal] {_e}", file=__import__('sys').stderr)
+            canh_bao = (f"⚠ Model '{api_model}' không chạy được qua Codex (tài khoản ChatGPT) - "
+                        f"đã tự đổi sang '{actual_model}'. Đổi model khác ở trang Models nếu muốn.\n\n")
         openai_oauth.write_codex_auth()
         ccli = sess.get("codex")
         if ccli is None:
@@ -5651,32 +5729,76 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
             return "⚠ Chưa cài Codex CLI trong container nên ChatGPT chưa dùng được tool."
         t0 = time.time()
         out = ""
-        async for ev in ccli.query(_cli_think(reasoning, text)):
-            et = ev.get("type")
-            if et == "tool_call":
-                await _p(f"⚙ Đang gọi: {ev.get('name', '')}")
-            elif et == "text":
-                out += ev.get("content") or ""
-                await _p("✍ Đang soạn câu trả lời…")
-            elif et == "final":
-                out = ev.get("content") or out
-                usage_store.record(
-                    "codex", actual_model,
-                    ev.get("tokens_in", 0), ev.get("tokens_out", 0),
-                )
-            elif et == "error":
-                return "⚠ " + str(ev.get("content") or "Codex lỗi")
+        loi = []
+        written = []   # đường dẫn moi từ payload tool call (xem candidate_paths_from_tool)
+
+        async def _nuot_codex(prompt, bo_qua_loi_resume=False):
+            """Tiêu thụ một lượt Codex. Trả về: lượt này có chết vì resume hỏng không."""
+            nonlocal out
+            resume_hong = False
+            async for ev in ccli.query(prompt):
+                et = ev.get("type")
+                if et in ("tool_call", "item"):
+                    if et == "tool_call":
+                        await _p(f"⚙ Đang gọi: {ev.get('name', '')}")
+                    # Codex KHÔNG phát file_path có cấu trúc như Claude nên phải moi từ payload,
+                    # nếu không thì file nó ghi ra chỉ được gửi kèm khi tình cờ được nhắc tên.
+                    # 'item' = item lạ (vd bản vá file) - không in ra nhưng vẫn moi đường dẫn.
+                    try:
+                        written.extend(channel_context.candidate_paths_from_tool(ev.get("item")))
+                    except Exception:
+                        pass
+                elif et == "text":
+                    out += ev.get("content") or ""
+                    await _p("✍ Đang soạn câu trả lời…")
+                elif et == "final":
+                    out = ev.get("content") or out
+                    usage_store.record(
+                        "codex", actual_model,
+                        ev.get("tokens_in", 0), ev.get("tokens_out", 0),
+                    )
+                elif et == "error":
+                    if ev.get("resume_failed"):
+                        resume_hong = True
+                        if bo_qua_loi_resume:
+                            continue    # còn cửa dựng lại, chưa phải lúc kêu lỗi với user
+                    loi.append(str(ev.get("content") or "Codex lỗi"))
+            return resume_hong
+
+        # Lịch sử để dựng lại thread khi cần. Bỏ lượt cuối vì đó chính là câu đang hỏi.
+        _raw = []
+        if store is not None and conv_sid:
+            try:
+                _raw = [{"role": m["role"], "content": m["content"]}
+                        for m in store.get_messages(conv_sid)[:-1]
+                        if m.get("role") in ("user", "assistant") and m.get("content")]
+            except Exception:
+                _raw = []
+        _hien_tai = _cli_think(reasoning, text)
+        thread_cu = (getattr(ccli, "session_id", None) or "")
+        # Chưa có thread (phiên mới, hoặc vừa bị xoá liên kết vì provider khác chen vào) thì
+        # seed transcript đúng một lượt; có thread rồi thì resume native, khỏi gửi lại lịch sử.
+        _resume_hong = await _nuot_codex(
+            _hien_tai if thread_cu else compaction.codex_bootstrap_prompt(_raw, _hien_tai),
+            bo_qua_loi_resume=bool(thread_cu))
+        if thread_cu and _resume_hong and not out:
+            # Rollout local có thể bị dọn/mất sau nâng cấp máy. Trước đây Telegram bỏ luôn lượt
+            # và mất sạch ngữ cảnh; dashboard thì dựng lại. Giờ Telegram cũng có kho phiên nên
+            # dựng lại được y hệt: thread mới từ transcript đã lưu, các lượt sau resume nó.
+            await _p("Phiên Codex cũ không còn trên máy - đang khôi phục ngữ cảnh từ lịch sử đã lưu.")
+            ccli.session_id = None
+            loi.clear()
+            await _nuot_codex(compaction.codex_bootstrap_prompt(_raw, _hien_tai))
+        if not out:
+            return "⚠ " + (loi[0] if loi else "Codex không trả về nội dung nào.")
         files = channel_context.collect_turn_files(
-            out, [], t0, cwd=_brain_root(brain), exclude=sess["sent"],
+            out, written, t0, cwd=_brain_root(brain), exclude=sess["sent"],
             vault_root=_brain_root(brain),
         )
         clean_out = channel_context.strip_attached_media(
             channel_context.strip_control_blocks(out), files, _brain_root(brain)
         )
-        return {
-            "text": clean_out,
-            "files": files,
-        }
+        return _tg_ket(clean_out, files, canh_bao, loi)
     if (kind == "api" and api_key) or kind == "oauth":
         label = _api_label(prov)
         if sess["or"] is None:
@@ -5687,6 +5809,7 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         t0 = time.time()
         out = ""
         actual_model = api_model or "?"
+        loi = []
         _pinged = False
         async for ev in (await _api_stream_mcp(prov, api_key, api_model, sess["or"], reasoning, brain=brain)):
             if ev["type"] == "text":
@@ -5702,12 +5825,17 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
             elif ev["type"] == "tool_call":
                 await _p(f"⚙ Đang gọi công cụ: {ev.get('name', '')}")
             elif ev["type"] == "error":
-                return "⚠ " + ev["content"]
+                # KHÔNG return ngay: một tool hỏng giữa chừng không có nghĩa là cả lượt hỏng,
+                # luồng thường chạy tiếp và vẫn ra câu trả lời. Dashboard vốn xử lý như vậy.
+                loi.append(str(ev.get("content") or "lỗi không rõ"))
+        if not out:
+            return "⚠ " + (loi[0] if loi else "Không nhận được nội dung nào.")
         sess["or"].append({"role": "assistant", "content": out})
-        # Nén (KHÔNG cắt câm) phần cũ rơi khỏi cửa sổ. Phiên Telegram giữ lịch sử in-memory
-        # nên dùng compact_mem - bản in-memory của cơ chế nén dashboard: phần cũ vào tóm tắt
-        # thay vì bị trim cứng bỏ mất, hết mất trí nhớ khi phiên dài / đổi từ Claude sang API.
-        sess["or"] = await compaction.compact_mem(sess["or"], prov, api_key, api_model, _api_stream)
+        # Nén (KHÔNG cắt câm) phần cũ rơi khỏi cửa sổ, chạy NỀN. Phiên Telegram giữ lịch sử
+        # in-memory nên dùng compact_mem - bản in-memory của cơ chế nén dashboard: phần cũ vào
+        # tóm tắt thay vì bị trim cứng bỏ mất. Chạy nền vì đây là một request LLM nữa; await
+        # thẳng ở đây là bắt user ngồi chờ tóm tắt xong mới thấy câu trả lời của chính mình.
+        _tg_compact_bg(sess, prov, api_key, api_model)
         # MCP đa-model có thể tạo ảnh/file dù engine không có tool Write native. Thu đường dẫn
         # Markdown giống nhánh Codex/Claude để OpenRouter cũng gửi media thật qua Telegram.
         files = channel_context.collect_turn_files(
@@ -5717,7 +5845,7 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         clean_out = channel_context.strip_attached_media(
             channel_context.strip_control_blocks(out), files, _brain_root(brain)
         )
-        return {"text": clean_out, "files": files}
+        return _tg_ket(clean_out, files, "", loi)
     else:
         if sess["cli"] is None:
             # tag riêng theo chat → /stop chỉ giết đúng subprocess của chat này, không đụng người khác
@@ -5729,6 +5857,8 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         t0 = time.time()
         written = []   # file agent ghi bằng tool Write trong lượt này (ứng viên auto-gửi)
         out = ""
+        _streamed = ""   # phần đã stream - phương án dự phòng khi luồng đứt trước 'final'
+        loi = []
         _pinged = False
         async for ev in cli.query(_cli_think(reasoning, text)):
             et = ev["type"]
@@ -5749,10 +5879,15 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
             elif et == "tool_result":
                 await _p("✓ Nhận kết quả - đang phân tích…")
             elif et == "text":
+                _streamed += ev.get("content") or ""
                 if not _pinged:
                     _pinged = True; await _p("✍ Đang soạn câu trả lời…")
             elif et == "error":
-                return "⚠ " + ev["content"]
+                # Xem nhánh API: lỗi giữa lượt không chí mạng, cứ chạy tiếp rồi báo ở cuối.
+                loi.append(str(ev.get("content") or "lỗi không rõ"))
+        out = out or _streamed
+        if not out:
+            return "⚠ " + (loi[0] if loi else "Engine không trả về nội dung nào.")
         # File sinh ra trong lượt → bot gửi đính kèm SAU câu trả lời (xem telegram_bot._handle_turn).
         # vault_root = brain phiên này: ảnh Javis tạo nhúng dạng ![](attachments/x.png) (path tương
         # đối) được resolve về gốc vault để tự đính kèm về ĐÚNG người đang chat, khỏi phải curl.
@@ -5763,7 +5898,7 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         clean_out = channel_context.strip_attached_media(
             channel_context.strip_control_blocks(out), files, _brain_root(brain)
         )
-        return {"text": clean_out, "files": files}
+        return _tg_ket(clean_out, files, "", loi)
 
 
 async def _tg_help_text(brain):

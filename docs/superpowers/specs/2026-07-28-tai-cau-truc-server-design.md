@@ -53,25 +53,27 @@ Thiếu ở TELEGRAM:
 2. ~~Không `store.append_message` / `auto_title` / `log_conversation` / `learn_feature.enqueue`~~.
    Hội thoại Telegram vắng mặt ở `/sessions`, ở `brain/Memory/conversations`, và ở vòng tự học.
    Đây là lỗ hổng chức năng lớn nhất trong danh sách. **XONG 0.9.244.**
-3. Không có phần phục hồi khi Codex resume thất bại - mất sạch ngữ cảnh, không dựng lại.
-4. `_codex_safe_model` ép model hợp lệ nhưng KHÔNG ghi lại, và không báo user là model đã đổi.
-5. Sự kiện `error` đầu tiên huỷ cả lượt, kể cả khi luồng còn hồi phục được. Dashboard coi lỗi
-   là không chí mạng.
-6. `compact_mem` chạy trong đường request - phiên dài phải chờ một vòng tóm tắt trước khi thấy
-   câu trả lời.
-9. Nhánh Codex truyền `written=[]` cho `collect_turn_files` trong khi nhánh Claude có thu thập
+3. ~~Không có phần phục hồi khi Codex resume thất bại~~ - mất sạch ngữ cảnh, không dựng lại.
+   **XONG 0.9.245.**
+4. ~~`_codex_safe_model` ép model hợp lệ nhưng KHÔNG ghi lại~~, và không báo user là model đã
+   đổi. **XONG 0.9.245.**
+5. ~~Sự kiện `error` đầu tiên huỷ cả lượt~~, kể cả khi luồng còn hồi phục được. Dashboard coi lỗi
+   là không chí mạng. **XONG 0.9.245.**
+6. ~~`compact_mem` chạy trong đường request~~ - phiên dài phải chờ một vòng tóm tắt trước khi thấy
+   câu trả lời. **XONG 0.9.245.**
+9. ~~Nhánh Codex truyền `written=[]` cho `collect_turn_files`~~ trong khi nhánh Claude có thu thập
    đường dẫn Write/NotebookEdit. File Codex ghi ra chỉ được tự đính kèm nếu đường dẫn tuyệt đối
-   tình cờ xuất hiện trong câu trả lời.
-10. Không có bản tương ứng của `store.clear_codex_thread_id`, mà `sess["codex"]` chỉ bị xoá bởi
+   tình cờ xuất hiện trong câu trả lời. **XONG 0.9.245.**
+10. ~~Không có bản tương ứng của `store.clear_codex_thread_id`~~, mà `sess["codex"]` chỉ bị xoá bởi
     `/reset` và `/brain` - đổi provider sang Claude rồi quay lại là resume một luồng Codex chưa
-    hề thấy các lượt ở giữa.
+    hề thấy các lượt ở giữa. **XONG 0.9.245.**
 
 Thiếu ở DASHBOARD:
 7. ~~Không `strip_control_blocks` trước khi `store.append_message`/`log_conversation`~~, nên khối
    `<!-- JAVIS_ASK ... -->` thô lọt vào kho phiên và vào nhật ký hội thoại - tức lọt vào chính
    corpus dùng để tự học. **XONG 0.9.244.**
-8. Khung `response` của nhánh Claude nằm TRONG handler `final`, không có `final` thì không có
-   `response`.
+8. ~~Khung `response` của nhánh Claude nằm TRONG handler `final`~~, không có `final` thì không có
+   `response`. **XONG 0.9.245.**
 
 Về cách chữa: đề xuất dựng tầng trừu tượng chung (`TurnSink` / `ChatHistory` / túi phụ thuộc)
 là ĐÚNG về thiết kế nhưng đây là đoạn code rủi ro nhất trong app. Khuyến nghị: sửa thẳng từng
@@ -100,6 +102,45 @@ Lỗi 1 chỉ là hai dòng `usage_store.record` đặt đúng chỗ: nhánh CLI
 Một thay đổi kèm theo, có chủ ý: `learn_feature.enqueue` từ `asyncio.create_task` đổi thành
 `await` thẳng. `enqueue` chỉ đọc config + cộng bộ đếm dưới khoá (mẻ học thật chạy ở `tick`), rẻ
 hơn chính lần ghi file log ngay trên nó - nên task mồ côi không ai chờ, nuốt lỗi im, không đáng.
+
+### Đã chữa ở 0.9.245 (bảy lỗi còn lại: 3, 4, 5, 6, 8, 9, 10)
+
+Danh sách đóng. Vẫn KHÔNG gộp luồng dispatch - mỗi lỗi sửa tại chỗ, chỉ rút thêm hai mảnh
+chung nhỏ (`_tg_ket` gói câu trả lời, `_tg_compact_bg` đẩy nén sang nền).
+
+Ba lỗi ăn nhau một cụm, và chỉ chữa được vì 0.9.244 đã cho Telegram một kho phiên. **Lỗi 10**
+xoá liên kết thread Codex khi provider khác chen vào một lượt, đúng bản tương ứng của
+`store.clear_codex_thread_id`. Mất thread thì phải có chỗ dựng lại ngữ cảnh - đó là **lỗi 3**:
+`_nuot_codex` trả về cờ resume-hỏng, hỏng thật thì xoá `session_id`, dựng prompt bootstrap từ
+transcript trong kho rồi chạy lại đúng một lần. Cùng đường đó phục vụ cả trường hợp phiên chưa
+có thread.
+
+**Lỗi 5** đổi hợp đồng lỗi ở cả ba nhánh: sự kiện `error` gom vào danh sách thay vì `return`
+ngay. Có chữ thì trả chữ kèm một dòng báo lỗi ở cuối; không có chữ nào thì mới trả lỗi như cũ.
+Nhánh Claude còn tích luỹ phần đã stream để luồng đứt trước `final` vẫn còn cái mà trả.
+
+**Lỗi 8** là cùng lớp lỗi đó bên dashboard: khung `response` chuyển ra NGOÀI vòng lặp sự kiện,
+dùng phần đã stream làm phương án dự phòng. Trước đây không có `final` là client không nhận
+`response` nào cả và bong bóng chat treo mãi, dù chữ đã hiện ra rồi.
+
+**Lỗi 6** đẩy `compact_mem` sang task nền, và chỉ ÁP kết quả khi lịch sử chưa đổi kể từ lúc bắt
+đầu nén - có lượt chen vào giữa mà cứ đè là nuốt mất lượt vừa nói.
+
+**Lỗi 9** không chữa bằng cách đoán khuôn JSON của Codex (đường dẫn nằm rải trong
+`changes[].path`, trong `arguments`, hay lẫn trong `command`, và khuôn còn đổi theo bản CLI).
+`CodexCLI` đẩy nguyên payload thô lên, `channel_context.candidate_paths_from_tool` đi hết
+payload và thu RỘNG mọi thứ trông giống đường dẫn. Thu rộng an toàn vì `collect_turn_files`
+phía sau vốn chỉ giữ tệp CÓ THẬT và VỪA ĐỔI trong lượt - ứng viên thừa lặng lẽ rơi. Item lạ
+(vd bản vá file) cũng được đẩy lên dưới dạng sự kiện `item`, không in ra để khỏi ồn.
+
+**`_codex_safe_model`** (lỗi 4) ghi lại model đã ép vào Settings và nói cho user biết. Trên
+Telegram lời báo phải nằm trong CÂU TRẢ LỜI chứ không phải progress - progress bị thay bằng
+câu trả lời nên user không bao giờ đọc được.
+
+Về kiểm thử: sáu lỗi Telegram test bằng cách gọi thẳng `_tg_answer` thật với engine giả. Lỗi 8
+nằm trong hàm lồng bên trong `@app.websocket("/ws")` nên không gọi thẳng được - test bằng AST,
+khẳng định đúng hai điều tạo nên lỗi (khung `response` không nằm trong vòng lặp, và vòng lặp có
+tích luỹ text đã stream).
 
 Kèm một chỗ THỨ 9 gọi route handler như hàm thường mà lưới 0.9.243 bỏ sót:
 `bench_hotpath.py:103` gọi `asyncio.run(main.list_brains())`. Lưới cũ chỉ soi `main.py` +

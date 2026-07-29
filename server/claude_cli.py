@@ -795,7 +795,15 @@ class CodexCLI:
                 elif itype in ("mcp_tool_call", "command_execution", "function_call",
                                "tool_call", "local_shell_call", "web_search_call"):
                     name = it.get("name") or it.get("server") or it.get("command") or itype
-                    yield {"type": "tool_call", "name": str(name)[:80]}
+                    # Kèm `item` THÔ. Codex không có trường file_path chuẩn hoá như Claude:
+                    # đường dẫn nằm rải trong changes[]/arguments/command tuỳ loại item, và
+                    # khuôn còn đổi theo bản CLI. Caller tự moi (channel_context
+                    # .candidate_paths_from_tool) thay vì tầng này đoán một khuôn cố định.
+                    yield {"type": "tool_call", "name": str(name)[:80], "item": it}
+                elif itype:
+                    # Item lạ (vd bản vá file) - KHÔNG dựng thành "đang gọi tool" để khỏi ồn,
+                    # nhưng vẫn đẩy payload lên cho caller moi đường dẫn file vừa ghi.
+                    yield {"type": "item", "item": it}
             elif t == "turn.completed":
                 u = ev.get("usage") or {}
                 yield {"type": "final", "content": final_text, "session_id": self.session_id,

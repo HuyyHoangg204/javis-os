@@ -261,6 +261,54 @@ def strip_attached_media(text: str, attached_paths: list, vault_root: str) -> st
     return cleaned.strip()
 
 
+# Ứng viên đường dẫn moi từ payload một tool call. Token = cụm không chứa khoảng trắng và
+# ký tự bao thường gặp trong JSON/shell; "trông giống đường dẫn" = có dấu phân cách thư mục
+# VÀ kết thúc bằng phần mở rộng. Cố tình chặt ở đây chứ không chặt ở tầng trên, vì tầng trên
+# (collect_turn_files) đã lọc bằng "tệp có thật" + "vừa đổi trong lượt này".
+_TOOL_TOKEN_RE = re.compile(r"""[^\s"'`,;{}()\[\]<>|]+""")
+_TOOL_PATH_RE = re.compile(r"[\\/].*\.[A-Za-z0-9]{1,8}$")
+
+
+def candidate_paths_from_tool(item, _depth: int = 0) -> list:
+    """Mọi chuỗi trông giống đường dẫn tệp trong payload của một tool call.
+
+    Vì sao cần: Codex CLI KHÔNG phát ra trường `file_path` có cấu trúc như Claude - tuỳ loại
+    item mà đường dẫn nằm trong `changes[].path`, trong `arguments` (chuỗi JSON), hay lẫn
+    trong `command` của một lệnh shell. Thay vì đoán đúng một khuôn (schema của Codex còn
+    đổi), hàm này đi hết payload và THU RỘNG mọi thứ trông giống đường dẫn.
+
+    Thu rộng là an toàn: `collect_turn_files` phía sau chỉ giữ tệp CÓ THẬT và VỪA ĐỔI trong
+    lượt này, nên ứng viên thừa lặng lẽ rơi, còn thiếu thì mất file của user.
+    """
+    out = []
+    if _depth > 6:
+        return out
+    if isinstance(item, dict):
+        for v in item.values():
+            out += candidate_paths_from_tool(v, _depth + 1)
+    elif isinstance(item, (list, tuple)):
+        for v in item:
+            out += candidate_paths_from_tool(v, _depth + 1)
+    elif isinstance(item, str):
+        s = item.strip()
+        if s[:1] in ("{", "["):
+            # `arguments` thường là chuỗi JSON: giải mã trước, kẻo dấu \ bị nhân đôi.
+            try:
+                return candidate_paths_from_tool(json.loads(s), _depth + 1)
+            except Exception:
+                pass
+        for tok in _TOOL_TOKEN_RE.findall(s):
+            tok = tok.rstrip(".,;:!?…")
+            if _TOOL_PATH_RE.search(tok):
+                out.append(tok)
+    seen, uniq = set(), []
+    for p in out:
+        if p not in seen:
+            seen.add(p)
+            uniq.append(p)
+    return uniq
+
+
 def collect_turn_files(reply_text: str, written_paths: list, t0: float,
                        cwd: str = None, exclude: set = None, vault_root: str = None) -> list:
     """Danh sách file đáng gửi trả về kênh chat sau 1 lượt.

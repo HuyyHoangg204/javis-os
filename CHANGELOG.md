@@ -4,6 +4,24 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.245] - 2026-07-29
+Đóng nốt bảy chỗ còn lại mà hai bản dispatch engine trôi lệch nhau. Danh sách phụ lục spec giờ hết mục.
+### Sửa lỗi
+- **Telegram mất sạch ngữ cảnh khi phiên Codex cũ không còn trên máy**: rollout của Codex nằm ở máy, bị dọn hoặc mất sau nâng cấp là lượt đó chết hẳn, không dựng lại được gì. Nay bắt đúng lỗi resume hỏng, mở thread mới và nạp lại ngữ cảnh từ lịch sử đã lưu, rồi các lượt sau resume thread mới. Chữa được là nhờ 0.9.244 đã cho Telegram một kho phiên để mà dựng lại.
+- **Đổi model rồi quay lại Codex thì nó mù các lượt ở giữa**: chuyển sang Claude nói vài câu rồi quay về ChatGPT, Codex vẫn resume đúng luồng cũ vốn chưa hề thấy mấy câu đó. Nay provider khác chen một lượt là liên kết luồng Codex bị xoá, lượt Codex kế tiếp dựng lại ngữ cảnh từ kho phiên.
+- **Một lỗi vặt giữa lượt huỷ luôn cả câu trả lời trên Telegram**: một tool hỏng là Javis trả về mỗi dòng "⚠", trong khi luồng thường vẫn chạy tiếp và vẫn ra câu trả lời tử tế. Nay lỗi giữa lượt không chí mạng: có câu trả lời thì gửi câu trả lời, kèm một dòng báo có lỗi ở cuối; không có chữ nào mới báo lỗi như cũ. Đây vốn là cách dashboard xử lý.
+- **Bong bóng chat trên web treo mãi khi luồng đứt giữa chừng**: khung `response` của nhánh Claude nằm trong nhánh xử lý `final`, nên engine chết trước khi kịp phát `final` là client không nhận được `response` nào cả, dù chữ đã hiện ra rồi. Nay khung `response` nằm ngoài vòng lặp và lấy phần đã stream làm phương án dự phòng. Nhánh Telegram cũng vậy.
+- **Phiên Telegram dài phải chờ tóm tắt xong mới thấy câu trả lời**: `compact_mem` là một request LLM nữa nhưng lại chạy thẳng trong đường request. Nay chạy nền, và chỉ áp kết quả khi lịch sử chưa đổi kể từ lúc bắt đầu nén (có lượt chen vào giữa mà đè lên là nuốt mất lượt vừa nói).
+- **File Codex ghi ra không được gửi kèm**: nhánh Codex truyền danh sách rỗng cho bộ thu file, nên file chỉ về tay anh nếu đường dẫn tình cờ được nhắc trong câu trả lời. Codex không có trường `file_path` chuẩn hoá như Claude - đường dẫn nằm rải trong `changes[]`, trong `arguments`, hay lẫn trong lệnh shell, tuỳ loại việc. Nay `CodexCLI` đẩy nguyên payload thô lên và bộ gom mới đi hết payload nhặt mọi thứ trông giống đường dẫn; thu rộng vô hại vì bộ lọc phía sau vốn chỉ giữ tệp có thật và vừa đổi trong lượt.
+- **Model bị ép về bản hợp lệ mà không ai nói gì**: chọn `gpt-4o` cho tài khoản ChatGPT thì Codex không chạy được, Javis lặng lẽ đổi sang model khác và anh cứ tưởng vẫn đang chạy model mình chọn. Nay ghi lại model đúng vào Settings và báo ngay trong câu trả lời. Báo trong câu trả lời chứ không phải dòng trạng thái, vì dòng trạng thái bị thay bằng câu trả lời nên không ai đọc được.
+### Thay đổi
+- **`_tg_ket`** gói câu trả lời Telegram (cảnh báo hệ thống lên đầu, lỗi giữa lượt xuống cuối) và **`_tg_compact_bg`** đẩy vòng nén sang nền. Vẫn KHÔNG gộp luồng dispatch: mỗi lỗi sửa tại chỗ, đúng khuyến nghị trong spec.
+- **`channel_context.candidate_paths_from_tool`**: bộ gom đường dẫn từ payload tool call, cố tình thu rộng vì tầng lọc phía sau đã chặt sẵn.
+- **`CodexCLI` phát thêm sự kiện `item`** cho các item lạ (vd bản vá file). Không hiện thành "đang gọi tool" để khỏi ồn, nhưng caller vẫn moi được đường dẫn file vừa ghi.
+### Kiểm thử
+- **`test_dispatch_hai_kenh.py`**: 27 khẳng định, sáu lỗi Telegram test bằng cách gọi thẳng `_tg_answer` thật với engine giả (đo hành vi, không đo hình dạng code) - resume hỏng có dựng lại ngữ cảnh thật không, lỗi giữa lượt có nuốt câu trả lời không, nén có chặn đường request không, file Codex ghi ra có về tay user không. Lỗi bong bóng treo nằm trong hàm lồng bên trong WebSocket handler nên không gọi thẳng được, test bằng AST đúng hai điều tạo nên lỗi.
+- 90/90 xanh.
+
 ## [0.9.244] - 2026-07-29
 Hội thoại Telegram từ nay được LƯU và được HỌC như hội thoại trên web, token Telegram được tính vào bảng Mức dùng, và khối nút bấm thôi lọt vào kho phiên.
 ### Sửa lỗi
