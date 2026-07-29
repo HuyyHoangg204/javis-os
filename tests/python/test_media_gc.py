@@ -63,6 +63,59 @@ check("tat ca hai -> khong xoa gi",
 # ---- 7. Danh sách rỗng ----
 check("danh sach rong", media_gc.plan_deletions([], NOW, 30, 300) == [])
 
+# ---- 8. Quét đĩa + xoá thật (thư mục tạm) ----
+import os        # noqa: E402
+import tempfile  # noqa: E402
+
+import config    # noqa: E402
+
+_brain = tempfile.mkdtemp(prefix="javis-mediagc-")
+
+
+def _tao(rel, mb, tuoi_ngay):
+    """Tạo file thật với dung lượng và mtime mong muốn."""
+    p = os.path.join(_brain, rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "wb") as f:
+        f.write(b"\0" * int(mb * MB))
+    t = time.time() - tuoi_ngay * DAY
+    os.utime(p, (t, t))
+    return p
+
+
+_cu = _tao("05 - attachments/cu.png", 0.001, 40)          # biến thể tên có số thứ tự
+_moi = _tao("05 - attachments/moi.png", 0.001, 1)
+_note = _tao("05 - attachments/ghi-chu.md", 0.001, 999)
+_tg = _tao("inbox/telegram/photo_1.jpg", 0.001, 40)
+_wiki = _tao("Wiki/khai-niem.md", 0.001, 999)             # ngoài vùng cache -> không được đụng
+
+d = media_gc.media_dirs(_brain)
+check("media_dirs bat dung 2 thu muc", len(d) == 2 and any("attachments" in x for x in d)
+      and any(x.endswith("inbox") for x in d))
+check("media_dirs bo qua thu muc khac", not any("Wiki" in x for x in d))
+
+check("scan duyet de quy", len(media_gc.scan(d)) == 4)
+
+kq = media_gc.sweep(_brain, max_age_days=30, max_mb=300)
+check("sweep xoa dung so file", kq["files"] == 2)
+check("sweep tra so byte da don", kq["bytes"] > 0)
+check("sweep xoa file qua han", not os.path.exists(_cu) and not os.path.exists(_tg))
+check("sweep giu file moi", os.path.exists(_moi))
+check("sweep giu file .md trong vung cache", os.path.exists(_note))
+check("sweep khong dung file ngoai vung cache", os.path.exists(_wiki))
+
+kq2 = media_gc.sweep(_brain, max_age_days=30, max_mb=300)
+check("sweep chay lai khong xoa them", kq2["files"] == 0)
+
+check("sweep brain khong ton tai khong no",
+      media_gc.sweep(os.path.join(_brain, "khong-co-that")) == {"files": 0, "bytes": 0})
+
+# ---- 9. Mặc định cấu hình ----
+_m = config._DEFAULT.get("media") or {}
+check("config mac dinh media.enabled", _m.get("enabled") is True)
+check("config mac dinh 30 ngay", _m.get("max_age_days") == 30)
+check("config mac dinh tran 300MB", _m.get("max_mb") == 300)
+
 print()
 if _fails:
     print(f"{len(_fails)} test ĐỎ: " + ", ".join(_fails))

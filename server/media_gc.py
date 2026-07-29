@@ -52,3 +52,75 @@ def plan_deletions(entries, now, max_age_days, max_mb):
             xoa.append(t)
             tong -= t[1]
     return [t[0] for t in xoa]
+
+
+# Cùng luật nhận diện thư mục attachments với image_gen.py:40 và main.py:1931: tên có thể là
+# "attachments", "Attachments", hay có tiền tố số thứ tự kiểu "05 - attachments".
+_ATTACH_RE = r"^(\d+\s*[-_.]\s*)?attachments$"
+
+
+def media_dirs(brain_root):
+    """Các thư mục VÙNG CACHE cấp 1 của brain: attachments (mọi biến thể tên) + inbox."""
+    ra = []
+    try:
+        with os.scandir(brain_root) as it:
+            for d in it:
+                try:
+                    if not d.is_dir(follow_symlinks=False):
+                        continue
+                except OSError:
+                    continue
+                ten = d.name.strip()
+                if ten.lower() == "inbox" or re.match(_ATTACH_RE, ten, re.IGNORECASE):
+                    ra.append(d.path)
+    except OSError:
+        pass
+    return ra
+
+
+def scan(dirs):
+    """Duyệt đệ quy các thư mục -> list[(path, size, mtime)].
+
+    Dùng os.scandir chứ KHÔNG dùng glob: glob đi hết cây rồi mới cắt nên không có trần thật,
+    và stat đi kèm entry của scandir thì rẻ hơn hẳn stat riêng từng file. Lỗi từng file
+    (đang bị khoá, vừa bị xoá, thiếu quyền) thì bỏ qua chứ không làm hỏng cả lượt quét.
+    """
+    ra = []
+    for d in dirs:
+        stack = [d]
+        while stack:
+            cur = stack.pop()
+            try:
+                with os.scandir(cur) as it:
+                    for x in it:
+                        try:
+                            if x.is_dir(follow_symlinks=False):
+                                stack.append(x.path)
+                            elif x.is_file(follow_symlinks=False):
+                                st = x.stat()
+                                ra.append((x.path, st.st_size, st.st_mtime))
+                        except OSError:
+                            continue
+            except OSError:
+                continue
+    return ra
+
+
+def sweep(brain_root, max_age_days=30, max_mb=300, now=None):
+    """Dọn vùng cache của MỘT brain. CHẶN vì đụng đĩa - phải gọi qua asyncio.to_thread.
+
+    Trả {"files": số file đã xoá, "bytes": tổng byte đã giải phóng}.
+    """
+    entries = scan(media_dirs(brain_root))
+    co = {t[0]: t[1] for t in entries}
+    can_xoa = plan_deletions(entries, float(now if now is not None else time.time()),
+                             max_age_days, max_mb)
+    n, b = 0, 0
+    for p in can_xoa:
+        try:
+            os.remove(p)
+        except OSError:
+            continue      # file vừa bị xoá tay hoặc đang bị khoá -> lần sau dọn
+        n += 1
+        b += co.get(p, 0)
+    return {"files": n, "bytes": b}

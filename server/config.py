@@ -81,6 +81,11 @@ _DEFAULT = {
     # nào cũng bắt đầu ở trạng thái này. Bật lên là quyết định CÓ Ý THỨC của chủ workspace,
     # kèm trách nhiệm tự công bố nội dung AI theo luật/điều khoản nền tảng nơi họ đăng.
     "image": {"strip_c2pa": False},
+    # Vùng cache media của brain: attachments/ + inbox/. Ảnh là NGUYÊN LIỆU đi qua, không
+    # phải tri thức - đọc xong rút thành .md là đủ dùng, nên chúng tự hết hạn thay vì nằm
+    # mãi làm phình đĩa VPS. Muốn giữ ảnh lâu dài thì đấu kho ngoài (Drive), đừng để Javis ôm.
+    # max_age_days / max_mb <= 0 = tắt luật tương ứng. enabled=False = không dọn gì cả.
+    "media": {"enabled": True, "max_age_days": 30, "max_mb": 300},
     "telegram": {"enabled": False, "token": "", "chat_id": ""},
     # Backup brain lên GitHub (repo RIÊNG TƯ). token = GitHub PAT (fine-grained, quyền Contents).
     # Lưu trong settings.json (đã gitignored) - KHÔNG bao giờ đẩy lên brain repo.
