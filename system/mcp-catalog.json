@@ -78,28 +78,35 @@
     },
     {
       "id": "zalo",
-      "name": "Zalo (tài khoản cá nhân)",
+      "name": "Zalo Agent MCP",
       "icon": "/static/logos/zalo.png",
       "category": "Nhắn tin",
-      "description": "Đọc và gửi tin nhắn Zalo bằng tài khoản cá nhân (qua zalo-agent-cli, đăng nhập quét QR). Nối được nhiều tài khoản - mỗi tài khoản chạy cô lập.",
+      "description": "MCP chuẩn của zalo-agent-cli: đọc tin mới/lịch sử, tìm cuộc chat, xem media và gửi tin bằng tài khoản Zalo cá nhân.",
       "status": "beta",
       "transport": "stdio",
       "command": "npx",
-      "args": ["-y", "zalo-agent-cli", "mcp", "start"],
+      "args": ["-y", "zalo-agent-cli@1.6.2", "mcp", "start"],
       "requires": { "node": ">=20" },
       "isolate_home": true,
       "auth": {
         "type": "qr",
         "fields": [],
-        "guide": "Bấm Kết nối rồi quét mã QR bằng app Zalo trên điện thoại (Zalo > biểu tượng QR góc trên).\n\nCần trước: Node.js 20+ trên máy chạy Javis.",
-        "guide_url": "https://github.com/PhucMPham/zalo-agent-cli"
+        "guide": "Cần Node.js 20+. Bấm Kết nối, quét QR bằng app Zalo rồi dùng trực tiếp 7 tool MCP của zalo-agent-cli. Không còn listener/webhook/luật Zalo riêng của Javis.",
+        "guide_url": "https://github.com/blogminhquy/javis-os/blob/main/docs/12-zalo.md"
       },
       "tool_meta": {
-        "write": ["*send*", "*mark*"],
-        "danger": ["*send*"]
+        "read": [
+          "zalo_get_messages",
+          "zalo_get_history",
+          "zalo_list_threads",
+          "zalo_search_threads",
+          "zalo_view_media"
+        ],
+        "write": ["zalo_mark_read"],
+        "danger": ["zalo_send_message"]
       },
       "default_perm": "full",
-      "risk": "Connector này MẶC ĐỊNH ở mức TOÀN QUYỀN, tức quyền GỬI TIN đang bật sẵn. Muốn chặn thì tự hạ xuống Ghi nháp hoặc Chỉ đọc ở trang Kết nối.\n\nZalo KHÔNG hỗ trợ chính thức công cụ này (API không chính thức qua zca-js). Tài khoản của bạn CÓ THỂ bị Zalo hạn chế hoặc KHOÁ, nhất là khi gửi tin tự động số lượng lớn.\n\nKhuyến nghị dùng tài khoản phụ.\n\nJavis chỉ gửi khi bạn yêu cầu trực tiếp trong chat; loop chạy nền không bao giờ được tự gửi.",
+      "risk": "Connector này MẶC ĐỊNH ở mức TOÀN QUYỀN, tức tool gửi tin đang bật. Muốn chặn gửi, hãy hạ xuống Ghi nháp hoặc Chỉ đọc.\n\nzalo-agent-cli dùng API Zalo không chính thức qua zca-js. Tài khoản CÓ THỂ bị hạn chế hoặc KHOÁ; khuyến nghị dùng tài khoản phụ và không tự động gửi hàng loạt.",
       "rate_limit": { "calls_per_min": 20 }
     },
     {

@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.251] - 2026-07-30
+Zalo được rút về đúng một đường MCP: nối tài khoản xong là tìm cuộc chat và gửi trực tiếp, không cần bật nghe hay chọn danh sách theo dõi.
+### Cải thiện
+- **Gửi Zalo trực tiếp bằng MCP upstream**: Javis dùng `zalo_search_threads` để tìm đúng người/nhóm rồi gọi `zalo_send_message`; bỏ chốt phụ thuộc danh sách cuộc chat đang nghe và bỏ tool `javis_zalo_send`.
+- **Gỡ toàn bộ menu “Nghe tin liên tục”**: không còn chọn tài khoản nghe, cuộc chat theo dõi, báo Telegram theo từ khoá hay giờ im lặng.
+- **Một tiến trình Zalo duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool MCP.
+- Thẻ kết nối Zalo có link mở tài liệu hướng dẫn trên GitHub.
+
 ## [0.9.250] - 2026-07-29
 Nút đổi tông trước giờ chỉ lật từ đen sang xám, không phải giao diện sáng thật. Nay có tông sáng đúng nghĩa, và khoang não được vẽ lại cho hợp nền giấy.
 ### Thêm mới
@@ -11,7 +19,6 @@ Nút đổi tông trước giờ chỉ lật từ đen sang xám, không phải 
 - **Khoang não vẽ lại theo lối "mực trên giấy"**: nền giấy có quầng lavender-đào rất nhạt ở giữa, nút và dây nối vẽ bằng mực sẫm cùng tông màu danh mục cũ, sao đổi thành hạt bụi giấy, vignette tối đổi thành đậm dần bằng chính màu giấy. Bảng màu danh mục có bản mực riêng, cùng thứ tự màu nên mỗi thư mục vẫn giữ đúng "màu nhận dạng" của nó khi đổi tông.
 - Đổi tông **không nạp lại đồ thị**: node giữ nguyên vị trí, cụm đang rọi sáng và node đang trỏ đều còn - chỉ đổi màu tại chỗ.
 ### Cải thiện
-- **Làm lại Zalo thành một MCP duy nhất**: bỏ sidecar listener, webhook, luật theo từng cuộc chat và hai plugin Zalo cũ; nay Javis dùng thẳng `zalo-agent-cli` 1.6.2 qua stdio với đủ 7 tool đọc tin mới/lịch sử, tìm cuộc chat, xem media, đánh dấu đã đọc và gửi tin. Thẻ kết nối có link hướng dẫn đầy đủ trên GitHub.
 - Gom **62 biến màu** thành một bộ token duy nhất ở đầu `style.css`, khai đủ cho cả hai tông. Ba thủ pháp mà nền sáng không có (mặt kính trắng-mờ, bóng đen tách lớp, quầng phát sáng) được tách token riêng để tông sáng thay bằng thủ pháp tương đương: tô sẫm nhẹ, bóng nâu rất nhạt, viền vòng.
 - Khai `color-scheme` cho từng tông, nên thanh cuộn hệ thống, con trỏ nhập, lịch, và nền vàng autofill của trình duyệt cũng đổi theo thay vì kẹt ở mặc định tối.
 - Khối code cũng sáng theo (có bảng màu cú pháp riêng cho nền giấy) thay vì để một mảng đen giữa trang.

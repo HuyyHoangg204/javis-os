@@ -2828,270 +2828,14 @@
     return '<div class="prov-card conn-card">'
       + '<div class="prov-head"><span class="conn-ico">' + iconInner(con) + '</span>'
       + '<div class="prov-info"><div class="prov-name">' + esc(con.name || con.id) + '</div>'
-      + '<div class="prov-status">' + esc(con.description || "") + '</div></div></div>'
+      + '<div class="prov-status">' + esc(con.description || "") + '</div>'
+      + (con.guide_url ? '<a class="cat-doc" href="' + esc(safeHref(con.guide_url))
+          + '" target="_blank" rel="noopener">Hướng dẫn trên GitHub ↗</a>' : "")
+      + '</div></div>'
       + '<div class="conn-accounts">' + chips + '</div>'
-      + (con.id === "zalo" ? zaloListenerPanel(conns) : "")
       + '</div>';
   }
 
-  // Panel "Nghe tin liên tục" trong thẻ Zalo. Sidecar `zalo-agent-cli listen` chạy nền,
-  // đẩy tin về /hook/zalo → lọc từ khoá → báo Telegram. Javis KHÔNG tự trả lời khách.
-  const ZL_STATE = {
-    off: ["Đang tắt", ""],
-    starting: ["Đang khởi động…", "var(--warn-ink)"],
-    listening: ["● Đang nghe", "var(--green)"],
-    reconnecting: ["Mất kết nối, đang thử lại…", "var(--warn-ink)"],
-    duplicate: ["Trùng phiên - tài khoản này đang bị dùng ở nơi khác", "var(--red)"],
-    error: ["Lỗi", "var(--red)"],
-  };
-  function zaloListenerPanel(conns) {
-    const opts = conns.map(c => '<option value="' + esc(c.id) + '">' + esc(c.label || c.id) + '</option>').join("");
-    return '<div class="zl-panel" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline)">'
-      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-      + '<b style="font-size:13px">Nghe tin liên tục</b>'
-      + '<span id="zlState" class="mp-note">đang tải…</span>'
-      + '<button class="mp-btn" id="zlToggle" style="margin-left:auto">…</button></div>'
-      + '<div class="gcard-meta" style="margin-top:6px">Tick chọn cuộc chat để Javis <b>theo dõi</b> - chỉ đọc và báo về Telegram, KHÔNG tự trả lời khách. Điền từ khoá bên dưới nếu chỉ muốn được báo khi tin có chứa từ đó. Muốn Javis nhắn tin cho ai thì bảo thẳng trong chat.</div>'
-      + '<div class="mp-note" id="zlSignal" style="margin-top:6px">đang tải…</div>'
-      + '<div id="zlForm" style="margin-top:10px;display:flex;flex-direction:column;gap:8px">'
-      + '<label class="mcp-lb">Tài khoản Zalo dùng để nghe<select class="js-input" id="zlConn">' + opts + '</select></label>'
-      + '<div class="mcp-lb">Cuộc chat theo dõi <span style="opacity:.6">(chưa chọn cái nào thì không báo gì)</span>'
-      + '<div style="display:flex;gap:6px;margin-top:4px">'
-      + '<input class="js-input" id="zlSearch" placeholder="Tìm tên nhóm hoặc người…" style="flex:1">'
-      + '<button class="mp-btn" id="zlNames" style="font-size:12px;white-space:nowrap">Lấy tên nhóm</button></div>'
-      + '<div id="zlThreads" style="max-height:200px;overflow:auto;border:1px solid var(--hairline);border-radius:6px;padding:6px;margin-top:4px"></div></div>'
-      + '<label class="mcp-lb">Báo Telegram khi tin có chứa <span style="opacity:.6">(để trống = không báo gì)</span>'
-      + '<input class="js-input" id="zlKw" placeholder="giá, còn hàng, đặt, ship"></label>'
-      + '<label class="mcp-lb">Giờ im lặng (tuỳ chọn, vd 23-07)<input class="js-input" id="zlQuiet" placeholder="23-07" style="max-width:140px"></label>'
-      + '<div style="display:flex;align-items:center;gap:8px">'
-      + '<button class="mp-btn primary" id="zlSave" style="font-size:12px">Lưu theo dõi</button>'
-      + '<span class="mp-note" id="zlSaved"></span></div>'
-      + '<div class="mp-note" id="zlErr" style="color:var(--red)"></div>'
-      // Chỉ hiện khi đang trùng phiên: `zalo-agent logout` cố ý giữ lại thông tin đăng
-      // nhập nên đăng xuất KHÔNG gỡ được phiên đang kẹt, phải xoá thẳng rồi quét QR lại.
-      + '<button class="mp-btn" id="zlClear" style="display:none;font-size:12px">Xoá phiên đăng nhập rồi quét QR lại</button>'
-      + '<pre id="zlLog" style="display:none;white-space:pre-wrap;word-break:break-all;font-size:11px;opacity:.65;margin:0;max-height:110px;overflow:auto"></pre>'
-      + '</div></div>';
-  }
-  function zlAgo(ts) {
-    if (!ts) return "";
-    const d = new Date(ts * 1000), s = (Date.now() / 1000) - ts;
-    if (s < 60) return "vừa xong";
-    if (s < 3600) return Math.floor(s / 60) + " phút trước";
-    const p = n => String(n).padStart(2, "0");
-    return p(d.getHours()) + ":" + p(d.getMinutes()) + " " + p(d.getDate()) + "/" + p(d.getMonth() + 1);
-  }
-  async function wireZaloListener(el) {
-    const panel = el.querySelector(".zl-panel");
-    if (!panel) return;
-    const $ = id => panel.querySelector("#" + id);
-    // rosterKey = null chứ KHÔNG phải "": danh sách rỗng cũng cho key "", để "" thì lần vẽ đầu
-    // bị chặn ngay và dòng hướng dẫn "chưa thấy cuộc chat nào" không bao giờ hiện ra.
-    let on = false, modes = {}, rosterKey = null, showAll = false, lastSt = null;
-    // Lệnh Bật nghe chỉ cần tài khoản và giờ im lặng. KHÔNG tham chiếu biến cũ "selected"
-    // (đã đổi thành "modes" ở 0.9.136 nhưng dòng này sót lại) - nó ném ReferenceError khiến
-    // bấm Bật nghe là văng lỗi, finally hồi nút về "Bật nghe", không có gì diễn ra. Đúng
-    // triệu chứng đã gặp. Cuộc chat theo dõi lưu riêng qua /watch bằng "modes".
-    const cfgBody = () => ({
-      conn_id: $("zlConn").value,
-      quiet_hours: $("zlQuiet").value.trim(),
-    });
-    // Dấu hiệu MỘT DÒNG: đủ để phân biệt "không ai nhắn" với "đang hỏng mà vẫn báo đang nghe".
-    const signal = (st) => {
-      if (!st.enabled) return "Đang tắt.";
-      if (st.last_event) return "Tin gần nhất nhận lúc " + zlAgo(st.last_event) + ".";
-      if (st.state === "listening") return "Đã nối, chưa nhận tin nào. Nhắn thử một tin để kiểm tra.";
-      return "Chưa nhận tin nào.";
-    };
-    const ZL_SHOW = 8;           // hiện sẵn ngần này, còn lại phải tìm hoặc bấm xem thêm
-    // Tick = theo dõi (chỉ đọc + báo). KHÔNG còn lựa chọn "tự phản hồi": Javis không tự
-    // nhắn cho khách, mọi tin gửi đi đều do chủ yêu cầu trực tiếp trong chat.
-    const row = (t) => {
-      const on = !!modes[t.id];
-      return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px">'
-        + '<input type="checkbox" class="zl-th" value="' + esc(t.id) + '"' + (on ? " checked" : "") + '>'
-        // esc() BẮT BUỘC: tên do người lạ trên Zalo tự đặt, chèn thẳng vào HTML là hở XSS.
-        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
-        + esc(t.name || t.id)
-        + (t.type === "group"
-            ? ' <span style="opacity:.55">' + (t.named ? "(nhóm)" : "(nhóm #" + esc(String(t.id).slice(-4)) + ")") + '</span>'
-            : "")
-        + ' <span style="opacity:.45">' + zlAgo(t.last) + '</span></span></div>';
-    };
-    // Lưu thành FILE LUẬT qua /watch. Gửi vào settings như trước là mất trắng: write_cfg
-    // chỉ nhận khoá có trong DEFAULT_CFG, mà threads/keywords đã bị bỏ khỏi đó.
-    const saveWatch = async () => {
-      $("zlSaved").textContent = "đang lưu…";
-      $("zlSaved").style.color = "";
-      const r = await postJson("/zalo-listener/watch", {
-        conn_id: $("zlConn").value,   // lưu luôn tài khoản đang chọn, không đợi bấm Bật nghe
-        modes: modes,
-        keywords: $("zlKw").value.split(",").map(s => s.trim()).filter(Boolean),
-        quiet_hours: $("zlQuiet").value.trim(),
-      });
-      if (r.ok === false) {
-        $("zlSaved").textContent = "";
-        $("zlErr").textContent = r.error || "Lưu không được";
-        return false;
-      }
-      $("zlErr").textContent = "";
-      $("zlSaved").textContent = "✓ " + (r.msg || "Đã lưu.");
-      $("zlSaved").style.color = "var(--green)";
-      setTimeout(() => { if ($("zlSaved")) $("zlSaved").textContent = ""; }, 6000);
-      return true;
-    };
-    const paintRoster = (st) => {
-      const enabledRules = (st.rules || []).filter(x => x.enabled);
-      // Luật đang bật = đang theo dõi -> đảm bảo có tick. Chỉ THÊM chứ không xoá tick đang
-      // có (chủ có thể vừa tick tại chỗ, chưa lưu xong), để nhịp hỏi lại không đè mất.
-      enabledRules.forEach(x => { if (!modes[x.thread_id]) modes[x.thread_id] = "chi-doc"; });
-      // Nguồn vẽ = sổ cuộc chat (roster) HỢP với cuộc chat đang có LUẬT bật. Sổ là bộ nhớ
-      // tạm, RỖNG sau khi khởi động lại server, nên nếu chỉ dựa vào nó thì cuộc chat đang
-      // theo dõi biến mất khỏi giao diện dù luật vẫn còn trên đĩa - đúng lỗi "tải lại là
-      // mất tick". Ghép luật vào để tick luôn hiện và bỏ được, kể cả khi chưa có tin mới.
-      const byId = {};
-      (st.roster || []).forEach(t => { byId[t.id] = t; });
-      enabledRules.forEach(x => {
-        if (!byId[x.thread_id]) byId[x.thread_id] = {
-          id: x.thread_id, name: x.thread_name || x.thread_id,
-          type: x.thread_type || "user", named: true, last: 0 };
-      });
-      const list = Object.values(byId);
-      const q = ($("zlSearch").value || "").trim().toLowerCase();
-      // Khoá vẽ lại gồm cả trạng thái bật/tắt, từ khoá tìm và cờ xem-thêm: thiếu cái nào
-      // thì thao tác đó không có tác dụng vì bị guard chặn.
-      const key = (st.enabled ? "on" : "off") + "|" + (showAll ? "all" : "top") + "|" + q
-        + "|" + list.map(x => x.id).join("|")
-        // Luật đổi (vd chủ đặt qua chat) thì ô tick phải vẽ lại theo, không thì hiện sai.
-        + "|" + (st.rules || []).filter(x => x.enabled)
-            .map(x => x.thread_id + ":" + x.mode).sort().join(",");
-      if (key === rosterKey) return;         // không vẽ lại khi chưa đổi, tránh nhảy ô đang tick
-      rosterKey = key;
-      const box = $("zlThreads");
-      if (!list.length) {
-        box.innerHTML = '<div class="mp-note">' + (st.enabled
-          ? 'Đang nghe nhưng chưa ai nhắn. Nhờ ai đó nhắn một tin vào nhóm hoặc cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây trong vài giây.'
-          : 'Danh sách này chỉ có khi đang nghe. Bấm <b>Bật nghe</b> ở trên, rồi đợi có người nhắn vào cuộc chat anh cần theo dõi, nó sẽ tự hiện ra đây để tick chọn.')
-          + '</div>';
-        return;
-      }
-      // Cái ĐÃ CHỌN luôn ghim lên đầu và không bao giờ bị cắt: đang theo dõi mà trôi mất
-      // khỏi danh sách thì không bỏ tick được nữa.
-      const picked = list.filter(t => modes[t.id]);
-      let rest = list.filter(t => !modes[t.id]);
-      if (q) rest = rest.filter(t => (t.name || t.id).toLowerCase().includes(q));
-      const hidden = showAll ? 0 : Math.max(0, rest.length - ZL_SHOW);
-      const shown = showAll ? rest : rest.slice(0, ZL_SHOW);
-      box.innerHTML = picked.map(row).join("")
-        + (picked.length && shown.length ? '<div style="border-top:1px solid var(--hairline);margin:4px 0"></div>' : "")
-        + shown.map(row).join("")
-        + (!shown.length && q ? '<div class="mp-note">Không có cuộc chat nào khớp "' + esc(q) + '".</div>' : "")
-        + (hidden ? '<button class="mp-btn" id="zlMore" style="margin-top:6px;font-size:12px">Xem thêm ' + hidden + ' cuộc chat</button>' : "");
-      box.querySelectorAll(".zl-th").forEach(cb => cb.onchange = async () => {
-        if (cb.checked) modes[cb.value] = "chi-doc"; else delete modes[cb.value];
-        rosterKey = null;                       // ghim lại lên đầu ngay
-        await saveWatch();
-      });
-      const more = box.querySelector("#zlMore");
-      if (more) more.onclick = () => { showAll = true; rosterKey = null; paintRoster(st); };
-    };
-    const paint = (st) => {
-      const [txt, color] = ZL_STATE[st.state] || ZL_STATE.off;
-      on = !!st.enabled;
-      // Đã bật mà tiến trình nền báo "off" là MÂU THUẪN (luồng chết hoặc chưa kịp chạy).
-      // Hiện "Đang tắt" lúc này là nói dối người dùng - phải gọi đúng tên vấn đề.
-      const stuck = st.enabled && st.state === "off";
-      $("zlState").textContent = !st.enabled ? "Đang tắt"
-        : (stuck ? "Đã bật nhưng tiến trình chưa chạy" : txt);
-      $("zlState").style.color = !st.enabled ? "" : (stuck ? "var(--red)" : color);
-      $("zlToggle").textContent = on ? "Tắt" : "Bật nghe";
-      $("zlToggle").classList.toggle("primary", !on);
-      // Hiện lỗi KỂ CẢ khi đang tắt: bật thất bại thì cờ enabled không được đặt, mà lý do
-      // thất bại lại chính là thứ cần đọc. Lọc theo enabled là tự xoá mất lời giải thích.
-      $("zlErr").textContent = st.error || "";
-      // Log thô của sidecar: chỉ hiện khi đang trục trặc. Không có nó thì lúc hỏng chỉ
-      // nhìn được mỗi nhãn trạng thái, không đủ để biết vì sao.
-      const bad = st.enabled && (st.error || ["error", "duplicate", "reconnecting"].includes(st.state));
-      const log = (st.log || []).join("\n");
-      $("zlLog").style.display = (bad && log) ? "" : "none";
-      $("zlLog").textContent = log;
-      $("zlSignal").textContent = signal(st);
-      const dup = st.state === "duplicate";
-      $("zlClear").style.display = dup ? "" : "none";
-      if (dup && st.strays) {
-        $("zlErr").textContent = "Tìm thấy " + st.strays + " tiến trình nghe cũ còn sót. "
-          + "Bấm Bật nghe lại là Javis tự dọn trước khi khởi động.";
-      }
-      lastSt = st;
-      paintRoster(st);
-    };
-    let st;
-    try { st = await (await fetch("/zalo-listener/status")).json(); } catch (e) { return; }
-    const c = st.cfg || {};
-    if (c.conn_id) $("zlConn").value = c.conn_id;
-    // Lấy từ LUẬT đang bật, không lấy từ cfg.threads (trường đó đã bỏ, đọc vào là sai).
-    // Luật nào đang bật = cuộc chat đang theo dõi -> tick sẵn.
-    modes = {};
-    (st.rules || []).filter(x => x.enabled).forEach(x => {
-      modes[x.thread_id] = "chi-doc";
-    });
-    $("zlKw").value = (c.keywords || []).join(", ");
-    $("zlQuiet").value = c.quiet_hours || "";
-    $("zlSearch").oninput = () => { rosterKey = null; if (lastSt) paintRoster(lastSt); };
-    // Đổi tài khoản là lưu ngay: để ô hiện một đằng mà cấu hình một nẻo là gốc của lỗi
-    // "chưa chọn tài khoản Zalo" dù trong ô rõ ràng đang có tên.
-    $("zlConn").onchange = () => saveWatch();
-    // Tên nhóm KHÔNG có trong dữ liệu tin nhắn nên phải hỏi Zalo riêng. Là nút bấm tay vì
-    // nó mở một kết nối ngắn, làm listener phải nối lại một nhịp.
-    $("zlSave").onclick = async () => {
-      $("zlSave").disabled = true;
-      await saveWatch();
-      $("zlSave").disabled = false;
-      rosterKey = null;
-      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
-    };
-    $("zlNames").onclick = async () => {
-      $("zlNames").disabled = true;
-      $("zlNames").textContent = "Đang lấy…";
-      const r = await postJson("/zalo-listener/group-names", {});
-      $("zlNames").disabled = false;
-      $("zlNames").textContent = "Lấy tên nhóm";
-      $("zlErr").textContent = r.ok ? (r.msg || "") : (r.error || "Lỗi");
-      rosterKey = null;
-      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
-    };
-    paint(st);
-    $("zlToggle").onclick = async () => {
-      $("zlErr").textContent = "";
-      $("zlToggle").disabled = true;
-      $("zlToggle").textContent = on ? "Đang tắt…" : "Đang bật…";
-      try {
-        const r = await postJson(on ? "/zalo-listener/stop" : "/zalo-listener/start",
-                                 on ? {} : cfgBody(), 30000);
-        if (r.ok === false) { $("zlErr").textContent = r.error || "Lỗi"; }
-        try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
-      } finally {
-        // LUÔN bật lại nút dù có lỗi gì - trước đây thiếu finally nên request treo là
-        // nút chìm mãi, không bấm lại được.
-        $("zlToggle").disabled = false;
-      }
-    };
-    $("zlClear").onclick = async () => {
-      if (!confirm("Xoá phiên đăng nhập Zalo của tài khoản này? Sau đó anh phải quét QR lại "
-                   + "trong kho Kết nối. Dùng khi bị trùng phiên mà đăng xuất không ăn thua.")) return;
-      $("zlClear").disabled = true;
-      const r = await postJson("/zalo-listener/clear-session", {});
-      $("zlClear").disabled = false;
-      $("zlErr").textContent = r.ok ? (r.msg || "Đã xoá phiên.") : (r.error || "Lỗi");
-      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
-    };
-    // Trạng thái thật đến từ tiến trình nền (đang nghe / đứt / trùng phiên) nên phải hỏi lại.
-    clearInterval(window._zlPoll);
-    window._zlPoll = setInterval(async () => {
-      if (!document.body.contains(panel)) { clearInterval(window._zlPoll); return; }
-      try { paint(await (await fetch("/zalo-listener/status")).json()); } catch (e) {}
-    }, 5000);
-  }
   // ── Nhóm connector (khối B): mọi dịch vụ Google gom về MỘT card, bấm vào chọn dịch vụ ──
   const GROUP_META = {
     google: { name: "Google", icon: '<span class="gico">G</span>', category: "Văn phòng",
@@ -3152,7 +2896,9 @@
       + (soon
         ? '<button class="gcard-btn" disabled style="opacity:.5">Sắp có</button>'
           + (con.guide_url ? ' <a class="cat-doc" href="' + esc(con.guide_url) + '" target="_blank">docs ↗</a>' : "")
-        : '<button class="gcard-btn" data-connect="' + esc(con.id) + '">Kết nối</button>')
+        : '<button class="gcard-btn" data-connect="' + esc(con.id) + '">Kết nối</button>'
+          + (con.guide_url ? ' <a class="cat-doc" href="' + esc(safeHref(con.guide_url))
+              + '" target="_blank" rel="noopener">Hướng dẫn ↗</a>' : ""))
       + '</div>';
   }
 
@@ -3206,8 +2952,14 @@
 
   function openQrFlow(el, con, isFirst) {
     const risk = con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "";
+    const guide = con.guide
+      ? '<div class="conn-guide">' + esc(con.guide)
+        + (con.guide_url ? ' <a href="' + esc(safeHref(con.guide_url))
+          + '" target="_blank" rel="noopener">Xem hướng dẫn đầy đủ trên GitHub ↗</a>' : "")
+        + '</div>'
+      : "";
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
-      + '<div class="conn-form">' + risk
+      + '<div class="conn-form">' + risk + guide
       + '<label class="mcp-lb">Tên gợi nhớ (tuỳ chọn)<input class="js-input" id="qLabel"></label>'
       + '<button class="mp-btn primary" id="qGo">' + (con.risk ? "Tôi hiểu rủi ro, hiện mã QR" : "Hiện mã QR") + '</button>'
       + '<div id="qrZone"></div></div>'
@@ -3554,7 +3306,6 @@
       + '<div class="prov-list" id="mcpAmbient" style="margin-top:12px"><div class="mp-empty">Bấm để tải…</div></div>'
       + '<div class="prov-list" id="mcpAmbientCodex" style="margin-top:12px"></div></details>';
     document.getElementById("mcpStrict").onchange = (e) => postJson("/mcp/strict", { strict: e.target.checked });
-    wireZaloListener(el);   // panel "Nghe tin liên tục" trong thẻ Zalo (chỉ có khi đã nối Zalo)
     // Sức khoẻ kết nối: tô ngay khi mở trang + làm tươi mỗi 60s (tự dừng khi rời trang)
     clearInterval(_healthTimer);
     refreshConnHealth(el, conns, byId);

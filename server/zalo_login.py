@@ -26,6 +26,7 @@ _SESS_TTL = 900
 _sessions = {}        # sid -> {state, qr, label, conn_id, error, proc, home, ts}
 
 _SUCCESS_EVENTS = {"login", "login_success", "success", "ready", "logged_in", "authenticated"}
+_CLI_PACKAGE = "zalo-agent-cli@1.6.2"
 
 
 def _sweep():
@@ -39,7 +40,7 @@ def _npx_argv():
     npx = shutil.which("npx")
     if not npx:
         return None
-    argv = [npx, "-y", "zalo-agent-cli", "login", "--json"]
+    argv = [npx, "-y", _CLI_PACKAGE, "login", "--json"]
     if npx.lower().endswith((".cmd", ".bat")):
         argv = ["cmd.exe", "/c"] + argv
     return argv

@@ -89,10 +89,7 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
 # /reminders/cancel đi cùng nhóm với /reminders (TẠO nhắc): huỷ là thao tác YẾU HƠN tạo, nên
 # miễn cùng mức là nhất quán chứ không nới rào - thiếu nó thì javis_schedule (plugin in-process,
 # gọi localhost không cookie) huỷ nhắc hẹn LUÔN lỗi 401 khi đã bật mật khẩu (gate_active()=True).
-# /hook/zalo: sidecar `zalo-agent-cli listen` (tiến trình con cùng máy/container) POST sự kiện
-# tin nhắn vào đây - không có cookie. Vẫn KHÔNG hở: ngoài rào loopback này còn phải khớp
-# secret trong header X-Javis-Zalo-Secret (xem zalo_listener.register).
-_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel", "/hook/zalo")
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel")
 
 
 @app.middleware("http")
@@ -3755,34 +3752,6 @@ reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
 ))
 
 
-# ============================================================
-# LISTENER ZALO LIÊN TỤC (zalo_listener.py) - sidecar `zalo-agent-cli listen`.
-# Connector `zalo` qua MCP là PULL-ONLY và bị mcp_client._IDLE_TTL=600 giết sau 10 phút
-# không dùng, nên nghe liên tục phải có tiến trình sống ĐỘC LẬP với pool MCP: nó POST
-# mỗi tin về /hook/zalo → lọc theo từ khoá → báo Telegram. KHÔNG tự trả lời khách.
-# ============================================================
-import zalo_listener as zalo_listener_mod
-
-zalo_listener_feature = zalo_listener_mod.register(app, zalo_listener_mod.ZaloListenerDeps(
-    read_settings=cfgmod.read_settings,
-    write_settings=cfgmod.write_settings,
-    # Luật từng cuộc chat nằm ở <brain>/Javis/zalo/*.md. Listener là dịch vụ NỀN, không có
-    # khái niệm "brain đang mở", nên luôn đọc brain mặc định.
-    brain_root=lambda: _brain_root(None),
-    # Mọi brain: luật đặt bằng lời qua chat nằm ở brain ĐANG MỞ, không phải brain mặc định.
-    brain_roots=lambda: [str(p) for p in Path(BRAINS_DIR).iterdir()
-                         if p.is_dir() and not p.name.startswith(".")],
-    # enabled_only=False: chủ TẮT được connector Zalo trong kho (tránh va chạm một-socket-mỗi-
-    # tài-khoản) mà listener vẫn chạy được, vì sidecar không đi qua tầng MCP.
-    resolved_conns=lambda: mcp_store.resolved(enabled_only=False),
-    # Listener tự tắt connector Zalo của chính tài khoản đó khi bật (một kết nối mỗi tài
-    # khoản), và bật lại khi dừng nghe.
-    set_conn_enabled=lambda cid, en: mcp_store.update_connection(cid, {"enabled": en}),
-    notify=_notify_owner,                 # báo cho CHỦ (owner_chat rỗng → ID Telegram đầu tiên)
-    port=lambda: _javis_port(),           # định nghĩa phía dưới - lambda nên resolve lúc gọi
-))
-
-
 @app.get("/viec/all")
 async def viec_all():
     """Gộp MỌI brain cho trang Việc: mỗi brain kèm loop + nhắc hẹn đang chờ, mỗi item gắn
@@ -4183,6 +4152,20 @@ async def _start_scheduler():
     _migrate_legacy_brain()   # dữ liệu brain cũ → <BRAINS_DIR>/Brain Default (không mất data)
     _ensure_default_brain()   # brain mặc định có sẵn cấu trúc chuẩn (ghi được trên mount /brains)
     _sync_system_all_brains() # năng lực hệ thống → mọi brain (update theo phiên bản app)
+    # 0.9.251: gỡ hẳn listener Zalo cũ. Nó từng tự tắt connector MCP để giữ riêng socket,
+    # nên khi nâng cấp phải bật trả connector về rồi xoá cấu hình listener; nếu không user
+    # nối tài khoản rồi mà model vẫn không thấy các tool zalo_* để gửi trực tiếp.
+    try:
+        _legacy_cfg = cfgmod.read_settings()
+        _legacy_zalo = _legacy_cfg.pop("zalo_listener", None)
+        if isinstance(_legacy_zalo, dict):
+            _legacy_conn = str(_legacy_zalo.get("conn_id") or "")
+            if _legacy_conn and _legacy_zalo.get("conn_was_enabled"):
+                mcp_store.update_connection(_legacy_conn, {"enabled": True})
+            cfgmod.write_settings(_legacy_cfg)
+            mcp_hub.invalidate_cache()
+    except Exception as e:
+        print(f"[zalo mcp migrate] {e}", file=_sys.stderr)
     try:
         _record_boot_version(_read_version())   # duy trì last_good/previous cho tính năng lùi bản
     except Exception:
@@ -4216,13 +4199,6 @@ async def _start_scheduler():
                   "=" * 66 + "\n", file=_sys.stderr)
     except Exception as e:
         print(f"[auth bootstrap] {e}", file=_sys.stderr)
-    try:
-        # Listener Zalo: chủ đã bật trước đó thì dựng lại sidecar sau khi app khởi động lại
-        # (VPS reboot / cập nhật) - không bắt chủ vào bấm bật tay mỗi lần.
-        await zalo_listener_feature.autostart()
-    except Exception as e:
-        print(f"[zalo listener autostart] {e}", file=_sys.stderr)
-
     async def _scheduler_loop():
         while True:
             try:
@@ -4233,12 +4209,6 @@ async def _start_scheduler():
                     await loop_feature.tick()
                 except Exception as lpe:
                     print(f"[loop tick] {type(lpe).__name__}: {lpe}", file=__import__('sys').stderr)
-                # 1b) Listener Zalo: nhắc chủ khi có tin khách quá lâu chưa ai trả lời
-                #     (chế độ nhac-quen). Rẻ - chỉ so mốc thời gian, không gọi model.
-                try:
-                    await zalo_listener_feature.tick()
-                except Exception as zle:
-                    print(f"[zalo tick] {type(zle).__name__}: {zle}", file=__import__('sys').stderr)
                 # 2) Engine tự học: debounce tick (rewire sau lượt) + curator định kỳ
                 try:
                     await learn_feature.tick()
@@ -6439,13 +6409,6 @@ async def _shutdown_mcp_pool():
         await tasks_feature.shutdown()
     except Exception as e:
         print(f"[kanban shutdown] {e}", file=__import__('sys').stderr)
-    # Listener Zalo TRƯỚC: nó cần được đóng tử tế để phía Zalo thả phiên ra. Bị giết đột
-    # ngột thì phiên cũ còn treo và lần bật sau báo trùng phiên, chủ tưởng hỏng phải quét
-    # QR lại. Đây chính là triệu chứng "cập nhật xong là báo đỏ".
-    try:
-        zalo_listener_feature.shutdown()
-    except Exception as e:
-        print(f"[zalo listener shutdown] {e}", file=__import__('sys').stderr)
     try:
         await mcp_client.pool.close_all()
     except Exception:
