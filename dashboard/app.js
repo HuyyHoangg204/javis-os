@@ -164,17 +164,17 @@ function handleMessage(data) {
   if (data.type === "status") {
     if (t) t.running = true;
     setSessionRunning(sid, true);
-    if (isActive) { setOrbState("thinking", "ĐANG SUY NGHĨ"); showActivity(data.content); syncActiveUI(); }
+    if (isActive) { setOrbState("thinking", "ĐANG SUY NGHĨ"); showActivity(escapeHtml(data.content || "")); syncActiveUI(); }
   } else if (data.type === "tool_call") {
     if (data.tool) trackMCP(data.tool);
-    if (isActive) showActivity(data.content);
+    if (isActive) showActivity(escapeHtml(data.content || ""));
   } else if (data.type === "tool_result") {
-    if (isActive) showActivity(ic("check", { cls: "ic-ok" }) + " Nhận data - đang phân tích...");
+    if (isActive) showActivity(Icons.msg("check", "Nhận data - đang phân tích...", { cls: "ic-ok" }));
   } else if (data.type === "stream") {
     if (!t) return;
     t.text += (data.content || "");
     if (isActive) {
-      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity(ic("pen-line") + " Đang soạn câu trả lời..."); }
+      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity(Icons.msg("pen-line", "Đang soạn câu trả lời...")); }
       t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
       scrollBottom();
       // Đọc NGAY đoạn trung gian (chỉ đọc phiên đang xem). OpenRouter gửi tts:false → đọc 1 lần ở cuối.
@@ -328,7 +328,7 @@ async function openStoredSession(id) {
     if (t && t.running) {
       t.bubble = createStreamingBubble();
       if (t.text) t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
-      showActivity(ic("pen-line") + " Đang soạn câu trả lời...");
+      showActivity(Icons.msg("pen-line", "Đang soạn câu trả lời..."));
       setOrbState("thinking", "ĐANG SUY NGHĨ");
     }
     persistSession();
@@ -466,7 +466,10 @@ function escapeHtml(t) { return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").rep
 //      biến mất khi phóng to chat). Chip là 1 "bong bóng" 3 chấm nhún + dòng trạng thái
 //      + đồng hồ đếm giây, luôn nằm CUỐI khung chat, đi theo cả chế độ zoom. ----
 let activityEl = null, activityT0 = 0, activityTimer = null;
-function showActivity(text) {
+// Chip hoạt động cuối khung chat. THAM SỐ LÀ HTML, không phải chữ thuần: nhiều chỗ
+// gọi kèm icon (Icons.msg) nên textContent sẽ in nguyên thẻ <svg ...> ra màn hình.
+// Chữ từ server BẮT BUỘC đi qua escapeHtml trước khi truyền vào đây.
+function showActivity(html) {
   if (!activityEl) {
     activityEl = document.createElement("div");
     activityEl.className = "msg msg-activity";
@@ -481,7 +484,7 @@ function showActivity(text) {
       activityEl.querySelector(".act-time").textContent = s >= 3 ? s + "s" : "";
     }, 1000);
   }
-  activityEl.querySelector(".act-text").textContent = text || "Đang xử lý...";
+  activityEl.querySelector(".act-text").innerHTML = html || "Đang xử lý...";
   chatAppend(activityEl);   // re-append → luôn dưới cùng (kể cả dưới bubble đang stream)
   scrollBottom();
 }

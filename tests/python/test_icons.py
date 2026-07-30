@@ -144,6 +144,82 @@ def _so_dong(dau_dong, vi_tri):
     return bisect.bisect_right(dau_dong, vi_tri) - 1
 
 
+def _doi_so(src, mo):
+    """Tách danh sách đối số của lời gọi; mo trỏ vào dấu '(' mở.
+
+    Cắt ở dấu phẩy NGOÀI CÙNG thôi, nên ic("check", {cls: "ic-ok"}) vẫn đếm là
+    một đối số chứ không bị xé làm đôi.
+    """
+    than = _khoi_can(src, mo)[0][1:-1]
+    ds, sau, nhay, bo_qua, cur = [], 0, "", False, ""
+    for c in than:
+        if bo_qua:
+            bo_qua, cur = False, cur + c
+            continue
+        if nhay:
+            if c == "\\":
+                bo_qua = True
+            elif c == nhay:
+                nhay = ""
+            cur += c
+            continue
+        if c in "\"'`":
+            nhay, cur = c, cur + c
+            continue
+        if c in "([{":
+            sau += 1
+        elif c in ")]}":
+            sau -= 1
+        if c == "," and sau == 0:
+            ds.append(cur)
+            cur = ""
+            continue
+        cur += c
+    if cur.strip():
+        ds.append(cur)
+    return ds
+
+
+# Hai lối khai hàm mà dashboard đang dùng. Group 2 là dấu "(" của danh sách tham số.
+HAM_KHAI = [
+    re.compile(r"\bfunction\s+([A-Za-z_$][\w$]*)\s*(\()"),
+    re.compile(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s+)?(?:function\s*)?(\()"),
+]
+
+
+def _ham_nhan_html(text):
+    """Hàm nào nhận tham số rồi ĐỔ THẲNG vào .textContent -> {tên hàm: chỉ số tham số}.
+
+    Gọi hàm đó kèm chuỗi icon là icon hiện thành chữ, mà chỗ gán lại nằm ở file
+    khác hoặc cách đó vài trăm dòng nên đọc code rất khó thấy. Đúng đường lọt
+    của showActivity() trong app.js.
+    """
+    ra = {}
+    for mau in HAM_KHAI:
+        for m in mau.finditer(text):
+            mo_ngoac = m.start(2)
+            tham_so = [t[0] for t in
+                       (TEN_TRONG_MAU.findall(d) for d in _doi_so(text, mo_ngoac)) if t]
+            if not tham_so:
+                continue
+            sau_ngoac = _khoi_can(text, mo_ngoac)[1]
+            mo_than = text.find("{", sau_ngoac)
+            if mo_than < 0 or mo_than - sau_ngoac > 12:   # thân hàm phải ngay sau, tránh vớ nhầm
+                continue
+            than = _khoi_can(text, mo_than)[0]
+            for gan in ASSIGN_TEXT.finditer(than):
+                # Không đòi biến TRẦN: thực tế hay viết `= html || "Đang xử lý..."`.
+                # Lỏng ở đây không sinh báo nhầm, vì còn điều kiện thứ hai bên dưới -
+                # phải có lời gọi thật truyền chuỗi icon vào đúng tham số đó.
+                bieu = than[gan.end():].split(";")[0].split("\n")[0]
+                co = set(TEN_TRONG_MAU.findall(bieu))
+                for ts in tham_so:
+                    if ts in co:
+                        ra[m.group(1)] = tham_so.index(ts)
+                        break
+    return ra
+
+
 def scan_text_content():
     """Tìm chỗ gán HTML icon vào .textContent (phải là .innerHTML).
 
@@ -158,9 +234,13 @@ def scan_text_content():
       chuỗi <svg> mà lệnh gán vẫn nguyên textContent, nên user đọc mã nguồn
       hiện ra giữa thanh công cụ. Tên rã ra chỉ tính TRONG THÂN callback đó,
       vì label/title là tên chung, dùng lại chỗ khác với chữ thuần là bình thường.
+    - Icon truyền qua THAM SỐ HÀM PHỤ, hàm đó mới đổ vào textContent (vd
+      `showActivity(ic(..) + " Nhận data")` trong app.js, còn chỗ gán nằm cách
+      đó 300 dòng). Đây là chip hoạt động trong khung chat ở 0.9.257: mỗi lượt
+      chat lại in một khối <svg> ra giữa màn hình.
 
-    Chưa canh được: icon truyền qua THAM SỐ hàm phụ (vd một hàm mk(label) tự
-    gán label vào textContent). Chỗ đó phải tự nhớ khi viết hàm nhận HTML.
+    Chưa canh được: hàm nhận HTML được gọi từ FILE KHÁC. Quét trong từng file
+    một, nên gọi chéo file phải tự nhớ.
     """
     hits = []
     for path in SCAN:
@@ -202,6 +282,16 @@ def scan_text_content():
             trong_bang = ten and any(d0 <= i <= d1 and ten in ts for d0, d1, ts in vung)
             if ICON_EXPR.search(stmt) or (ten and ten in icon_vars) or trong_bang:
                 hits.append((path.name, i + 1, line.strip()[:90]))
+
+        # Vòng 3: hàm nhận tham số rồi đổ vào textContent -> soi mọi lời gọi nó.
+        for ten_ham, vi_tri in _ham_nhan_html(text).items():
+            for goi in re.finditer(r"(?<![.\w$])" + re.escape(ten_ham) + r"\s*(\()", text):
+                if re.search(r"\bfunction\s+$", text[:goi.start()]):
+                    continue                                  # chính chỗ khai hàm
+                ds = _doi_so(text, goi.start(1))
+                if len(ds) > vi_tri and ICON_EXPR.search(ds[vi_tri]):
+                    dong = _so_dong(dau_dong, goi.start())
+                    hits.append((path.name, dong + 1, lines[dong].strip()[:90]))
     return hits
 
 

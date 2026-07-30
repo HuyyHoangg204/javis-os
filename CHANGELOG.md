@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.262] - 2026-07-30
+Nốt chỗ thứ ba của cùng một lỗi: chip hoạt động trong khung chat cũng in nguyên thẻ svg.
+### Sửa lỗi
+- **Mỗi lượt chat lại hiện một khối `<svg ...>` giữa màn hình.** Chip hoạt động ("Nhận data - đang phân tích...", "Đang soạn câu trả lời...") gọi qua hàm `showActivity`, mà hàm này đổ tham số vào `.textContent` trong khi ba chỗ gọi lại truyền chuỗi icon vào. Đây là lối lọt thứ ba của đợt đổi emoji sang icon Lucide, và là lối khó thấy nhất: chỗ gọi với chỗ gán cách nhau ba trăm dòng. Đổi `showActivity` sang nhận HTML, ba chỗ gọi icon dùng `Icons.msg`, còn hai chỗ truyền chữ từ server thì escape trước.
+- Nhân tiện bịt luôn một lỗ nhỏ: chữ trạng thái do engine gửi lên trước nay đi bằng `textContent` nên vô hại; chuyển sang `innerHTML` mà không escape là mở đường chèn HTML từ dữ liệu server. Giờ có `escapeHtml`, thử với chuỗi `<img src=x onerror=...>` thì hiện đúng thành chữ, không sinh thẻ nào.
+### Cải thiện
+- Bộ quét icon canh thêm lối thứ ba: **hàm phụ nhận tham số rồi mới đổ vào `.textContent`**. Test lần được từ chỗ khai hàm tới mọi lời gọi nó trong cùng file, chỉ báo khi lời gọi thật sự truyền chuỗi icon vào đúng vị trí tham số đó. Ba lần lọt trong hai ngày đều là cùng một lỗi đi ba đường khác nhau, giờ cả ba đường đều có rào.
+
 ## [0.9.261] - 2026-07-30
 Hai lỗi giao diện lọt vào từ bản dọn emoji: bấm chip model không ra menu, và thanh công cụ sửa file .md hiện nguyên thẻ svg.
 ### Sửa lỗi
