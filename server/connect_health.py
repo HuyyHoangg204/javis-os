@@ -130,9 +130,15 @@ on_engine_down = None     # main.py gắn: async fn(text) gửi Telegram MỘT l
 
 # Mẫu lỗi đăng nhập trong OUTPUT một lượt chạy engine (vụ 2026-07-27: Claude CLI hết phiên,
 # mọi task trả "Failed to authenticate: OAuth session expired and could not be refreshed").
+# Vụ 2026-07-30: Codex CLI trả "Your access token could not be refreshed because your
+# refresh token was already used. Please log out and sign in again." Không câu nào khớp
+# mẫu cũ, nên đèn không sáng và user chỉ thấy ba bong bóng lỗi khó hiểu liên tiếp - đúng
+# thứ tính năng này sinh ra để tránh. Thêm cả ba cách nói của Codex.
 _ENGINE_AUTH_PATTERNS = ("failed to authenticate", "oauth session expired",
                          "oauth token has expired", "please run /login",
-                         "api key not found", "not logged in", "invalid api key")
+                         "api key not found", "not logged in", "invalid api key",
+                         "could not be refreshed", "refresh token was already used",
+                         "log out and sign in again")
 
 ENGINE_FIX = {
     "claude": "Mở terminal chạy claude rồi gõ /login để đăng nhập lại.",

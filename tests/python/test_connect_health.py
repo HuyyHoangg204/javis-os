@@ -168,6 +168,23 @@ def test_flag_engine_bat_den_voi_loi_that():
     assert connect_health.engines_snapshot()["claude"]["ok"] is False
 
 
+def test_flag_engine_bat_voi_loi_refresh_token_codex():
+    """Chuỗi lỗi THẬT của vụ 2026-07-30: Codex mất phiên nhưng nói theo kiểu khác hẳn.
+
+    Không câu nào khớp mẫu cũ nên đèn im, user chỉ thấy ba bong bóng lỗi liên tiếp
+    mà không ai nói cho biết phải đăng nhập lại.
+    """
+    for raw in (
+        "Codex: Your access token could not be refreshed because your refresh token "
+        "was already used. Please log out and sign in again.",
+        "Your refresh token was already used.",
+        "Please log out and sign in again.",
+    ):
+        _reset_engines()
+        assert connect_health.flag_engine_auth_error("codex", raw) is True, raw
+        assert connect_health.engines_snapshot()["codex"]["ok"] is False
+
+
 def test_flag_engine_khong_bat_voi_ket_qua_thuong():
     _reset_engines()
     assert connect_health.flag_engine_auth_error("claude", "Doanh thu hôm nay 5 triệu.") is False

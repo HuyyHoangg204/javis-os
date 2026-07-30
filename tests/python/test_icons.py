@@ -193,12 +193,20 @@ HAM_KHAI = [
 ]
 
 
+# Hàm ĂN CHỮ THUẦN: đưa HTML vào là hỏng. Hai loại, hỏng theo hai kiểu khác nhau:
+#   .textContent   -> thẻ <svg> hiện nguyên xi ra màn hình.
+#   escape/render  -> markdownToHtml, escapeHtml, esc... escape dấu nhọn, nên icon
+#                     cũng thành chữ, VÀ chữ nào escape sẵn thì escape lần hai
+#                     (user đọc ra "&quot;" giữa câu log).
+BO_ESCAPE = re.compile(r"\b(?:markdownToHtml|mdToHtml|escapeHtml|esc|escapeAttr)\s*\(\s*([A-Za-z_$][\w$]*)")
+
+
 def _ham_nhan_html(text):
-    """Hàm nào nhận tham số rồi ĐỔ THẲNG vào .textContent -> {tên hàm: chỉ số tham số}.
+    """Hàm nào nhận tham số rồi đổ vào chỗ ĂN CHỮ THUẦN -> {tên hàm: chỉ số tham số}.
 
     Gọi hàm đó kèm chuỗi icon là icon hiện thành chữ, mà chỗ gán lại nằm ở file
-    khác hoặc cách đó vài trăm dòng nên đọc code rất khó thấy. Đúng đường lọt
-    của showActivity() trong app.js.
+    khác hoặc cách đó vài trăm dòng nên đọc code rất khó thấy. Hai đường lọt thật:
+    showActivity() (textContent) và appendJavisMessage() (markdownToHtml).
     """
     ra = {}
     for mau in HAM_KHAI:
@@ -223,6 +231,10 @@ def _ham_nhan_html(text):
                     if ts in co:
                         ra[m.group(1)] = tham_so.index(ts)
                         break
+            for esc_goi in BO_ESCAPE.finditer(than):
+                if esc_goi.group(1) in tham_so:
+                    ra[m.group(1)] = tham_so.index(esc_goi.group(1))
+                    break
     return ra
 
 
@@ -419,11 +431,12 @@ if hits:
         if len(rows) > 4:
             print(f"        ... thêm {len(rows) - 4} chỗ")
 
-# --- 7. Không gán HTML icon vào textContent ----------------------------------
+# --- 7. Không đưa HTML icon vào chỗ chỉ ăn chữ thuần -------------------------
 tc_hits = scan_text_content()
-check(f"không nhét thẻ <svg> icon vào .textContent (thấy {len(tc_hits)})", not tc_hits)
+check(f"không đưa thẻ <svg> icon vào chỗ chỉ ăn chữ thuần (thấy {len(tc_hits)})", not tc_hits)
 for fname, lineno, snippet in tc_hits:
-    print(f"      {fname}:{lineno} - phải đổi sang .innerHTML | {snippet}")
+    print(f"      {fname}:{lineno} - dựng bằng .innerHTML, hoặc nếu là hàm escape/render "
+          f"markdown thì gắn icon riêng đừng truyền vào | {snippet}")
 
 # --- 8. Không bind giá trị icon bằng x-text (Alpine) --------------------------
 xt_hits = scan_x_text_icon()

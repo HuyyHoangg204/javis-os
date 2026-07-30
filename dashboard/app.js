@@ -204,7 +204,7 @@ function handleMessage(data) {
     }
     refreshUsage();     // cập nhật panel Mức dùng sau mỗi lượt
   } else if (data.type === "error") {
-    if (isActive) { hideActivity(); appendJavisMessage(ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(data.content)); setOrbState("", "SẴN SÀNG"); }
+    if (isActive) { hideActivity(); appendJavisError(data.content); setOrbState("", "SẴN SÀNG"); }
   } else if (data.type === "system") {
     if (isActive) appendJavisMessage(data.content);
   } else if (data.type === "turn_done") {
@@ -401,6 +401,17 @@ function appendJavisMessage(text, ts) {
   div.innerHTML = `<div class="bubble">${markdownToHtml(text)}</div>` +
     actsHtml("javis", ts === undefined ? Date.now() : ts, !!lastUserText().trim());
   chatAppend(div); scrollBottom();
+  return div;
+}
+// Bong bóng LỖI. KHÔNG nhét icon vào appendJavisMessage: hàm đó chạy nội dung qua
+// markdownToHtml, mà bộ render escape HTML - thẻ <svg> sẽ hiện thành chữ, và chữ nào
+// escape sẵn trước khi truyền vào thì bị escape lần hai (user đọc ra "&quot;" giữa
+// câu log). Nên phần chữ đi đúng đường markdown như mọi tin khác, icon gắn riêng vào
+// bong bóng bằng HTML thật.
+function appendJavisError(text) {
+  const div = appendJavisMessage(text);
+  const bubble = div.querySelector(".bubble");
+  if (bubble) bubble.insertAdjacentHTML("afterbegin", ic("triangle-alert", { cls: "ic-warn" }) + " ");
   return div;
 }
 function createStreamingBubble() {

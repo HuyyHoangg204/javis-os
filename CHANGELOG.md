@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.267] - 2026-07-30
+Bong bóng lỗi trong chat in nguyên thẻ svg, và Javis không nhận ra Codex mất đăng nhập.
+### Sửa lỗi
+- **Tin báo lỗi trong chat hiện nguyên `<svg ...>` và chữ bị escape hai lần.** Lối lọt thứ tư của đợt đổi sang icon Lucide, cơ chế khác hẳn ba lần trước: `appendJavisMessage` chạy nội dung qua `markdownToHtml`, mà bộ render escape HTML, nên thẻ icon thành chữ. Tệ hơn, chỗ gọi còn `escapeHtml` sẵn trước khi truyền vào nên chữ bị escape lần hai, user đọc ra `&quot;` giữa câu log. Tách riêng `appendJavisError`: phần chữ vẫn đi đúng đường markdown như mọi tin khác, icon gắn vào bong bóng bằng HTML thật.
+- **Codex mất đăng nhập mà đèn báo não không sáng.** Codex CLI báo "Your access token could not be refreshed because your refresh token was already used. Please log out and sign in again." Bộ mẫu nhận diện chỉ biết cách nói của Claude ("OAuth session expired", "failed to authenticate") nên không câu nào khớp: user hỏi ba lần, nhận ba bong bóng lỗi khó hiểu, không ai nói cho biết phải đăng nhập lại - đúng thứ tính năng đèn báo não sinh ra để tránh. Thêm ba cách nói của Codex vào bộ mẫu.
+### Cải thiện
+- Bộ quét icon canh thêm lối thứ tư: hàm phụ nhận tham số rồi đưa qua **bộ escape hoặc render markdown** (`markdownToHtml`, `escapeHtml`, `esc`), không chỉ `.textContent`. Bốn lối lọt của cùng một lỗi giờ đều có rào.
+
 ## [0.9.266] - 2026-07-30
 Icon mục Kênh đổi sang máy bay giấy, và chuẩn hoá chữ trong mọi ô nhập.
 ### Cải thiện
