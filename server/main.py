@@ -2956,11 +2956,9 @@ async def files_zip(brain: str = Query("brain"), path: str = Query(""), probe: i
     return await zip_dir_response(brain, path, probe=bool(probe))
 
 
-@app.get("/files/raw")
-async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int = Query(0)):
-    """Phục vụ file THÔ để XEM INLINE trong trình duyệt: ảnh hiện trong <img>, pdf mở thẳng trên
-    tab, mọi file khác có URL tĩnh để mở/tải. Khác /files/download (luôn ép tải về): mặc định
-    inline; truyền dl=1 để ép tải. Cùng rào chống traversal (_safe_serve_path)."""
+def raw_file_response(brain: str, path: str, dl: bool = False):
+    """Lõi thuần của /files/raw (route handler KHÔNG được gọi nhau như hàm thường, xem
+    test_handler_khong_goi_truc_tiep). Trả file inline, hoặc ép tải khi dl=True."""
     try:
         f = _safe_serve_path(brain, path)
     except ValueError as e:
@@ -2974,6 +2972,14 @@ async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int
     resp.headers["Content-Disposition"] = "inline"      # hiển thị trong trình duyệt, không ép tải
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+@app.get("/files/raw")
+async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int = Query(0)):
+    """Phục vụ file THÔ để XEM INLINE trong trình duyệt: ảnh hiện trong <img>, pdf mở thẳng trên
+    tab, mọi file khác có URL tĩnh để mở/tải. Khác /files/download (luôn ép tải về): mặc định
+    inline; truyền dl=1 để ép tải. Cùng rào chống traversal (_safe_serve_path)."""
+    return raw_file_response(brain, path, dl=bool(dl))
 
 
 @app.get("/brains/{brain_name}/{path:path}")
@@ -2992,7 +2998,7 @@ async def brain_file_compat(brain_name: str, path: str, dl: int = Query(0)):
     root = (base / safe_name).resolve()
     if root.parent != base or not root.is_dir():
         return JSONResponse({"error": "Không tìm thấy brain"}, status_code=404)
-    return await files_raw(brain=str(root), path=path, dl=dl)
+    return raw_file_response(str(root), path, dl=bool(dl))
 
 
 # ============================================================

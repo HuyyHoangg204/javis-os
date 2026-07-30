@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.259] - 2026-07-30
+Dọn hai test đỏ tồn từ trước, giờ cả 93 test đều xanh.
+### Sửa lỗi
+- **`/brains/<tên>/<path>` gọi thẳng handler `/files/raw` như hàm Python thường.** Chạy được nên không ai thấy, nhưng tham số mặc định của handler là đối tượng `Query` chứ không phải chuỗi, nên ngày nào có người gọi thiếu đối số thì nó nổ ở route tương thích link cũ, chứ không nổ ở chỗ vừa sửa. Tách lõi thuần `raw_file_response()` đúng lối `zip_dir_response()` đã đi, hai handler cùng gọi vào đó.
+### Kiểm thử
+- **Hợp đồng lite-mode trong `test_settings_consolidation.py` viết ngược ý định nên đỏ ngay từ lúc ra đời (0.9.182).** Bản 0.9.182 chủ ý cho màn hẹp đi thẳng tới Trò chuyện vì trang Tổng quan đã bỏ, nhưng test lại đòi "không được nhảy sang Trò chuyện". Sửa test theo hành vi đã chốt, và canh thêm rằng không còn chỗ nào trỏ về trang Tổng quan đã xoá.
+
 ## [0.9.258] - 2026-07-30
 Sửa mấy chỗ hiện nguyên mã `<svg ...>` thành chữ trên màn hình - dư âm của đợt đổi emoji sang icon Lucide.
 ### Sửa lỗi
