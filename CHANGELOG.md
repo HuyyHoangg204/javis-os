@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.261] - 2026-07-30
+Hai lỗi giao diện lọt vào từ bản dọn emoji: bấm chip model không ra menu, và thanh công cụ sửa file .md hiện nguyên thẻ svg.
+### Sửa lỗi
+- **Bấm vào chip model không hiện menu đổi model.** Bản 0.9.257 thêm `overflow: hidden` lên hàng model để dải HỆ THỐNG/MCP dài khỏi đẩy nở cột chat. Nhưng menu đổi model là con `position:absolute` nằm HOÀN TOÀN phía trên hàng đó, mà hàng lại chính là khối chứa của nó, nên bị cắt sạch: menu vẫn mở đúng trong DOM, chỉ là không còn một điểm ảnh nào được vẽ. Bỏ cắt tràn ở hàng model và chuyển việc chống nở ngang xuống đúng chỗ cần: dải HỆ THỐNG tự cắt phần thừa như cũ, chip model thêm trần bề ngang để tên model dài cũng không đẩy được hàng.
+- **Thanh công cụ sửa file .md hiện nguyên `<svg ...>` thành chữ.** Cùng bản đó đổi hai nút Trích dẫn và Link từ emoji sang icon Lucide, nhưng nhãn nút vẫn gán bằng `textContent` nên chuỗi SVG bị in ra như văn bản, chiếm hai dòng to đùng giữa thanh công cụ. Giờ nhãn dựng bằng `innerHTML`, chữ thuần thì escape trước để nút `</>` không bị trình duyệt nuốt mất.
+- Hai rào test mới cho đúng hai lỗi trên, vì cả hai đều thuộc loại mắt người review không thấy: bộ quét icon giờ lần được cả đường icon đi qua BẢNG DỮ LIỆU rồi rã mảng ra biến (`BTNS.forEach(([label]) => ...textContent = label)`) chứ không chỉ biến gán thẳng; và test bố cục thanh model đổi từ "phải có `overflow: hidden`" thành "CẤM cắt tràn ở hàng model" - chính dòng test cũ đang khoá cứng cái lỗi lại.
+
 ## [0.9.260] - 2026-07-30
 Lịch tự động giờ NÓI RÕ nó chạy lúc nào, sửa được, và không tự sinh ra khi chưa đủ điều kiện.
 ### Sửa lỗi

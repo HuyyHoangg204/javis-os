@@ -4504,7 +4504,11 @@
     ];
     host.innerHTML = "";
     BTNS.forEach(([label, title, fn, style]) => {
-      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.title = title;
+      const b = document.createElement("button"); b.type = "button"; b.title = title;
+      // Nhãn nút có hai loại: chuỗi SVG do ic() sinh ra, và chữ thuần ("B", "</>", "―").
+      // Cả hai đều đi bằng innerHTML - textContent sẽ in nguyên thẻ <svg ...> ra màn hình.
+      // Chữ thuần bắt buộc escape, nếu không nút "</>" bị trình duyệt nuốt mất.
+      b.innerHTML = /^\s*<svg\b/.test(label) ? label : Icons.esc(label);
       if (style) b.style.cssText += style;
       b.onmousedown = (e) => e.preventDefault();
       b.onclick = fn;

@@ -1403,10 +1403,14 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 }
 
 /* ===== Thanh chọn model + effort ngay trên khung chat ===== */
+/* KHÔNG đặt overflow:hidden lên hàng này. Popup đổi model (.mb-pop) là con position:absolute
+   nằm HOÀN TOÀN phía trên hàng (bottom: 100% + 6px), mà hàng lại là khối chứa của nó
+   (position:relative) - cắt tràn ở đây là popup biến mất sạch, bấm chip không thấy gì.
+   Việc chống nở ngang do dải HỆ THỐNG/MCP dài đã có .sysbar và .mb-chip tự lo bên dưới. */
 .model-bar {
   position: relative; display: flex; align-items: center; gap: 8px 16px;
   width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
-  padding: 8px 18px 6px; overflow: hidden;
+  padding: 8px 18px 6px;
 }
 /* Dải HỆ THỐNG + MCP nằm ngang nhưng chỉ dùng phần rộng còn lại. Nội dung dài bị cắt
    trong chính dải này, tuyệt đối không làm nở grid/canvas hay đẩy cột chat ra ngoài. */
@@ -1432,7 +1436,9 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 .sysbar .mcp-kind { color: var(--text3); font-size: 10px; }
 .mb-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);
   background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
-  cursor: pointer; font-family: var(--font); transition: border-color .15s, color .15s; }
+  cursor: pointer; font-family: var(--font); transition: border-color .15s, color .15s;
+  /* tên model dài cũng không được phép đẩy nở hàng ra ngoài cột chat */
+  flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; }
 .mb-chip:hover { color: var(--text); border-color: var(--accent); }
 .mb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex: none; }
 .mb-sep { opacity: .4; }

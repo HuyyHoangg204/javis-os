@@ -15,6 +15,7 @@ Hai lỗi test này canh, đều là loại KHÔNG thấy bằng mắt khi revie
    bẫy riêng của đợt di trú: đổi nội dung sang icon mà quên đổi textContent
    thành innerHTML. Mắt người review rất khó thấy, nên quét bằng test.
 """
+import bisect
 import json
 import re
 
@@ -94,14 +95,69 @@ def _stmt_at(lines, i, start):
     return stmt.split(";")[0]
 
 
+DONG_NGOAC = {"[": "]", "(": ")", "{": "}"}
+
+
+def _khoi_can(src, mo):
+    """Cắt khối cân ngoặc bắt đầu tại src[mo] (mở bằng [ ( hoặc {).
+
+    Phải BỎ QUA ngoặc nằm trong chuỗi, vì bảng nút thật có dòng
+    wrapTa("[", "](" + u + ")") - đếm thô là cắt cụt ngay giữa bảng.
+    Trả về (nguyên văn khối, vị trí ngay sau dấu đóng).
+    """
+    mo_c = src[mo]
+    dong_c = DONG_NGOAC[mo_c]
+    sau, nhay, bo_qua = 0, "", False
+    for j in range(mo, len(src)):
+        c = src[j]
+        if bo_qua:                 # ký tự ngay sau dấu \ trong chuỗi: nuốt luôn,
+            bo_qua = False         # nếu không thì \" bị hiểu là đóng chuỗi
+            continue
+        if nhay:
+            if c == "\\":
+                bo_qua = True
+            elif c == nhay:
+                nhay = ""
+            continue
+        if c in "\"'`":
+            nhay = c
+            continue
+        if c == mo_c:
+            sau += 1
+        elif c == dong_c:
+            sau -= 1
+            if sau == 0:
+                return src[mo:j + 1], j + 1
+    return src[mo:], len(src)
+
+
+# Rã mảng lấy tên ngay trên tham số callback: BTNS.forEach(([label, title]) => ...).
+# Bắt cả dấu "(" của .forEach để còn khoanh được THÂN callback - tên kiểu label/title
+# dùng lại khắp file, chỉ được tính là icon bên trong đúng vòng lặp đó.
+# Chưa canh: dạng for (const [label] of BTNS) - chưa file nào viết vậy.
+RA_MANG_LAP = r"\.(?:forEach|map|flatMap|filter|some|every)\s*(\()\s*(?:async\s*)?\(?\s*\[([^\]]*)\]"
+TEN_TRONG_MAU = re.compile(r"[A-Za-z_$][\w$]*")
+
+
+def _so_dong(dau_dong, vi_tri):
+    """Offset ký tự -> số dòng (đếm từ 0)."""
+    return bisect.bisect_right(dau_dong, vi_tri) - 1
+
+
 def scan_text_content():
     """Tìm chỗ gán HTML icon vào .textContent (phải là .innerHTML).
 
-    Hai lối lọt, canh cả hai:
+    Ba lối lọt, canh cả ba:
     - Icon nằm NGAY trong câu lệnh gán. Quét theo CÂU LỆNH chứ không theo dòng,
       vì nhiều chỗ viết ternary trải 3 dòng, icon ở dòng dưới dấu "=".
     - Icon nằm trong BIẾN dựng ở trên rồi mới gán (vd `line = ic(...)` ... rồi
       `st.textContent = line`). Đây đúng là chỗ đã lọt thật ở thẻ Telegram.
+    - Icon nằm trong BẢNG DỮ LIỆU rồi rã mảng ra biến (vd `const BTNS = [[ic(..),
+      ...]]` rồi `BTNS.forEach(([label]) => b.textContent = label)`). Đây là
+      đường lọt thật của thanh công cụ sửa file .md ở 0.9.257: nhãn nút thành
+      chuỗi <svg> mà lệnh gán vẫn nguyên textContent, nên user đọc mã nguồn
+      hiện ra giữa thanh công cụ. Tên rã ra chỉ tính TRONG THÂN callback đó,
+      vì label/title là tên chung, dùng lại chỗ khác với chữ thuần là bình thường.
 
     Chưa canh được: icon truyền qua THAM SỐ hàm phụ (vd một hàm mk(label) tự
     gán label vào textContent). Chỗ đó phải tự nhớ khi viết hàm nhận HTML.
@@ -110,7 +166,12 @@ def scan_text_content():
     for path in SCAN:
         if path.suffix != ".js":
             continue
-        lines = path.read_text(encoding="utf-8").splitlines()
+        text = path.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        dau_dong, chay = [0], 0
+        for line in lines:
+            chay += len(line) + 1
+            dau_dong.append(chay)
 
         # Vòng 1: biến nào từng nhận chuỗi icon.
         icon_vars = set()
@@ -119,6 +180,17 @@ def scan_text_content():
                 if ICON_EXPR.search(_stmt_at(lines, i, m.end() - 1)):
                     icon_vars.add(m.group(1))
 
+        # Vòng 1b: bảng dữ liệu có icon -> tên rã ra từ bảng, chỉ tính trong thân vòng lặp.
+        vung = []   # (dòng đầu, dòng cuối, {tên})
+        for m in re.finditer(r"\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[", text):
+            bang, _ = _khoi_can(text, m.end() - 1)
+            if not ICON_EXPR.search(bang):
+                continue
+            for mau in re.finditer(re.escape(m.group(1)) + RA_MANG_LAP, text):
+                _, het = _khoi_can(text, mau.start(1))
+                vung.append((_so_dong(dau_dong, mau.start(1)), _so_dong(dau_dong, het - 1),
+                             set(TEN_TRONG_MAU.findall(mau.group(2)))))
+
         # Vòng 2: chỗ gán vào textContent - icon trực tiếp hoặc qua biến trên.
         for i, line in enumerate(lines):
             m = ASSIGN_TEXT.search(line)
@@ -126,7 +198,9 @@ def scan_text_content():
                 continue
             stmt = _stmt_at(lines, i, m.end())
             bare = BARE_VAR.match(stmt.strip())
-            if ICON_EXPR.search(stmt) or (bare and bare.group(1) in icon_vars):
+            ten = bare.group(1) if bare else None
+            trong_bang = ten and any(d0 <= i <= d1 and ten in ts for d0, d1, ts in vung)
+            if ICON_EXPR.search(stmt) or (ten and ten in icon_vars) or trong_bang:
                 hits.append((path.name, i + 1, line.strip()[:90]))
     return hits
 
