@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.256] - 2026-07-30
+Webcake có thêm cách đấu dễ hơn: bấm Kết nối rồi đăng nhập, không dán JWT, không cần Node.js.
+### Thêm mới
+- **Webcake Landing (đăng nhập web)**: connector mới trỏ vào máy chủ hosted `https://mcp.toolvn.io.vn/mcp`. Máy chủ này công bố OAuth đúng chuẩn (RFC 9728 discovery + RFC 7591 đăng ký ứng dụng động, PKCE S256, scope `landing:read` và `landing:write`), nên Javis tự đăng ký ứng dụng và user chỉ cần bấm Kết nối, y như Higgsfield. Hai cách đấu Webcake gom về CÙNG một thẻ trong kho kết nối, mỗi cách một dòng mô tả để chọn.
+- Thẻ nói thẳng đánh đổi: cách web đi qua máy chủ trung gian do tác giả công cụ vận hành (Pancake dẫn link trong tài liệu chứ không phải hạ tầng chính chủ), nên quyền vào tài khoản Webcake nằm ở máy chủ đó; cách chạy trên máy thì token nằm lại máy và đi thẳng tới Webcake.
+### Bảo mật
+- **KHÔNG dùng kiểu link kèm token mà tài liệu Webcake gợi ý** (`...?jwt=<token>`). `mcp_store` lưu `url` KHÔNG mã hoá và `_public()` trả nguyên `url` ra frontend, chỉ headers/env/secrets mới được che, nên token nhét vào URL là rơi thẳng ra dashboard và log. Dùng OAuth thay thế.
+- `test_webcake_env.py` thêm bất biến cho TOÀN catalog: không connector nào được nhét `jwt=`, `token=`, `api_key=`, `secret=`, `password=`, `access_token=` vào `url`, kèm canary chứng minh luật này soi thật.
+### Kiểm thử
+- Đã kiểm bằng curl thật: endpoint hosted trả 401 kèm `WWW-Authenticate` trỏ `.well-known/oauth-protected-resource`, và metadata có `registration_endpoint`. Bước đăng nhập bằng trình duyệt thì phải user tự bấm nên connector để `status: beta`.
+- Test buộc hai cách Webcake CÙNG `tool_meta`, CÙNG tool validate và CÙNG `default_perm`, tránh một đường cho qua thứ đường kia chặn.
+
 ## [0.9.255] - 2026-07-30
 Đấu Webcake trong Javis xong là hỏng ngay: mọi tool tạo, sửa hay đăng trang đều trả `missing_env WEBCAKE_API_BASE`, vì catalog chưa hề cấp base URL của API.
 ### Sửa lỗi

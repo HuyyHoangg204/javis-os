@@ -118,12 +118,59 @@ check("user tự đặt WEBCAKE_API_BASE ở connection -> vẫn thắng (packag
       "trước preset, nên staging/self-hosted không bị kéo về prod)",
       merged.get("WEBCAKE_API_BASE") == "https://api.staging.webcake.io")
 
+# ---- cách 2: đăng nhập trên web (OAuth qua máy chủ hosted) ----
+# Máy chủ hosted công bố OAuth chuẩn (RFC 9728 + DCR), nên khai như higgsfield: chỉ url +
+# auth.type=oauth, KHÔNG khai authorize_url/token_url - oauth_mcp tự discovery rồi tự đăng ký.
+web = mcp_catalog.get("webcake-landing-web")
+check("catalog có connector 'webcake-landing-web'", web is not None)
+if web is not None:
+    check("web: transport http", web.get("transport") == "http")
+    check("web: trỏ đúng endpoint hosted", web.get("url") == "https://mcp.toolvn.io.vn/mcp")
+    check("web: auth kiểu oauth", ((web.get("auth") or {}).get("type")) == "oauth")
+    check("web: KHÔNG ô nhập nào (một chạm, không dán JWT)",
+          ((web.get("auth") or {}).get("fields") or []) == [])
+    check("web: KHÔNG khai authorize_url/token_url (để oauth_mcp tự discovery như higgsfield)",
+          not (web.get("auth") or {}).get("authorize_url")
+          and not (web.get("auth") or {}).get("token_url"))
+    check("web: không cần env (http, không spawn tiến trình)", not web.get("env"))
+    check("web: nói rõ rủi ro máy chủ trung gian trong risk",
+          "trung gian" in (web.get("risk") or ""))
+    # Hai cách phải cùng bộ quyền, lệch là một cách sẽ cho qua thứ cách kia chặn.
+    check("hai cách gom về CÙNG một thẻ (group)",
+          web.get("group") == con.get("group") == "webcake")
+    check("mỗi cách có group_line riêng để user chọn được",
+          bool(web.get("group_line")) and bool(con.get("group_line"))
+          and web.get("group_line") != con.get("group_line"))
+    check("hai cách CÙNG tool_meta (không lệch quyền giữa hai đường)",
+          web.get("tool_meta") == con.get("tool_meta"))
+    check("hai cách CÙNG tool validate", (web.get("validate") or {}).get("tool")
+          == (con.get("validate") or {}).get("tool"))
+    check("hai cách CÙNG default_perm", web.get("default_perm") == con.get("default_perm"))
+
+# ---- BẤT BIẾN BẢO MẬT TOÀN CATALOG: không được nhét credential vào url ----
+# Tài liệu Webcake gợi ý kiểu link 'https://.../mcp?jwt=<token>'. Javis KHÔNG được dùng kiểu đó:
+# mcp_store.add_connection lưu 'url' KHÔNG qua secrets_store, và _public() trả nguyên url ra
+# frontend (chỉ headers/env/secrets mới được che). Token trong url là rơi thẳng ra dashboard + log.
+_CRED_PARAMS = ("jwt=", "token=", "api_key=", "apikey=", "secret=", "password=", "access_token=")
+_ban = []
+for _c in mcp_catalog.load().values():
+    _u = (_c.get("url") or "").lower()
+    if any(p in _u for p in _CRED_PARAMS):
+        _ban.append(_c.get("id"))
+check(f"không connector nào nhét credential vào url (url không được che, xem ghi chú){_ban and ': ' + str(_ban) or ''}",
+      not _ban)
+
 # ---- CANARY: chứng minh các check ở trên có quyền lực thật, không phải luôn-xanh ----
 _fake_khong_env = {"auth": {"fields": [{"key": "api_key", "env": "WEBCAKE_JWT"}]}}
 _canary = mcp_catalog.build_env(_fake_khong_env, {"api_key": "J"})
 check("CANARY: connector KHÔNG khai env tĩnh thì build_env phải KHÔNG có base "
       "-> tức check base ở trên thật sự đọc catalog chứ không luôn xanh",
       not _canary.get("WEBCAKE_API_BASE") and _canary.get("WEBCAKE_ENV") not in PRESET_ENVS)
+
+_url_gia = "https://mcp.toolvn.io.vn/mcp?jwt=TOKEN-THAT-CUA-USER"
+check("CANARY: url kiểu dán-link-kèm-token phải BỊ BẮT -> tức bất biến bảo mật ở trên "
+      "thật sự soi chứ không phải luôn xanh vì catalog đang sạch",
+      any(p in _url_gia.lower() for p in _CRED_PARAMS))
 
 if _fails:
     print(f"\nFAIL - test_webcake_env: {len(_fails)} lỗi: {_fails}")
