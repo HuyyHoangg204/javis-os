@@ -142,7 +142,17 @@ Dòng thứ ba là lịch sử ngắn: `lần cuối HH:MM` (hoặc `chưa chạ
 
 ### Đọc một thẻ nhắc hẹn
 
-Thẻ nhắc hẹn gọn hơn: tên (hoặc nội dung nếu không đặt tên), rồi một dòng phụ ghi thời điểm và kiểu. Thời điểm hiện dạng `HH:MM DD/MM/YYYY`, hoặc `cron 0 7 * * *` nếu là lịch lặp. Kiểu là `nhắc` (chỉ nhắc), `tự làm + báo`, hoặc `script`.
+Thẻ nhắc hẹn gọn hơn: tên (hoặc nội dung nếu không đặt tên), rồi một dòng phụ ghi thời điểm và kiểu. Kiểu là `nhắc` (chỉ nhắc), `tự làm + báo`, hoặc `script`.
+
+Thời điểm luôn nói rõ **bao giờ chạy**, không bắt bạn tự đọc cron:
+
+- Hẹn một lần: `một lần, kế tiếp mai 08:30 (còn 14 giờ)`.
+- Lịch lặp cron: lịch dịch thành lời rồi mới tới lần chạy kế tiếp, ví dụ `7:00 mỗi ngày · kế tiếp mai 07:00 (còn 14 giờ)`. Biểu thức thô vẫn in bên cạnh dạng `0 7 * * *` cho ai muốn kiểm.
+- Lặp theo khoảng cách: `lặp mỗi 60 phút · kế tiếp hôm nay 15:20 (còn 12 phút)`.
+
+Giờ trong ngày hôm nay ghi `hôm nay HH:MM`, ngày mai ghi `mai HH:MM`, xa hơn ghi `HH:MM DD/MM`.
+
+Nếu lần chạy trước bị lỗi (ví dụ không gửi được tin), thẻ có thêm một dòng `⚠ lần chạy trước lỗi: ...` để bạn biết mà xử lý, thay vì im lặng chạy sai mãi.
 
 ### Các nút trên thẻ
 
@@ -156,7 +166,24 @@ Trên thẻ việc lặp:
 - **Xoá**: hỏi xác nhận rồi xoá hẳn file `Javis/loops/<slug>.md`.
 - **Chuyển brain…**: ô chọn để dời việc sang brain khác, giữ nguyên file và trạng thái chạy. Brain đích đã có việc trùng tên thì Javis từ chối và báo lỗi, không ghi đè. Việc đang chạy cũng không dời được, hãy thử lại sau.
 
-Trên thẻ nhắc hẹn: **Huỷ** (hỏi xác nhận) và **Chuyển brain…**.
+Trên thẻ nhắc hẹn:
+
+- **Sửa**: mở lại biểu mẫu với nội dung của nhắc hẹn này. Đổi được tên, nội dung, kiểu và giờ. Nếu là lịch cron thì ô "Khi nào" điền sẵn biểu thức cũ, sửa xong Javis tính lại lần chạy kế tiếp ngay. Nếu là hẹn một lần thì ô đó để trống và ghi giờ đang hẹn trong phần gợi ý: **để trống nghĩa là giữ nguyên giờ cũ**, chỉ gõ khi muốn đổi.
+- **Huỷ**: ngừng chạy nhưng bản ghi vẫn nằm trong lịch sử để tra lại.
+- **Xoá**: mất hẳn, không hoàn tác được.
+- **Chuyển brain…**: dời sang brain khác, giữ nguyên id và mọi thiết lập.
+
+## Chưa đấu Telegram thì Javis không tạo lịch
+
+Nhắc hẹn và việc "tự làm rồi báo" chỉ có giá trị khi tới giờ nó **nói được với ai đó**, mà kênh báo duy nhất hiện nay là Telegram. Nếu bot Telegram chưa bật, chưa có token, hoặc chưa có Chat ID nào được phép, Javis **từ chối tạo** và nói rõ thiếu gì kèm lối sang trang [Kênh](11-telegram.md) để đấu.
+
+Đây là chỗ trước đây gây hiểu lầm nhiều nhất: Javis dựng job "sáng nào cũng báo email và lịch", job chạy đúng giờ thật, nhưng kết quả không gửi được cho ai và cũng không ai nói cho bạn biết là thiếu Telegram.
+
+Nếu bạn vẫn muốn tạo (ví dụ định đấu Telegram sau), bấm **Vẫn tạo** ngay cạnh lời cảnh báo. Việc sẽ chạy đúng giờ, kết quả lưu trong Javis, chỉ là chưa gửi đi đâu.
+
+Khi trang Việc định kỳ phát hiện chưa có kênh báo, nó hiện một dải cảnh báo ở đầu trang, vì các việc đã tạo từ trước vẫn đang chạy mà không tới tay bạn.
+
+Đặt lịch bằng lời qua chat cũng theo luật này: Javis phải soát trước xem nguồn dữ liệu đã đấu chưa và có chỗ báo kết quả chưa, thiếu thì nói thẳng rồi hỏi bạn, không tạo cho xong.
 
 ## Chạy ngay và dừng vòng đang chạy
 
@@ -269,7 +296,10 @@ Phần **thân file** (bên dưới dấu `---` thứ hai) chính là ô "Mô t�
 | **▶ Chạy ngay** | Chạy một vòng ngay, xoá trạng thái tự tạm dừng |
 | **Sửa** / **Xoá** | Sửa hoặc xoá hẳn file việc lặp |
 | **Chuyển brain…** | Dời việc sang brain khác |
-| **Huỷ** (trên thẻ nhắc hẹn) | Huỷ một nhắc hẹn đang chờ |
+| **Sửa** (trên thẻ nhắc hẹn) | Đổi tên, nội dung, kiểu, giờ hoặc biểu thức cron |
+| **Huỷ** (trên thẻ nhắc hẹn) | Ngừng chạy, vẫn giữ trong lịch sử |
+| **Xoá** (trên thẻ nhắc hẹn) | Xoá hẳn bản ghi, không hoàn tác |
+| **Vẫn tạo** | Tạo lịch dù chưa đấu kênh báo kết quả |
 | ⏳ đang chạy | Vòng của việc này đang chạy |
 | ⚠ tự tạm dừng | Hỏng 3 lần liên tiếp, đã tự khoá |
 | ● bật / ○ tắt | Có tự chạy theo chu kỳ hay không |

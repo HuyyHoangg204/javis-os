@@ -89,7 +89,11 @@ _AUTH_PUBLIC_EXACT = ("/", "/favicon.ico", "/auth/status", "/auth/login", "/auth
 # /reminders/cancel đi cùng nhóm với /reminders (TẠO nhắc): huỷ là thao tác YẾU HƠN tạo, nên
 # miễn cùng mức là nhất quán chứ không nới rào - thiếu nó thì javis_schedule (plugin in-process,
 # gọi localhost không cookie) huỷ nhắc hẹn LUÔN lỗi 401 khi đã bật mật khẩu (gate_active()=True).
-_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel")
+# /reminders/update cùng nhóm: SỬA lịch cũng là thao tác yếu hơn TẠO, và javis_schedule
+# (op=update) gọi từ chính máy này khi user nói "đổi giờ việc đó sang 8h" - thiếu nó thì sửa lịch
+# bằng chat trả 401 câm. /reminders/delete CỐ Ý không có ở đây: xoá hẳn thì để dashboard (có
+# session) làm, chat chỉ cần huỷ.
+_AUTH_LOCAL_EXACT = ("/telegram/send-file", "/reminders", "/reminders/cancel", "/reminders/update")
 
 
 @app.middleware("http")
@@ -3868,10 +3872,41 @@ learn_feature.deps.enqueue_task = tasks_feature.enqueue
 # ============================================================
 import reminders as reminders_mod
 
+
+def _notify_ready() -> tuple:
+    """(sẵn_sàng, lý_do): Javis có đường BÁO kết quả cho người dùng hay chưa. Nhắc hẹn và việc
+    nền chỉ có giá trị khi tới giờ nó nói được với ai đó - chưa đấu Telegram thì việc chạy xong
+    rồi kết quả rơi vào hư không, người dùng tưởng Javis quên. Dùng để chặn ngay lúc TẠO."""
+    try:
+        tg = cfgmod.read_settings().get("telegram", {}) or {}
+    except Exception:
+        return True, ""      # không đọc được cấu hình thì đừng dựng rào, cứ để tạo
+    if not tg.get("enabled"):
+        return False, "bot Telegram chưa bật"
+    if not tg.get("token"):
+        return False, "chưa có bot token"
+    if not tg_parse_ids(tg.get("chat_id")):
+        return False, "chưa có Chat ID được phép"
+    return True, ""
+
+
+def _notify_live_warn() -> str:
+    """Cấu hình đủ nhưng bot Telegram ĐANG lỗi thật (token bị thu hồi, 409 poll trùng...) thì
+    việc tới giờ vẫn chạy mà tin không đi được. KHÔNG dùng để chặn tạo việc (lỗi có thể thoáng
+    qua và tự khỏi), chỉ để nói ra ở trang Việc. Rỗng = không có gì đáng báo."""
+    try:
+        if not _TG_BOT or _TG_BOT.status not in ("error", "conflict"):
+            return ""
+        return f"bot Telegram đang lỗi ({_TG_BOT.status}): {(_TG_BOT.last_error or '')[:160]}"
+    except Exception:
+        return ""
+
+
 reminders_feature = reminders_mod.register(app, reminders_mod.RemindersDeps(
     brain_root=_brain_root,
     atomic_write_text=_atomic_write_text,
     send_telegram=_tg_send_to,
+    notify_ready=_notify_ready,
     build_system_prompt=build_system_prompt,
     aux_model=_aux_model,
     aux_swap=_aux_swap,
@@ -3964,8 +3999,14 @@ async def viec_all():
         if v["loops"] or v["reminders"]:   # brain ngoài chỉ hiện khi thực sự có việc (tránh rác)
             out.append(v)
 
+    ready, why = reminders_feature.notify_status()
     return {"brains": out, "running": loop_feature.lock.locked(),
-            "running_slug": loop_feature._running[1] if loop_feature._running else ""}
+            "running_slug": loop_feature._running[1] if loop_feature._running else "",
+            # Trang Việc cảnh báo ngay đầu trang khi chưa có kênh báo: việc vẫn chạy nhưng không
+            # ai nhận được kết quả, mà đó là thứ người dùng KHÔNG tự đoán ra được. "warn" là
+            # trường hợp KHÁC: cấu hình đủ nhưng bot đang lỗi thật (token bị thu hồi, 409...) -
+            # không chặn tạo việc (lỗi có thể chỉ thoáng qua) nhưng phải nói ra.
+            "notify": {"ok": ready, "error": why, "warn": _notify_live_warn()}}
 
 
 @app.get("/lint")

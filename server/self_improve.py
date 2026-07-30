@@ -66,6 +66,9 @@ import aux_engine   # engine viec nen theo model phu nguoi dung chon
 import channel_context   # bóc khối JAVIS_* trước khi báo Telegram - kênh chữ, không phải web
 
 LEGACY_SLUG = "vong-lap-goc"
+# Dấu "đã migrate loop_config.json" ghi thẳng vào chính file đó. Có dấu này thì KHÔNG dựng lại
+# loop legacy nữa, kể cả khi người dùng đã xoá nó (xem ensure_migrated).
+MIGRATED_KEY = "loops_migrated"
 GOALS = ("business", "brain", "product", "custom")
 
 # Chỉ dẫn an toàn CỨNG cho mọi loop có MCP (mặc định): được ĐỌC, cấm hành động ghi ra ngoài.
@@ -178,6 +181,14 @@ class LoopFeature:
             pass
         return cfg
 
+    @staticmethod
+    def _has_legacy_content(cfg: dict) -> bool:
+        """Config cũ có gì ĐÁNG migrate không? register_brain() cũng ghi ra file này chỉ để nhớ
+        danh sách brain, nên "file tồn tại" KHÔNG đồng nghĩa "có loop cũ cần chuyển"."""
+        return bool(str(cfg.get("custom_goal") or "").strip()
+                    or cfg.get("enabled")
+                    or float(cfg.get("last_run") or 0) > 0)
+
     def read_config(self) -> dict:
         """Legacy shape (Telegram đọc 'brain'; /loop/config cũ đọc cả cụm). Field loop
         (enabled/mode/goal/interval/custom_goal/last_*) overlay LIVE từ loop vong-lap-goc."""
@@ -208,9 +219,14 @@ class LoopFeature:
         try:
             brain = cfg.get("brain") or "brain"
             self.ensure_migrated()
-            old = self.get_loop(brain, LEGACY_SLUG) or {"slug": LEGACY_SLUG, "name": "Vòng lặp tự cải thiện",
-                                                        "workspace": "vault", "tools_profile": "vault-safe",
-                                                        "quiet_hours": "", "max_runs_per_day": 0, "body": ""}
+            old = self.get_loop(brain, LEGACY_SLUG)
+            # Loop legacy KHÔNG còn (người dùng đã xoá) và lệnh ghi này cũng rỗng → đừng dựng lại
+            # một loop trắng. Client cũ bật thật (enabled) hay có nội dung thì mới tạo.
+            if old is None and not self._has_legacy_content(cfg):
+                return
+            old = old or {"slug": LEGACY_SLUG, "name": "Vòng lặp tự cải thiện",
+                          "workspace": "vault", "tools_profile": "vault-safe",
+                          "quiet_hours": "", "max_runs_per_day": 0, "body": ""}
             old.update({
                 "enabled": bool(cfg.get("enabled")), "mode": cfg.get("mode", "suggest"),
                 "goal": cfg.get("goal", "business"),
@@ -440,10 +456,27 @@ class LoopFeature:
 
     # ══════════════════════ migration 1 lần từ loop_config.json ══════════════════════
 
+    def _mark_migrated(self, cfg: dict) -> None:
+        """Đóng dấu ĐÃ MIGRATE vào loop_config.json - chạy một lần là xong VĨNH VIỄN."""
+        try:
+            cfg[MIGRATED_KEY] = True
+            self.deps.atomic_write_text(self.config_path, json.dumps(cfg, ensure_ascii=False, indent=2))
+        except Exception as e:
+            print(f"[loops migrate mark] {e}", file=__import__('sys').stderr)
+
     def ensure_migrated(self) -> None:
-        """Idempotent: Javis/loops/ chưa có file nào + loop_config.json tồn tại → sinh
-        vong-lap-goc.md (giữ nguyên goal/mode/interval/enabled; TOÀN BỘ custom_goal vào
-        thân file - không mất quy trình Hermes). Không xoá json cũ (giữ backup)."""
+        """Idempotent: loop_config.json còn nội dung THẬT của bản cũ → sinh vong-lap-goc.md
+        (giữ nguyên goal/mode/interval/enabled; TOÀN BỘ custom_goal vào thân file - không mất
+        quy trình Hermes). Không xoá json cũ (giữ backup).
+
+        Hai rào chống HỒI SINH - trước đây thiếu nên "Vòng lặp tự cải thiện" mọc lại mãi:
+          1. Đóng dấu MIGRATED_KEY sau lần đầu. Điều kiện cũ là "thư mục loops chưa có .md nào",
+             mà người dùng XOÁ loop cuối cùng là thư mục rỗng lại → lần khởi động sau nó dựng lại,
+             xoá bao nhiêu lần cũng vô ích.
+          2. Config rỗng thì KHÔNG có gì để migrate. loop_config.json được register_brain() tạo ra
+             chỉ để nhớ danh sách brain cho scheduler, nên bản mới hoàn toàn sạch vẫn có file này -
+             và bản cũ đã dựng ra một loop trắng tên "Vòng lặp tự cải thiện" trên MỌI máy fork về.
+        """
         if self._migrated:
             return
         self._migrated = True
@@ -451,9 +484,24 @@ class LoopFeature:
             if not self.config_path.exists():
                 return
             cfg = self._read_legacy_raw()
+            if cfg.get(MIGRATED_KEY):
+                return
+            if not self._has_legacy_content(cfg):
+                self._mark_migrated(cfg)
+                return
             brain = cfg.get("brain") or "brain"
+            # Vault cũ ghi trong config KHÔNG còn trên máy này (đổi máy, dọn ổ đĩa, fork sang chỗ
+            # khác) → không có gì migrate một cách trung thực. Cứ migrate thì brain_root() rơi về
+            # brain MẶC ĐỊNH và loop cũ mọc ra ở một brain chẳng liên quan - đúng cái "Vòng lặp tự
+            # cải thiện" lạ mà người dùng thấy trong Brain Default rồi xoá mãi không hết.
+            if brain != "brain" and not Path(brain).is_dir():
+                print(f"[loops] bỏ qua migrate: vault cũ '{brain}' không còn trên máy này",
+                      file=__import__('sys').stderr)
+                self._mark_migrated(cfg)
+                return
             d = self._loops_dir(brain)
             if d.is_dir() and any(d.glob("*.md")):
+                self._mark_migrated(cfg)
                 return
             self.save_loop(brain, {
                 "slug": LEGACY_SLUG, "name": "Vòng lặp tự cải thiện",
@@ -469,6 +517,7 @@ class LoopFeature:
                                last_summary=cfg.get("last_summary", ""),
                                last_status=cfg.get("last_status", ""),
                                runs_today=0, day="", fail_streak=0, auto_paused_reason="")
+            self._mark_migrated(cfg)
             print(f"[loops] đã migrate loop_config.json → Javis/loops/{LEGACY_SLUG}.md",
                   file=__import__('sys').stderr)
         except Exception as e:

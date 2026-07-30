@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.260] - 2026-07-30
+Lịch tự động giờ NÓI RÕ nó chạy lúc nào, sửa được, và không tự sinh ra khi chưa đủ điều kiện.
+### Sửa lỗi
+- **Nhìn thẻ nhắc hẹn không biết bao giờ nó chạy.** Thẻ cron chỉ in đúng biểu thức thô `cron 0 7 * * *` rồi hết. Giờ đọc thành lời (`7:00 mỗi ngày`) kèm lần chạy kế tiếp và còn bao lâu nữa (`kế tiếp mai 07:00 (còn 14 giờ)`), biểu thức thô vẫn giữ bên cạnh cho ai cần. Thẻ việc lặp cũng nói rõ ngày chứ không chỉ giờ trần, và nói thẳng "đang tắt nên chưa có lần chạy kế tiếp" thay vì bỏ trống.
+- **Không sửa/xoá được lịch cron.** Nhắc hẹn tạo xong là bất động: chỉ có Huỷ và Chuyển brain, muốn đổi giờ phải xoá đi tạo lại. Thêm nút **Sửa** (đổi tên, nội dung, kiểu, và giờ - sửa cron xong tính lại ngay lần chạy kế tiếp) và nút **Xoá** (mất hẳn, khác Huỷ là vẫn giữ trong lịch sử). Hai endpoint mới `POST /reminders/update` và `POST /reminders/delete`; tool `javis_schedule` thêm `op=update` để sửa được bằng chat luôn.
+- **Javis tạo cron quá dễ, thiếu điều kiện vẫn tạo rồi im lặng.** Khách dựng job "sáng nào cũng báo email + lịch qua Telegram" trong khi Telegram còn chưa đấu: job chạy đúng giờ, kết quả rơi vào hư không, không ai nói cho họ biết thiếu gì. Giờ server chặn ngay lúc tạo, nói rõ thiếu gì và chỉ chỗ sửa; người dùng vẫn có quyền bấm "Vẫn tạo". Trang Việc định kỳ hiện cảnh báo ở đầu trang khi chưa có kênh báo, và thẻ nào lần chạy trước lỗi thì hiện luôn lỗi đó. Job script không bị chặn - loại đó vốn cố ý im lặng.
+- **"Vòng lặp tự cải thiện" mọc lại sau mỗi lần xoá.** Bản di trú cũ dựng lại loop legacy mỗi lần khởi động nếu thư mục `Javis/loops` trống - mà xoá cái cuối cùng thì đúng là trống, nên xoá bao nhiêu lần cũng vô ích. Thêm ba rào: đóng dấu đã-di-trú vào `loop_config.json` (chạy một lần là xong vĩnh viễn); config rỗng thì không có gì để di trú, nên bản fork sạch không còn tự mọc ra một loop trắng; và vault cũ ghi trong config mà không còn trên máy thì bỏ qua luôn, thay vì dồn loop cũ sang brain mặc định - đó chính là đường một "Vòng lặp tự cải thiện" lạ đi vào Brain Default trên máy khách. Bản cũ có nội dung thật, vault còn nguyên, vẫn được chuyển đầy đủ.
+- Trang Việc định kỳ cũng báo khi **kênh đã đấu nhưng đang lỗi thật** (token bị thu hồi, 409 trùng poll): việc vẫn chạy nhưng tin không tới. Lỗi loại này không chặn tạo việc mới vì có thể chỉ thoáng qua, nhưng phải nói ra.
+### Cải thiện
+- **Mở app là vào màn Javis**, kể cả màn hẹp hoặc khi tắt khoang não. Bản 0.9.182 cho lite-mode tự nhảy sang Trò chuyện; dùng thật thì rối hơn vì mỗi lần tải lại rơi vào một trang khác. Màn Javis đã có sẵn ô chat, chỉ khác là không vẽ khoang não. Co giãn cửa sổ qua ngưỡng mobile cũng không còn tự đẩy sang trang khác.
+- Luật **"đủ điều kiện mới tạo lịch"** vào CLAUDE.md + chỉ dẫn kênh + mô tả tool: trước khi tạo, Javis phải tự soát nguồn dữ liệu đã đấu chưa và có chỗ báo kết quả chưa; thiếu thì nói thẳng rồi hỏi, không tạo cho xong.
+
 ## [0.9.259] - 2026-07-30
 Dọn hai test đỏ tồn từ trước, giờ cả 93 test đều xanh.
 ### Sửa lỗi

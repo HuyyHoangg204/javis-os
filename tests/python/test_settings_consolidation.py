@@ -31,12 +31,12 @@ check("rail không còn tab Tổng quan", 'id: "overview"' not in rail_block and
 check("metadata không còn trang Tổng quan", "overview:" not in meta_block)
 check("router không còn render Tổng quan", 'id === "overview"' not in router_block)
 boot_block = CONSOLE.split("function boot()", 1)[1]
-# Hợp đồng đúng theo 0.9.182: mặc định mở ở Javis (home), còn lite-mode (cờ tắt graph
-# hoặc màn hẹp) đi THẲNG tới Trò chuyện - trước đây nó dừng ở Tổng quan, mà trang đó đã bỏ.
-# Bản đầu của test này viết ngược lại ("không được nhảy sang chat") nên đỏ ngay từ lúc ra đời.
-check("mặc định mở ở Javis, lite/mobile đi thẳng Trò chuyện chứ không dừng ở trang trung gian",
+# Hợp đồng (chủ chốt, 0.9.260): MỞ APP LÀ VÀO MÀN JAVIS, mọi khổ màn hình. 0.9.182 từng cho
+# lite-mode/mobile tự nhảy sang Trò chuyện; dùng thật thì rối hơn (mỗi lần tải lại rơi vào một
+# trang khác) nên bỏ. Trang Tổng quan cũ cũng không còn chỗ nào trỏ tới.
+check("mở app là vào màn Javis, không tự nhảy trang khác",
       'active: "home"' in CONSOLE
-      and 'if (liteMode()) navigateTo("chat")' in boot_block
+      and 'navigateTo("chat")' not in boot_block
       and 'navigateTo("overview")' not in CONSOLE)
 check("deep-link file vẫn được ưu tiên sau khi vào Javis",
       'const m = /^#open=(.+)$/' in boot_block and "openFilesAt(decodeURIComponent(m[1]))" in boot_block)

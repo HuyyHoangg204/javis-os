@@ -155,3 +155,74 @@ def cron_next(expr: str, after_epoch: float, tz: tzinfo) -> float:
     """Epoch (giây) của lần chạy kế tiếp sau 'after_epoch', tính theo timezone tz."""
     after = datetime.fromtimestamp(float(after_epoch), tz)
     return CronExpr(expr).next_after(after).timestamp()
+
+
+# ── Đọc cron thành lời ────────────────────────────────────────────────────────
+# "0 7 * * *" là thứ chỉ dân kỹ thuật đọc được. Người dùng nhìn thẻ việc mà không biết nó chạy
+# lúc nào thì coi như lịch đó vô hình - nên mọi chỗ hiện cron PHẢI kèm câu tiếng Việt này.
+_DOW_VN = {0: "chủ nhật", 1: "thứ hai", 2: "thứ ba", 3: "thứ tư",
+           4: "thứ năm", 5: "thứ sáu", 6: "thứ bảy"}
+
+
+def _is_step(vals: Set[int], lo: int, hi: int) -> Optional[int]:
+    """vals có đúng dạng lo, lo+n, lo+2n... phủ hết khoảng? Trả n (bước), None nếu không."""
+    s = sorted(vals)
+    if len(s) < 2 or s[0] != lo:
+        return None
+    n = s[1] - s[0]
+    if n < 2 or any(b - a != n for a, b in zip(s, s[1:])):
+        return None
+    if s[-1] + n <= hi:            # còn chỗ cho một giá trị nữa mà thiếu → không phải bước đều
+        return None
+    return n
+
+
+def _hhmm(h: int, m: int) -> str:
+    return f"{h}:{m:02d}"
+
+
+def describe_cron(expr: str) -> str:
+    """Biểu thức cron → câu tiếng Việt ngắn ("7:00 mỗi ngày", "mỗi 30 phút", "9:00 thứ hai
+    hằng tuần"). Dạng lạ/phức tạp thì trả lại chính biểu thức - thà thô còn hơn nói sai giờ.
+    Không bao giờ ném lỗi: đây là chuỗi hiển thị, cron sai đã bị validate_cron bắt từ lúc tạo."""
+    try:
+        ce = CronExpr(expr)
+    except Exception:
+        return str(expr or "").strip()
+
+    # Phạm vi NGÀY: mỗi ngày / các thứ trong tuần / ngày trong tháng.
+    if ce.dom_star and ce.dow_star:
+        scope = "mỗi ngày"
+    elif ce.dom_star:
+        days = ", ".join(_DOW_VN[d] for d in sorted(ce.dows))
+        scope = f"{days} hằng tuần"
+    elif ce.dow_star:
+        days = ", ".join(str(d) for d in sorted(ce.doms))
+        scope = f"ngày {days} hằng tháng"
+    else:
+        return ce.raw          # vừa giới hạn thứ vừa giới hạn ngày (ngữ nghĩa OR) - đừng diễn giải
+    if len(ce.months) != 12:
+        scope += " trong tháng " + ", ".join(str(m) for m in sorted(ce.months))
+
+    # Phạm vi GIỜ/PHÚT.
+    every_min = len(ce.minutes) == 60
+    every_hour = len(ce.hours) == 24
+    if every_min:
+        return "mỗi phút" if every_hour else f"mỗi phút trong giờ {', '.join(str(h) for h in sorted(ce.hours))}"
+    min_step = _is_step(ce.minutes, 0, 59)
+    if min_step and every_hour:
+        return f"mỗi {min_step} phút"
+    if len(ce.minutes) == 1:
+        mm = next(iter(ce.minutes))
+        if every_hour:
+            return f"phút {mm:02d} mỗi giờ"
+        hour_step = _is_step(ce.hours, 0, 23)
+        if hour_step:
+            return f"mỗi {hour_step} giờ (phút {mm:02d})"
+        times = ", ".join(_hhmm(h, mm) for h in sorted(ce.hours))
+        return f"{times} {scope}"
+    if len(ce.hours) == 1:
+        h = next(iter(ce.hours))
+        times = ", ".join(_hhmm(h, m) for m in sorted(ce.minutes))
+        return f"{times} {scope}"
+    return ce.raw

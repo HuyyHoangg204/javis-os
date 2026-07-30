@@ -57,6 +57,11 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
         "`op=cancel`; không đẩy user sang trang Việc định kỳ để tự làm và chỉ xác nhận sau khi tool "
         "trả thành công. Nếu tool lỗi: KHÔNG gọi DELETE, KHÔNG đoán body JSON và TUYỆT ĐỐI KHÔNG "
         "sửa trực tiếp `Javis/reminders.json` - làm vậy có thể huỷ nhầm job.",
+        "- ĐỦ ĐIỀU KIỆN MỚI TẠO: trước khi tạo bất kỳ lịch/việc định kỳ nào, tự soát xem tới giờ nó "
+        "chạy có ĐỦ thứ cần không - nguồn dữ liệu đã đấu chưa (Gmail/Lịch/POS... kiểm bằng "
+        "`javis_connections`), và có kênh nào để BÁO kết quả chưa. Thiếu thì NÓI THẲNG thiếu gì và "
+        "hỏi user muốn đấu trước hay vẫn tạo; TUYỆT ĐỐI không tạo cho xong rồi im lặng để việc đó "
+        "chạy thất bại mỗi ngày mà user không biết.",
         "- CHỈ gọi `javis_schedule` khi user ra lệnh rõ ràng đọc/tạo/sửa/xoá lịch tự động của Javis. "
         "Nếu user chỉ nhắc tới \"đặt lịch\", booking, tư vấn 1-1, cuộc hẹn, hoặc đang hỏi ý kiến về "
         "sản phẩm/UX/marketing thì đó là hội thoại bình thường: trả lời đúng câu hỏi, KHÔNG `op=list`, "

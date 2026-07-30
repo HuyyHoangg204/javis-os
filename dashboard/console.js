@@ -1143,6 +1143,30 @@
     el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
     const GNAME = { business: "Kinh doanh", brain: "Bộ não", product: "Cải thiện Javis", custom: "Tự định nghĩa" };
     const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
+    // Giờ TRẦN (chỉ "07:00") không cho biết là hôm nay, mai hay tuần sau - nhìn thẻ việc vẫn
+    // không biết bao giờ nó chạy. fmtWhen luôn nói rõ NGÀY khi không phải hôm nay.
+    function fmtWhen(ts) {
+      if (!ts) return "-";
+      const d = new Date(ts * 1000), now = new Date();
+      const hm = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      const day = x => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+      const tomorrow = new Date(now.getTime() + 86400000);
+      if (day(d) === day(now)) return `hôm nay ${hm}`;
+      if (day(d) === day(tomorrow)) return `mai ${hm}`;
+      return `${hm} ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+    }
+    // "còn 2 giờ 15 phút" - trả lời đúng câu người dùng hỏi trong đầu: bao lâu nữa thì nó chạy.
+    function fmtLeft(ts) {
+      if (!ts) return "";
+      const s = Math.round(ts - Date.now() / 1000);
+      if (s <= 0) return "đang tới hạn";
+      if (s < 3600) return `còn ${Math.max(1, Math.round(s / 60))} phút`;
+      if (s < 86400) {
+        const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60);
+        return `còn ${h} giờ${m ? " " + m + " phút" : ""}`;
+      }
+      return `còn ${Math.round(s / 86400)} ngày`;
+    }
 
     el.innerHTML = `<div class="cview-section">
       <p style="color:var(--text3);font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
@@ -1150,8 +1174,10 @@
         <button class="s-btn" id="lpNew">+ Thêm việc</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
       </div>
+      <div id="lpNotifyWarn" style="display:none;margin-bottom:12px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);font-size:13px;line-height:1.5"></div>
       <div id="lpForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-1)">
         <input type="hidden" id="lpSlug">
+        <input type="hidden" id="lpRemId">
         <div class="si-grid">
           <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
             <button class="si-chip sel" data-kind="loop">${ic("repeat")} Việc lặp</button>
@@ -1217,7 +1243,9 @@
         : "Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)";
     }
     el.querySelectorAll("#lpKind .si-chip").forEach(c => c.onclick = () => {
-      if (el.querySelector("#lpSlug").value) return;   // đang SỬA loop → khoá loại, không đổi sang nhắc
+      // Đang SỬA (loop hay nhắc hẹn) → khoá loại: đổi loại giữa đường là ghi sang kho khác,
+      // để lại bản gốc ở kho cũ vẫn chạy.
+      if (el.querySelector("#lpSlug").value || el.querySelector("#lpRemId").value) return;
       fkind = c.dataset.kind; syncKindUI();
     });
     el.querySelectorAll("#lpRemModes .si-chip").forEach(c => c.onclick = () => {
@@ -1247,6 +1275,15 @@
       return { at: s };
     }
 
+    async function createReminder(payload) {
+      try {
+        return await (await fetch("/reminders", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })).json();
+      } catch (e) { return { ok: false, error: e.message }; }
+    }
+
     let allLoops = [];    // phẳng mọi brain - cho bộ lọc nhật ký (log per brain+slug)
     let allBrains = [];   // [{name, path, is_default}] - cho ô chọn brain (tạo mới + chuyển)
 
@@ -1271,29 +1308,47 @@
         .map(b => `<option value="${esc(b.path)}">${esc(b.name)}</option>`).join("");
     }
 
-    async function openForm(lp) {
+    // openForm(loop) = tạo/sửa việc lặp · openForm(null, rem) = SỬA một nhắc hẹn/lịch cron.
+    // Trước đây nhắc hẹn tạo xong là bất động (chỉ huỷ/chuyển brain) - muốn đổi giờ cron phải
+    // xoá rồi tạo lại, đúng chỗ khách báo "không sửa được lịch cron".
+    async function openForm(lp, rem) {
       await ensureBrains();   // đảm bảo ô brain luôn có lựa chọn dù /viec/all chưa tải xong
       fcur = { mode: lp ? lp.mode : "suggest" };
-      // Form này chỉ SỬA loop (nhắc hẹn không sửa ở đây, chỉ huỷ/chuyển trên thẻ). Tạo mới → về loop.
-      fkind = "loop"; frmode = "notify";
+      fkind = rem ? "reminder" : "loop";
+      frmode = rem && rem.mode === "task" ? "task" : "notify";
+      const locked = !!(lp || rem);   // đang SỬA (loop hay nhắc) → khoá loại việc + brain
       el.querySelector("#lpSlug").value = lp ? lp.slug : "";
-      el.querySelector("#lpName").value = lp ? lp.name : "";
-      el.querySelector("#lpBody").value = lp ? (lp.body || "") : "";
+      el.querySelector("#lpRemId").value = rem ? rem.id : "";
+      el.querySelector("#lpName").value = rem ? (rem.label || "") : (lp ? lp.name : "");
+      el.querySelector("#lpBody").value = rem ? (rem.text || "") : (lp ? (lp.body || "") : "");
       el.querySelector("#lpInterval").value = lp ? lp.interval_min : 120;
-      el.querySelector("#lpRemWhen").value = "";
-      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === "notify"));
-      el.querySelector("#lpFormMsg").textContent = "";
+      // Cron sửa được nguyên văn (không phụ thuộc múi giờ). Hẹn MỘT LẦN thì để trống + nói rõ
+      // "trống = giữ nguyên", vì viết lại mốc giờ tuyệt đối dễ lệch múi giờ máy người dùng.
+      const when = el.querySelector("#lpRemWhen");
+      when.value = rem && rem.cron ? rem.cron : "";
+      when.placeholder = (rem && !rem.cron)
+        ? `để trống = giữ nguyên (đang hẹn ${fmtWhen(rem.due_at)})`
+        : "30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00";
+      // Job script giữ nguyên kiểu (đổi kiểu là mất tên file script) → khoá hai nút Kiểu cho khỏi
+      // tưởng đang đổi được; server cũng bỏ qua trường mode với loại này.
+      const isScript = !!(rem && rem.script);
+      el.querySelectorAll("#lpRemModes .si-chip").forEach(x => {
+        x.classList.toggle("sel", !isScript && x.dataset.rmode === frmode);
+        x.disabled = isScript; x.style.opacity = isScript ? .45 : 1;
+      });
+      el.querySelector("#lpFormMsg").textContent = isScript
+        ? `Job script "${rem.script}" - sửa được tên, nội dung và lịch; kiểu giữ nguyên.` : "";
       // Khoá bộ chọn loại khi SỬA (chỉ đổi được lúc tạo mới); mờ đi cho rõ.
-      el.querySelectorAll("#lpKind .si-chip").forEach(x => { x.disabled = !!lp; x.style.opacity = lp ? .45 : 1; });
-      // Ô chọn brain: TẠO MỚI cho chọn (mặc định brain đang xem); SỬA thì khoá về brain của loop
+      el.querySelectorAll("#lpKind .si-chip").forEach(x => { x.disabled = locked; x.style.opacity = locked ? .45 : 1; });
+      // Ô chọn brain: TẠO MỚI cho chọn (mặc định brain đang xem); SỬA thì khoá về brain của việc
       // (đổi brain lúc sửa sẽ đẻ file mới ở brain khác mà bản gốc vẫn còn - muốn dời thì dùng nút
       // "Chuyển sang brain" trên thẻ, có kiểm tra trùng + dời state đàng hoàng).
       const bsel = el.querySelector("#lpBrain");
-      const defPath = lp ? (lp.brain_path || "")
+      const defPath = (lp || rem) ? ((lp || rem).brain_path || "")
         : ((allBrains.find(isCurrentBrain) || allBrains[0] || {}).path || "");
       bsel.innerHTML = allBrains.map(b =>
         `<option value="${esc(b.path)}" ${b.path === defPath ? "selected" : ""}>${esc(b.name)}</option>`).join("");
-      bsel.disabled = !!lp;
+      bsel.disabled = locked;
       syncKindUI();
       syncFormChips();
       el.querySelector("#lpForm").style.display = "block";
@@ -1311,18 +1366,44 @@
       if (!name) { msg.textContent = "Nhập tên"; return; }
       if (!body) { msg.textContent = fkind === "reminder" ? "Nhập nội dung nhắc" : "Nhập mô tả nhiệm vụ (Javis cần biết mỗi vòng làm gì)"; return; }
 
-      // NHẮC HẸN → POST /reminders (kho reminders, JSON). Một lần hoặc lặp cron.
+      // NHẮC HẸN → kho reminders. Tạo mới: POST /reminders. Đang sửa: POST /reminders/update.
       if (fkind === "reminder") {
-        const timePayload = parseReminderWhen(el.querySelector("#lpRemWhen").value);
-        if (!timePayload) { msg.textContent = 'Nhập thời điểm (vd "30 phút nữa", "8h30", "0 7 * * *")'; return; }
+        const remId = el.querySelector("#lpRemId").value;
+        const whenRaw = el.querySelector("#lpRemWhen").value.trim();
+        const timePayload = whenRaw ? parseReminderWhen(whenRaw) : null;
+        if (!remId && !timePayload) { msg.textContent = 'Nhập thời điểm (vd "30 phút nữa", "8h30", "0 7 * * *")'; return; }
         b.textContent = "Đang lưu...";
-        const payload = Object.assign(
-          { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard" }, timePayload);
         let r = {};
-        try { r = await (await fetch("/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })).json(); }
-        catch (e) { r = { error: e.message }; }
+        if (remId) {
+          const f = new FormData();
+          f.append("id", remId); f.append("brain", brainVal);
+          f.append("label", name); f.append("text", body); f.append("mode", frmode);
+          if (timePayload) Object.keys(timePayload).forEach(k => f.append(k, timePayload[k]));
+          try { r = await (await fetch("/reminders/update", { method: "POST", body: f })).json(); }
+          catch (e) { r = { error: e.message }; }
+        } else {
+          r = await createReminder(Object.assign(
+            { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard" }, timePayload));
+        }
         b.innerHTML = SAVE_ICON + " Lưu";
-        if (!r.ok) { msg.innerHTML = Icons.warn(r.error || "Lưu lỗi"); return; }
+        if (!r.ok) {
+          // can_force = server chặn vì THIẾU ĐIỀU KIỆN (chưa đấu Telegram thì không báo được kết
+          // quả cho ai). Nói rõ thiếu gì, và để người dùng tự quyết có tạo tiếp hay không.
+          if (r.can_force) {
+            msg.innerHTML = Icons.warn(r.error || "Chưa đủ điều kiện")
+              + ` <button class="s-btn-ghost" id="lpForce" style="margin-left:6px">Vẫn tạo</button>`;
+            const fb = el.querySelector("#lpForce");
+            if (fb) fb.onclick = async () => {
+              const r2 = await createReminder(Object.assign(
+                { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard",
+                  allow_no_channel: true }, timePayload));
+              if (!r2.ok) { msg.innerHTML = Icons.warn(r2.error || "Lưu lỗi"); return; }
+              el.querySelector("#lpForm").style.display = "none";
+              loadAll();
+            };
+          } else msg.innerHTML = Icons.warn(r.error || "Lưu lỗi");
+          return;
+        }
         el.querySelector("#lpForm").style.display = "none";
         loadAll();
         return;
@@ -1389,8 +1470,10 @@
         : lp.enabled ? `<span style="color:var(--green)">● bật</span>` : `<span style="color:var(--text3)">○ tắt</span>`;
       const verify = lp.last_status && lp.last_status !== "ok"
         ? ` · ${esc(lp.last_status.slice(0, 90))}` : (lp.last_status === "ok" ? " · ok" : "");
-      const last = lp.last_run ? `lần cuối ${fmtT(lp.last_run)}` : "chưa chạy";
-      const next = (lp.enabled && !paused && lp.next_run) ? ` · kế tiếp ~${fmtT(lp.next_run)}` : "";
+      const last = lp.last_run ? `lần cuối ${fmtWhen(lp.last_run)}` : "chưa chạy";
+      const next = (lp.enabled && !paused && lp.next_run)
+        ? ` · kế tiếp ~${fmtWhen(lp.next_run)} (${fmtLeft(lp.next_run)})`
+        : (lp.enabled ? "" : " · đang tắt nên chưa có lần chạy kế tiếp");
       const modeLbl = lp.mode === "full" ? `<span style="color:var(--red);font-weight:600">${WARN_ICON} toàn quyền</span>`
         : lp.mode === "auto" ? "tự làm (an toàn)" : "đề xuất";
       const extra = [
@@ -1451,27 +1534,49 @@
     // Nhắc hẹn đang chờ: gộp cùng loop trong mỗi nhóm brain. Loop = việc bền (.md, sửa trong
     // Obsidian); nhắc = việc phù du. Cả hai đều gắn brain_path để thao tác đúng brain.
     const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+    // Câu tả LỊCH của một nhắc hẹn. Trước đây thẻ cron chỉ in "cron 0 7 * * *" rồi hết - không
+    // đọc được lịch, cũng không biết lần chạy kế tiếp là lúc nào (lỗi khách báo).
+    function remWhen(r) {
+      const next = r.due_at ? `kế tiếp ${fmtWhen(r.due_at)} (${fmtLeft(r.due_at)})` : "";
+      if (r.cron) {
+        const human = r.cron_human || r.cron;
+        return `${human} · ${next}`.replace(/ · $/, "");
+      }
+      if (r.repeat_min) return `lặp mỗi ${r.repeat_min} phút · ${next}`.replace(/ · $/, "");
+      return next ? `một lần, ${next}` : (r.due_human || "");
+    }
     function reminderCard(r) {
       const title = r.label || r.text || "Nhắc hẹn";
-      const when = r.cron ? `cron ${r.cron}`
-        : (r.repeat_min ? `lặp mỗi ${r.repeat_min} phút · kế tiếp ${r.due_human || ""}` : (r.due_human || ""));
+      const when = remWhen(r);
       const kind = MODE_LBL[r.mode] || "nhắc";
       const div = document.createElement("div");
       div.className = "wf-card";
       div.dataset.kind = "rem";
-      div.dataset.search = _lpNorm(`${title} ${when} ${kind}`);
-      div.innerHTML = `<b>${esc(title)}</b>
-        <div class="dim" style="font-size:12px;color:var(--text3)">${esc(when)} · ${esc(kind)}</div>
+      div.dataset.search = _lpNorm(`${title} ${when} ${r.cron || ""} ${kind}`);
+      div.innerHTML = `<b>${ic("alarm-clock")} ${esc(title)}</b>
+        <div class="dim" style="font-size:12px;color:var(--text3)">${esc(when)} · ${esc(kind)}${r.cron ? ` · <code>${esc(r.cron)}</code>` : ""}</div>
+        ${r.error ? `<div style="font-size:12px;color:var(--warn-ink);margin-top:4px">${WARN_ICON} lần chạy trước lỗi: ${esc(r.error.slice(0, 160))}</div>` : ""}
         <div class="wf-actions" style="margin-top:8px">
+          <button class="s-btn-ghost rmEdit">Sửa</button>
           <button class="s-btn-ghost rmCancel">Huỷ</button>
+          <button class="s-btn-ghost rmDel" style="color:var(--red)">Xoá</button>
           <select class="mv loop-sel" style="font-size:12px"><option value="">Chuyển brain…</option>${moveOptions(r.brain_path)}</select>
         </div>`;
+      div.querySelector(".rmEdit").onclick = () => openForm(null, r);
       div.querySelector(".rmCancel").onclick = async () => {
-        if (!confirm(`Huỷ "${title}"?`)) return;
+        if (!confirm(`Huỷ "${title}"?\n\nMục này ngừng chạy nhưng vẫn còn trong lịch sử. Muốn mất hẳn thì bấm Xoá.`)) return;
         const f = new FormData();
         f.append("id", r.id);        // id THÔ, /reminders/cancel nhận đúng dạng này
         f.append("brain", r.brain_path);
         await fetch("/reminders/cancel", { method: "POST", body: f });
+        loadAll();
+      };
+      div.querySelector(".rmDel").onclick = async () => {
+        if (!confirm(`Xoá hẳn "${title}"? Không hoàn tác được.`)) return;
+        const f = new FormData();
+        f.append("id", r.id); f.append("brain", r.brain_path);
+        let rr = {}; try { rr = await (await fetch("/reminders/delete", { method: "POST", body: f })).json(); } catch (er) { rr = { error: er.message }; }
+        if (!rr.ok) alert("Không xoá được: " + (rr.error || "lỗi"));
         loadAll();
       };
       div.querySelector(".mv").onchange = async (e) => {
@@ -1512,6 +1617,26 @@
         return;
       }
       allBrains = (d.brains || []).map(b => ({ name: b.name, path: b.path, is_default: b.is_default }));
+      // Chưa đấu Telegram = việc vẫn chạy đúng giờ nhưng kết quả không tới tay ai. Người dùng
+      // không tự đoán ra điều đó, nên nói thẳng ở đầu trang kèm lối đi sang trang Kênh.
+      const nw = el.querySelector("#lpNotifyWarn");
+      if (nw) {
+        const nt = d.notify || {};
+        const bad = nt.ok === false;            // chưa đấu gì cả
+        const warn = !bad && nt.warn;           // đấu rồi nhưng bot đang lỗi thật
+        nw.style.display = (bad || warn) ? "block" : "none";
+        if (bad || warn) {
+          nw.innerHTML = bad
+            ? `${WARN_ICON} <b>Chưa có kênh báo kết quả</b> - ${esc(nt.error || "bot Telegram chưa sẵn sàng")}.
+               Việc vẫn chạy đúng giờ nhưng kết quả sẽ không gửi được cho ai.
+               <a href="#" data-settings-go="channels" style="color:var(--link-ink)">Đấu Telegram ở trang Kênh</a>`
+            : `${WARN_ICON} <b>Kênh báo đang lỗi</b> - ${esc(nt.warn)}.
+               Việc vẫn chạy nhưng tin có thể không tới.
+               <a href="#" data-settings-go="channels" style="color:var(--link-ink)">Xem trang Kênh</a>`;
+          const go = nw.querySelector("[data-settings-go]");
+          if (go) go.onclick = (ev) => { ev.preventDefault(); navigateTo("channels"); };
+        }
+      }
       allLoops = [];
       const groups = (d.brains || []).slice().sort((a, b) => {
         const ac = isCurrentBrain(a) ? 0 : 1, bc = isCurrentBrain(b) ? 0 : 1;
@@ -4537,11 +4662,9 @@
     // Theo dõi Studio mở/đóng → bật/tắt graph theo
     const st = document.getElementById("studio");
     if (st) new MutationObserver(recomputeGraph).observe(st, { attributes: true, attributeFilter: ["class"] });
-    // Màn hình co/giãn qua ngưỡng mobile → tính lại
-    window.matchMedia("(max-width: 860px)").addEventListener("change", () => {
-      if (liteMode() && Alpine.store("nav").active === "home") navigateTo("chat");
-      recomputeGraph();
-    });
+    // Màn hình co/giãn qua ngưỡng mobile → tính lại (chỉ tắt/bật graph, KHÔNG tự nhảy trang:
+    // đang đứng ở màn Javis mà tự bị đẩy sang Trò chuyện là mất chỗ đang xem)
+    window.matchMedia("(max-width: 860px)").addEventListener("change", recomputeGraph);
     // Đổi brain (Select Brain) → nạp lại trang quản lý đang xem theo brain mới (không cần F5)
     const gs = document.getElementById("graphSource");
     if (gs) gs.addEventListener("change", () => {
@@ -4557,8 +4680,9 @@
 
     freshSettings().then(s => {
       graphEnabled = !(s.dashboard && s.dashboard.graph_enabled === false);
-      // Lite-mode (cờ tắt hoặc màn hẹp) → vào thẳng chat, không ép người dùng qua một trang trung gian.
-      if (liteMode()) navigateTo("chat");
+      // MỞ APP LÀ VÀO MÀN JAVIS, kể cả lite-mode (cờ graph tắt hoặc màn hẹp): màn Javis đã có
+      // sẵn ô chat, chỉ khác là không vẽ khoang não. Bản trước tự đẩy sang trang Trò chuyện,
+      // hoá ra rối hơn - mỗi lần tải lại là mỗi lần rơi vào một trang khác.
       recomputeGraph();
       // Deep-link mở tab mới từ link file trong chat: #open=<đường-dẫn-vault> → mở thẳng Tệp tin đúng vị trí
       try {

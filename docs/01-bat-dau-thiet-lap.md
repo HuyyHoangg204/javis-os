@@ -120,7 +120,7 @@ Phụ đề: "Hiệu năng đồ thị và cấu trúc dữ liệu". Gồm ba th
 **Thẻ Đồ thị não** cho biết đồ thị tri thức đang bật hay tắt.
 
 - Bấm **Tắt đồ thị** để giảm tải tối đa; khi đang tắt, nút đổi thành **Bật đồ thị**.
-- Nếu màn hình hẹp (dưới 860px, tức điện thoại), Javis tự vào chế độ nhẹ: đồ thị dừng chạy và app mở thẳng vào trang Trò chuyện, dù công tắc đang bật.
+- Nếu màn hình hẹp (dưới 860px, tức điện thoại), Javis tự vào chế độ nhẹ: đồ thị dừng chạy dù công tắc đang bật. App vẫn mở ở màn Javis như trên máy tính - màn đó đã có sẵn ô chat, chỉ khác là không vẽ khoang não.
 
 Chi tiết về đồ thị xem [Đồ thị tri thức](03-do-thi-tri-thuc.md).
 

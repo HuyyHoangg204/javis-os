@@ -15,7 +15,13 @@ Lịch: hẹn 1-lần (delay_min|at|due_at) HOẶC định kỳ bằng biểu th
 tự viết, không phụ thuộc lib). Có cron thì mỗi lần fire xong tự tính due_at kế tiếp.
 
 Tạo nhắc: engine (Javis) tự gọi POST /reminders qua Bash curl từ localhost khi user nói
-"nhắc anh ..." (endpoint được khai báo trong channel_context). Cũng tạo/huỷ được từ dashboard.
+"nhắc anh ..." (endpoint được khai báo trong channel_context). Dashboard tạo/sửa/huỷ/xoá được
+qua /reminders, /reminders/update, /reminders/cancel (giữ lịch sử), /reminders/delete (mất hẳn).
+
+ĐỦ ĐIỀU KIỆN MỚI TẠO: notify/task tồn tại chỉ để BÁO cho người, mà kênh báo duy nhất là
+Telegram. Chưa đấu Telegram thì _create ném NotifyNotReady kèm lý do, endpoint trả thêm cờ
+can_force để chỗ gọi hỏi lại người dùng (allow_no_channel=true mới tạo tiếp). Trước đây job cứ
+tạo, cứ chạy đúng giờ, rồi kết quả rơi vào hư không - người dùng tưởng Javis quên việc.
 Thời gian do SERVER tính (giờ VN, UTC+7) từ delay_min | at | due_at → engine chỉ cần map câu
 nói của user, KHỎI cần biết "bây giờ" trong prompt (giữ prompt-cache ổn định).
 
@@ -64,6 +70,22 @@ _SCRIPT_RUNNERS = {
     ".bat": ["cmd", "/c"],
     ".cmd": ["cmd", "/c"],
 }
+
+
+class NotifyNotReady(ValueError):
+    """Chưa có đường gửi kết quả (bot Telegram chưa bật / chưa có Chat ID).
+
+    Tách riêng khỏi ValueError thường để endpoint trả thêm cờ can_force: đây KHÔNG phải lỗi cú
+    pháp mà là THIẾU ĐIỀU KIỆN, và người dùng có quyền chọn tạo tiếp (kết quả chỉ lưu trong Javis).
+    """
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(
+            f"Chưa gửi được kết quả về đâu: {reason}. Vào trang Kênh đấu bot Telegram "
+            "(dán bot token + Chat ID) rồi tạo lại. Nếu vẫn muốn tạo, đặt allow_no_channel=true - "
+            "việc sẽ chạy nhưng không ai được báo."
+        )
 
 
 def _now() -> float:
@@ -166,6 +188,9 @@ class RemindersDeps:
     # Đổi engine việc nền theo model phụ người dùng chọn (Claude / Codex / API rẻ).
     # None = giữ nguyên Claude như trước (test dựng deps tối giản không cần tiêm).
     aux_swap: Optional[Callable] = None
+    # () -> (sẵn_sàng, lý_do): có đường gửi kết quả cho người dùng chưa (bot Telegram bật +
+    # token + Chat ID). None = bỏ qua kiểm tra (test dựng deps tối giản).
+    notify_ready: Optional[Callable[[], tuple]] = None
 
 
 class RemindersFeature:
@@ -218,11 +243,29 @@ class RemindersFeature:
             raise ValueError(f"đuôi '{rp.suffix}' chưa hỗ trợ (dùng .py/.sh/.ps1/.js/.bat)")
         return rp
 
+    def notify_status(self) -> tuple:
+        """(sẵn_sàng, lý_do) - có đường gửi kết quả cho người dùng hay không. Thiếu dep thì coi
+        như sẵn sàng (test/embed tối giản), không tự dựng rào ở nơi không biết cấu hình."""
+        if not self.deps.notify_ready:
+            return True, ""
+        try:
+            ok, why = self.deps.notify_ready()
+            return bool(ok), str(why or "")
+        except Exception:
+            return True, ""
+
     # ── tạo (sync; caller async giữ self._io) ──
     def _create(self, brain: str, text: str, *, delay_min=None, at=None, due_at=None,
                 chat_id="", mode="notify", repeat_min=0, label="", cron=None, script="",
-                created_by="user") -> dict:
+                created_by="user", allow_no_channel=False) -> dict:
         mode = mode if mode in VALID_MODE else "notify"
+        # ĐỦ ĐIỀU KIỆN MỚI TẠO. notify/task tồn tại chỉ để BÁO cho người - chưa đấu Telegram thì
+        # tới giờ nó chạy xong rồi ném kết quả vào hư không, người dùng tưởng Javis quên việc.
+        # Thà chặn ngay lúc tạo và nói thiếu gì. (script = job giám sát, im lặng là bình thường.)
+        if mode in ("notify", "task") and not allow_no_channel:
+            ready, why = self.notify_status()
+            if not ready:
+                raise NotifyNotReady(why or "chưa có kênh gửi")
         text = (text or "").strip()
         script_name = ""
         if mode == "script":
@@ -265,12 +308,76 @@ class RemindersFeature:
         return rem
 
     def _view(self, r: dict) -> dict:
+        cron = r.get("cron", "") or ""
         return {"id": r.get("id"), "text": r.get("text"), "label": r.get("label"),
                 "mode": r.get("mode"), "status": r.get("status"),
                 "due_at": r.get("due_at"), "due_human": _fmt_vn(r.get("due_at", 0)),
                 "chat_id": r.get("chat_id"), "repeat_min": r.get("repeat_min", 0),
-                "cron": r.get("cron", ""), "script": r.get("script", ""),
+                # cron_human: "0 7 * * *" đọc thành "7:00 mỗi ngày". Thẻ việc chỉ hiện biểu thức
+                # thô thì người dùng không biết lịch chạy lúc nào - đúng lỗi khách báo.
+                "cron": cron, "cron_human": cron_util.describe_cron(cron) if cron else "",
+                "script": r.get("script", ""), "fired_at": r.get("fired_at", 0),
                 "result": (r.get("result") or "")[:500], "error": r.get("error", "")}
+
+    def update(self, brain: str, rid: str, *, text=None, label=None, mode=None, chat_id=None,
+               cron=None, at=None, delay_min=None, due_at=None) -> dict:
+        """Sửa 1 nhắc/lịch ĐANG CHỜ: nội dung, tên, kiểu, và thời điểm. Trả {"ok", "error",
+        "reminder"}. Chỉ nhận tham số được truyền (None = giữ nguyên) nên gọi sửa một phần
+        được. Đổi lịch thì tính lại due_at ngay để người dùng thấy lần chạy kế tiếp mới."""
+        data = self._load(brain)
+        cur = next((r for r in data.get("reminders", []) if r.get("id") == rid), None)
+        if cur is None:
+            return {"ok": False, "error": "không thấy nhắc hẹn này"}
+        if cur.get("status") != "pending":
+            return {"ok": False, "error": "chỉ sửa được nhắc đang chờ (mục đã xong/đã huỷ thì tạo mới)"}
+        if text not in (None, ""):
+            cur["text"] = str(text)[:2000]
+        if label is not None:
+            cur["label"] = str(label)[:120]
+        if mode not in (None, ""):
+            m = str(mode).strip().lower()
+            if m not in VALID_MODE:
+                return {"ok": False, "error": f"kiểu không hợp lệ: {mode}"}
+            if cur.get("mode") == "script":
+                pass   # job script GIỮ NGUYÊN kiểu (đổi là mất tên file script) - vẫn sửa được
+                       # tên/nội dung/lịch, nên bỏ qua trường mode thay vì chặn cả lệnh sửa
+            elif m == "script":
+                return {"ok": False, "error": "đổi sang job script thì tạo mới (cần chọn file script)"}
+            else:
+                cur["mode"] = m
+        if chat_id is not None:
+            cur["chat_id"] = str(chat_id)
+        has_when = any(v not in (None, "") for v in (cron, at, delay_min, due_at))
+        if has_when:
+            try:
+                if cron not in (None, ""):
+                    expr = cron_util.validate_cron(str(cron))
+                    cur["cron"] = expr
+                    cur["repeat_min"] = 0
+                    cur["due_at"] = cron_util.cron_next(expr, _now(), VN_TZ)
+                else:
+                    due = resolve_due(delay_min=delay_min, at=at, due_at=due_at)
+                    if due > _now() + MAX_DELAY_DAYS * 86400:
+                        return {"ok": False, "error": "Hẹn quá xa (giới hạn ~1 năm)"}
+                    cur["cron"] = ""          # chuyển lịch lặp → một lần: bỏ cron kẻo nó tự hồi sinh
+                    cur["due_at"] = float(due)
+            except ValueError as e:
+                return {"ok": False, "error": str(e)}
+        cur["error"] = ""                      # đã sửa thì lỗi lần chạy trước không còn đúng nữa
+        self._save(brain, data)
+        return {"ok": True, "error": "", "reminder": self._view(cur)}
+
+    def delete(self, brain: str, rid: str) -> bool:
+        """Xoá HẲN 1 bản ghi (khác cancel: cancel chỉ đổi trạng thái, mục vẫn nằm trong lịch sử).
+        Trả True nếu có xoá."""
+        data = self._load(brain)
+        rems = data.get("reminders", [])
+        left = [r for r in rems if r.get("id") != rid]
+        if len(left) == len(rems):
+            return False
+        data["reminders"] = left
+        self._save(brain, data)
+        return True
 
     def cancel(self, brain: str, rid: str) -> bool:
         """Huỷ 1 nhắc (đồng bộ). Trả True nếu có đổi."""
@@ -509,8 +616,10 @@ class RemindersFeature:
                           key=lambda r: float(r.get("due_at", 0)))
             pending = [self._view(r) for r in rems if r.get("status") == "pending"]
             history = [self._view(r) for r in rems if r.get("status") != "pending"][-30:]
+            ready, why = self.notify_status()
             return {"pending": pending, "history": history,
-                    "counts": {"pending": len(pending)}}
+                    "counts": {"pending": len(pending)},
+                    "notify": {"ok": ready, "error": why}}
 
         @router.post("/reminders")
         async def reminders_add(payload: dict = Body(None)):
@@ -535,14 +644,22 @@ class RemindersFeature:
                         chat_id=p.get("chat_id", ""), mode=p.get("mode", "notify"),
                         repeat_min=p.get("repeat_min", 0), label=p.get("label", ""),
                         created_by=str(p.get("created_by") or "user"),
+                        allow_no_channel=bool(p.get("allow_no_channel") or False),
                     )
+            except NotifyNotReady as e:
+                # can_force: chỗ gọi (dashboard/chat) hỏi lại người dùng rồi tạo tiếp với
+                # allow_no_channel=true. KHÔNG tự bỏ qua hộ - thiếu kênh là điều người dùng cần biết.
+                return {"ok": False, "error": str(e), "need": "telegram", "can_force": True}
             except ValueError as e:
                 return {"ok": False, "error": str(e)}
             except Exception as e:
                 return {"ok": False, "error": f"{type(e).__name__}: {e}"}
             return {"ok": True, "id": rem["id"], "mode": rem["mode"],
                     "due_at": rem["due_at"], "due_human": _fmt_vn(rem["due_at"]),
-                    "cron": rem["cron"], "repeat_min": rem["repeat_min"]}
+                    "cron": rem["cron"], "repeat_min": rem["repeat_min"],
+                    # Kèm lời đọc để chỗ gọi (chat) nhắc lại lịch bằng tiếng Việt, khỏi bắt user
+                    # tự dịch "0 7 * * *".
+                    "cron_human": cron_util.describe_cron(rem["cron"]) if rem["cron"] else ""}
 
         @router.get("/reminders/scripts")
         async def reminders_scripts(brain: str = Query("brain")):
@@ -567,6 +684,25 @@ class RemindersFeature:
         async def reminders_cancel(id: str = Form(...), brain: str = Form("brain")):
             async with self._io:
                 hit = self.cancel(brain, id)
+            return {"ok": hit, "error": ("" if hit else "not found")}
+
+        @router.post("/reminders/update")
+        async def reminders_update(id: str = Form(...), brain: str = Form("brain"),
+                                   text: str = Form(None), label: str = Form(None),
+                                   mode: str = Form(None), chat_id: str = Form(None),
+                                   cron: str = Form(None), at: str = Form(None),
+                                   delay_min: str = Form(None), due_at: str = Form(None)):
+            """Sửa nhắc/lịch đang chờ (trang Việc định kỳ: nút Sửa). Bỏ trống trường nào thì giữ
+            nguyên trường đó; truyền cron HOẶC at/delay_min/due_at để đổi thời điểm."""
+            async with self._io:
+                return self.update(brain, id, text=text, label=label, mode=mode, chat_id=chat_id,
+                                   cron=cron, at=at, delay_min=delay_min, due_at=due_at)
+
+        @router.post("/reminders/delete")
+        async def reminders_delete(id: str = Form(...), brain: str = Form("brain")):
+            """Xoá HẲN một mục (khác /reminders/cancel: cancel giữ lại trong lịch sử)."""
+            async with self._io:
+                hit = self.delete(brain, id)
             return {"ok": hit, "error": ("" if hit else "not found")}
 
         @router.post("/reminders/move")

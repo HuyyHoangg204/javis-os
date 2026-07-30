@@ -345,10 +345,20 @@ async def _post_reminder(payload: dict, brain_name: str = "") -> str:
     except Exception as e:
         return f"ERROR: gọi kho nhắc hẹn lỗi: {type(e).__name__}: {e}"
     if not data.get("ok"):
+        if data.get("can_force"):
+            # THIẾU ĐIỀU KIỆN, không phải lỗi cú pháp. Model TUYỆT ĐỐI không được tự vượt rào:
+            # phải nói thiếu gì rồi để user quyết. Đây đúng cái khách phàn nàn - Javis dựng cron
+            # "báo qua Telegram" trong khi Telegram còn chưa đấu, rồi im lặng không nói gì.
+            return (f"ERROR: {data.get('error')}\n"
+                    "→ BÁO LẠI CHO USER đúng thứ còn thiếu ở trên và HỎI: đấu Telegram trước, "
+                    "hay vẫn tạo dù chưa ai nhận được báo? User đồng ý tạo tiếp thì gọi lại tool "
+                    "với allow_no_channel=true. KHÔNG tự quyết hộ.")
         return f"ERROR: {data.get('error') or 'tạo nhắc hẹn thất bại'}"
     where = f" (brain {brain_name})" if brain_name else ""
     if data.get("cron"):
-        return f"Đã đặt lịch lặp cron '{data['cron']}'{where} (id {data.get('id')})."
+        lich = data.get("cron_human") or data["cron"]
+        return (f"Đã đặt lịch lặp {lich} (cron {data['cron']}){where} (id {data.get('id')}), "
+                f"lần chạy kế tiếp {data.get('due_human') or '?'}.")
     return f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'}{where} (id {data.get('id')})."
 
 
@@ -393,9 +403,97 @@ async def _do_create(vault_root: str, args: dict) -> str:
     # 418 _run_task, tốn tới max_wall_s=300). Trước đây hard-code "task" nên notify_only vô nghĩa -
     # mọi nhắc đều chạy LLM dù model chỉ được yêu cầu NHẮC.
     payload = {"text": prompt, "label": name, "mode": ("notify" if notify_only else "task"),
-               "brain": vault_root, "chat_id": chat_id, "created_by": "javis_schedule"}
+               "brain": vault_root, "chat_id": chat_id, "created_by": "javis_schedule",
+               "allow_no_channel": bool(args.get("allow_no_channel") or False)}
     payload.update(_reminder_time_payload(schedule))
     return await _post_reminder(payload, brain_name=brain_name)
+
+
+async def _update_reminder(vault_root: str, rid: str, fields: dict) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=10) as c:
+            r = await c.post(f"http://127.0.0.1:{_port()}/reminders/update",
+                             data=dict({"id": rid, "brain": vault_root}, **fields))
+        data = r.json()
+    except Exception as e:
+        return f"ERROR: sửa lịch lỗi: {type(e).__name__}: {e}"
+    if not data.get("ok"):
+        return f"ERROR: {data.get('error') or 'không sửa được'}"
+    rem = data.get("reminder") or {}
+    when = rem.get("cron_human") or rem.get("cron") or ""
+    return (f"Đã sửa lịch {rid}" + (f" thành '{when}'" if when else "")
+            + f", lần chạy kế tiếp {rem.get('due_human') or '?'}.")
+
+
+def _update_loop_file(vault_root: str, slug: str, fields: dict) -> str:
+    """Sửa loop bằng cách ghi lại frontmatter. Chỉ nhận name/prompt/schedule - các trường an toàn
+    (enabled/mode) vẫn phải bật tay trên dashboard, đúng luật loop tạo qua chat."""
+    fp = _loops_dir(vault_root) / f"{slug}.md"
+    try:
+        if fp.resolve().parent != _loops_dir(vault_root).resolve() or not fp.is_file():
+            return f"ERROR: không thấy việc lặp '{slug}'"
+        text = fp.read_text(encoding="utf-8")
+    except Exception as e:
+        return f"ERROR: đọc file loop lỗi: {type(e).__name__}: {e}"
+    m = _FM_RE.match(text)
+    if not m:
+        return f"ERROR: file loop '{slug}' không có frontmatter hợp lệ"
+    try:
+        fm = yaml.safe_load(m.group(1)) or {}
+    except Exception as e:
+        return f"ERROR: frontmatter lỗi: {e}"
+    if not isinstance(fm, dict):
+        return "ERROR: frontmatter lỗi"
+    body = m.group(2)
+    if fields.get("name"):
+        fm["name"] = str(fields["name"])
+    if fields.get("prompt"):
+        body = str(fields["prompt"]).strip() + "\n"
+    if fields.get("schedule"):
+        interval = _interval_min(str(fields["schedule"]))
+        if interval is None:
+            return (f"ERROR: không rõ chu kỳ '{fields['schedule']}' - nói rõ số + đơn vị "
+                    f"(vd '120m', '2 tiếng', 'mỗi ngày')")
+        fm["interval_min"] = interval
+    fm["updated"] = _today()
+    lines = ["---"]
+    for k, v in fm.items():
+        lines.append(f"{k}: " + (_yaml_scalar(v) if isinstance(v, str) else json.dumps(v)))
+    lines += ["---", "", body.strip(), ""]
+    try:
+        tmp = fp.with_suffix(".md.tmp")
+        tmp.write_text("\n".join(lines), encoding="utf-8")
+        tmp.replace(fp)
+    except Exception as e:
+        return f"ERROR: ghi file loop lỗi: {type(e).__name__}: {e}"
+    return (f"Đã sửa việc lặp '{fm.get('name') or slug}' (mỗi {fm.get('interval_min')} phút). "
+            f"Trạng thái bật/tắt giữ nguyên.")
+
+
+async def _do_update(vault_root: str, args: dict) -> str:
+    rid = str(args.get("id") or "").strip()
+    if not rid:
+        return "ERROR: cần 'id' để sửa (lấy từ op=list)."
+    fields = {}
+    if str(args.get("name") or "").strip():
+        fields["name"] = str(args["name"]).strip()
+    if str(args.get("prompt") or "").strip():
+        fields["prompt"] = str(args["prompt"]).strip()
+    if str(args.get("schedule") or "").strip():
+        fields["schedule"] = str(args["schedule"]).strip()
+    if not fields:
+        return "ERROR: không có gì để sửa - truyền ít nhất một trong name / prompt / schedule."
+    if (_loops_dir(vault_root) / f"{rid}.md").is_file():
+        return _update_loop_file(vault_root, rid, fields)
+    # Kho nhắc hẹn: đổi lịch thì dịch chuỗi lịch sang tham số thời gian như lúc tạo.
+    payload = {}
+    if "name" in fields:
+        payload["label"] = fields["name"]
+    if "prompt" in fields:
+        payload["text"] = fields["prompt"]
+    if "schedule" in fields:
+        payload.update(_reminder_time_payload(fields["schedule"]))
+    return await _update_reminder(vault_root, rid, payload)
 
 
 async def _do_list(vault_root: str) -> str:
@@ -412,8 +510,12 @@ async def _do_list(vault_root: str) -> str:
     if pending:
         lines.append("Nhắc hẹn / lịch (kho reminders):")
         for r in pending:
-            extra = f" (lặp cron {r.get('cron')})" if r.get("cron") else ""
-            lines.append(f"- [{r.get('id')}] {r.get('text')} - {r.get('due_human')}{extra}")
+            # Nói lịch bằng LỜI ("7:00 mỗi ngày") kèm biểu thức thô - model kể lại cho user thì
+            # user hiểu ngay, không phải tự dịch "0 7 * * *".
+            extra = (f" (lặp {r.get('cron_human') or r.get('cron')} - cron {r.get('cron')})"
+                     if r.get("cron") else "")
+            lines.append(f"- [{r.get('id')}] {r.get('label') or r.get('text')} - "
+                         f"kế tiếp {r.get('due_human')}{extra}")
     if rem.get("error"):
         lines.append(f"(không đọc được kho nhắc hẹn: {rem['error']})")
     if not lines:
@@ -442,21 +544,27 @@ async def javis_schedule(args: dict, cctx) -> str:
         return await _do_create(vault_root, args)
     if op == "list":
         return await _do_list(vault_root)
+    if op == "update":
+        return await _do_update(vault_root, args)
     if op == "cancel":
         return await _do_cancel(vault_root, args)
-    return f"ERROR: op không hợp lệ: {op!r} (dùng create|list|cancel)"
+    return f"ERROR: op không hợp lệ: {op!r} (dùng create|list|update|cancel)"
 
 
 def register(ctx) -> None:
     ctx.register_tool(
         name="javis_schedule",
         description=(
-            "Tạo/liệt kê/huỷ việc chạy ĐỊNH KỲ hoặc NHẮC HẸN ngay từ chat - thay vì tự gõ YAML "
+            "Tạo/liệt kê/sửa/huỷ việc chạy ĐỊNH KỲ hoặc NHẮC HẸN ngay từ chat - thay vì tự gõ YAML "
             "vào Javis/loops hay tự curl POST /reminders. GỌI khi user nói kiểu: 'tạo cho anh "
             "việc mỗi 2 tiếng quét đơn' (op=create, schedule='120m' hoặc 'mỗi 2 tiếng'), '7h "
             "sáng nào cũng nhắc anh doanh thu' (schedule='0 7 * * *'), '30 phút nữa nhắc anh "
             "gọi khách' (schedule='30 phút nữa'), 'còn việc gì đang chạy không' (op=list), hoặc "
+            "'đổi giờ việc đó sang 8h' (op=update, id lấy từ op=list, schedule='0 8 * * *'), hoặc "
             "'huỷ việc quét đơn đi' (op=cancel, id lấy từ op=list trước). "
+            "ĐỦ ĐIỀU KIỆN MỚI TẠO: trước khi op=create, tự hỏi việc này tới giờ chạy có ĐỦ thứ "
+            "cần không (nguồn dữ liệu đã đấu chưa, kênh báo kết quả đã có chưa). Thiếu thì NÓI "
+            "THẲNG thiếu gì và hỏi user, KHÔNG tạo trước rồi im lặng để nó chạy thất bại mỗi ngày. "
             "CHỈ GỌI khi user ra lệnh rõ ràng với lịch tự động của Javis; KHÔNG gọi chỉ vì câu có "
             "'đặt lịch', booking, tư vấn 1-1, cuộc hẹn, hoặc đang bàn về sản phẩm/UX/marketing. "
             "Trong các trường hợp đó phải trả lời hội thoại bình thường, không op=list/create/cancel. "
@@ -471,9 +579,11 @@ def register(ctx) -> None:
         schema={
             "type": "object",
             "properties": {
-                "op": {"type": "string", "enum": ["create", "list", "cancel"],
+                "op": {"type": "string", "enum": ["create", "list", "update", "cancel"],
                        "description": ("create = tạo việc mới (cần name/prompt/schedule); "
                                        "list = liệt kê MỌI việc đang có, cả loop lẫn nhắc hẹn; "
+                                       "update = sửa việc đã có theo id (truyền name/prompt/"
+                                       "schedule - trường nào không truyền thì giữ nguyên); "
                                        "cancel = huỷ 1 việc theo id (lấy từ op=list).")},
                 "name": {"type": "string",
                          "description": "Tên ngắn của việc, vd 'Quét đơn mỗi 2 tiếng' (op=create)."},
@@ -492,8 +602,13 @@ def register(ctx) -> None:
                                                  "schedule trông giống chu kỳ lặp. Mặc định false.")},
                 "chat_id": {"type": "string",
                              "description": "chat_id Telegram người yêu cầu, để báo đúng người. Bỏ trống nếu không rõ."},
+                "allow_no_channel": {"type": "boolean",
+                                      "description": ("Chỉ đặt true khi tool đã báo THIẾU KÊNH GỬI, "
+                                                      "bạn đã nói với user thiếu gì, và user vẫn "
+                                                      "muốn tạo. TUYỆT ĐỐI không tự đặt true ngay "
+                                                      "lần gọi đầu.")},
                 "id": {"type": "string",
-                       "description": "id việc cần huỷ (op=cancel) - lấy từ kết quả op=list."},
+                       "description": "id việc cần sửa/huỷ (op=update|cancel) - lấy từ kết quả op=list."},
             },
             "required": ["op"],
         },
