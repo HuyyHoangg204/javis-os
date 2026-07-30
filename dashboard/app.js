@@ -305,6 +305,8 @@ function restoreSession() {
     if (t.ask) window.JavisAsk.render(el, t.ask, i === convo.length - 1);
   });
   if (convo.length) scrollBottom(true);
+  notifySessions();   // panel Lịch sử tô đúng phiên đang xem thay vì không tô cái nào
+  syncActiveUI();
 }
 
 // ============================================
@@ -1893,7 +1895,10 @@ pumpAudioLevel();
 loadMemStats();
 loadBrainStats();
 checkVault();
-// Mặc định: mỗi lần tải trang là VÀO HỘI THOẠI MỚI (không khôi phục phiên cũ vào khung chat).
-// Hội thoại cũ KHÔNG mất - vẫn nằm trong panel Lịch sử (lưu ở server), bấm để mở lại.
-try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
-savedSessionId = null;
+// Mặc định: tải lại trang (hoặc mở thêm tab) thì VÀO LẠI ĐÚNG HỘI THOẠI ĐANG DỞ.
+// 0.9.88 từng đổi thành luôn mở khung trống; dùng thật thì mỗi lần F5 lại mất mạch chuyện
+// đang nói, phải vào Lịch sử bấm lại. Muốn khung trống thì bấm nút + (hội thoại mới).
+// Khôi phục lấy từ localStorage nên hiện tức thì, giữ nguyên cả ảnh đính kèm lẫn chip chọn
+// đáp án - thứ mà tải lại từ server (/sessions) không có. savedSessionId sống lại theo, nên
+// lượt đang chạy nền của phiên này vẫn stream tiếp vào đúng khung sau khi tải lại.
+restoreSession();

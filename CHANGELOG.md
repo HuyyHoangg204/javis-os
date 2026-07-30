@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.268] - 2026-07-30
+Tải lại trang hoặc mở thêm tab giờ vào lại đúng hội thoại đang dở.
+### Cải thiện
+- **Tải lại trang không còn văng vào hội thoại mới.** Bản 0.9.88 đổi mặc định thành mỗi lần tải trang là mở khung trống; dùng thật thì mỗi lần F5, mỗi lần mở thêm tab là mất mạch chuyện đang nói, phải vào Lịch sử bấm lại. Giờ quay về khôi phục đúng hội thoại đang dở. Muốn khung trống thì bấm nút + như cũ. Khôi phục đọc từ localStorage nên hiện tức thì và giữ nguyên cả ảnh đính kèm lẫn chip chọn đáp án - thứ mà tải lại từ server không có. Mã phiên sống lại theo, nên lượt đang chạy nền vẫn stream tiếp vào đúng khung sau khi tải lại.
+
 ## [0.9.267] - 2026-07-30
 Bong bóng lỗi trong chat in nguyên thẻ svg, và Javis không nhận ra Codex mất đăng nhập.
 ### Sửa lỗi
