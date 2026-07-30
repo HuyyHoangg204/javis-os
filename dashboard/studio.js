@@ -310,8 +310,20 @@
   }
 
   async function editAgent(a) {
-    const sd = await api(`/skills?brain=${encodeURIComponent(brain())}`);
+    const [sd, claudeData, codexData] = await Promise.all([
+      api(`/skills?brain=${encodeURIComponent(brain())}`),
+      api("/provider/models?provider=anthropic-cli"),
+      api("/provider/models?provider=openai-oauth&refresh=1"),
+    ]);
     const skills = sd.skills || [];
+    const uniq = (xs) => [...new Set((xs || []).filter(Boolean))];
+    const claudeModels = uniq(claudeData.models);
+    const codexModels = uniq(codexData.models);
+    const knownModels = claudeModels.concat(codexModels);
+    const currentOnly = a && a.model && !knownModels.includes(a.model)
+      ? `<optgroup label="Model đang lưu"><option value="${esc(a.model)}">${esc(a.model)} (đang lưu)</option></optgroup>` : "";
+    const modelOptions = (label, models) => models.length
+      ? `<optgroup label="${esc(label)}">${models.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}</optgroup>` : "";
     const box = document.getElementById("editorBox");
     box.innerHTML = `<h3>${a ? "Sửa" : "Tạo"} Agent</h3>
       <label>Tên</label><input id="agName" value="${esc(a ? a.name : "")}">
@@ -320,10 +332,11 @@
       <label>Skills</label><div class="skill-pick" id="skillPick">${skills.length ? skills.map(s => `<label class="sp"><input type="checkbox" value="${esc(s.slug)}" ${a && (a.skills || []).includes(s.slug) ? "checked" : ""}> ${esc(s.name)}</label>`).join("") : '<span class="dim">Vault chưa có skill trong skills/ - vẫn tạo agent được, gán skill sau.</span>'}</div>
       <label>Model</label><select id="agModel">
         <option value="">Mặc định (theo CLI)</option>
-        <optgroup label="Claude (Claude Code)"><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option><option value="fable">Fable</option></optgroup>
-        <optgroup label="ChatGPT (Codex - cần đăng nhập ChatGPT)"><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.4">GPT-5.4</option><option value="gpt-5.3-codex">GPT-5.3 Codex</option></optgroup>
+        ${currentOnly}
+        ${modelOptions("Claude (Claude Code)", claudeModels)}
+        ${modelOptions("ChatGPT (Codex - danh sách live)", codexModels)}
       </select>
-      <div class="dim" style="font-size:12px;margin-top:4px">Agent chạy qua CLI của nhà cung cấp: chọn Claude → Claude Code; chọn ChatGPT → Codex (cần đã đăng nhập ChatGPT ở máy/VPS). Cả hai đều đọc/ghi file vault + dùng MCP.</div>
+      <div class="dim" style="font-size:12px;margin-top:4px">Agent chạy qua CLI của nhà cung cấp. Model ChatGPT được lấy trực tiếp từ Codex nên bản mới sẽ tự xuất hiện; chọn Mặc định để Codex tự dùng model mặc định mới nhất. Cả hai đều đọc/ghi file vault + dùng MCP.</div>
       <div class="editor-actions"><button class="s-btn-ghost" id="cancelEd">Huỷ</button><button class="s-btn" id="saveAg">Lưu</button></div>`;
     if (a && a.model) box.querySelector("#agModel").value = a.model;
     box.querySelector("#cancelEd").onclick = () => editor.classList.remove("open");

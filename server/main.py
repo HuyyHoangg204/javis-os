@@ -600,7 +600,7 @@ PROVIDER_DEFS = [   # thứ tự = thứ tự hiển thị card ở trang Models
     {"id": "anthropic-cli", "label": "Anthropic OAuth (Claude Code)", "kind": "cli", "key_field": None,          "catalog_key": "claude",
      "default_models": ["opus", "sonnet", "haiku", "fable"]},
     {"id": "openai-oauth",  "label": "OpenAI OAuth (ChatGPT)",  "kind": "oauth", "key_field": None,             "catalog_key": "openai-oauth",
-     "default_models": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex"]},
+     "default_models": []},  # model/list của Codex app-server là nguồn chân lý; không ghim version ở đây
     {"id": "openrouter",    "label": "OpenRouter",              "kind": "api", "key_field": "openrouter_key",    "catalog_key": "openrouter",
      "default_models": ["openai/gpt-4o-mini"]},
     {"id": "anthropic-api", "label": "Anthropic (API)",         "kind": "api", "key_field": "anthropic_api_key", "catalog_key": "anthropic-api",
@@ -688,13 +688,15 @@ def _aux_swap(cli, mode=None, tag=None):
 
 def _codex_safe_model(model: str) -> str:
     """Model hợp lệ cho Codex/ChatGPT-account. Model API thường (gpt-5-mini, gpt-4o, o3...)
-    KHÔNG chạy được qua Codex → coerce về model Codex trong catalog (mặc định gpt-5.5).
+    KHÔNG chạy được qua Codex → coerce về model Codex mặc định vừa lấy live.
     Hợp lệ = nằm trong catalog 'openai-oauth' HOẶC kết thúc '-codex'."""
     m = (model or "").strip()
-    cat = (cfgmod.read_settings().get("model", {}).get("catalog", {}).get("openai-oauth")) or ["gpt-5.5"]
+    cat = (cfgmod.read_settings().get("model", {}).get("catalog", {}).get("openai-oauth")) or []
     if m and (m in cat or m.endswith("-codex")):
         return m
-    return cat[0]
+    # Catalog rỗng (cài mới/offline): không truyền -m để Codex tự chọn default
+    # hiện hành của chính nó, thay vì Javis đoán một model id rồi sớm lỗi thời.
+    return cat[0] if cat else ""
 
 def _is_codex_model(model: str) -> bool:
     """Model này thuộc Codex/ChatGPT (chạy qua Codex CLI) hay Claude? gpt* / *-codex / trong
@@ -1664,7 +1666,9 @@ async def _fetch_provider_models(provider, m):
                if "generateContent" in (x.get("supportedGenerationMethods") or [])]
         return sorted(i for i in ids if i.startswith("gemini")) or None
     if provider == "openai-oauth":
-        return openai_oauth.list_models(openai_oauth.valid_creds())   # None nếu backend không có endpoint → fallback
+        # app-server là subprocess đồng bộ; chạy ở worker để request FastAPI
+        # khác không đứng hình trong lúc Codex nạp catalog.
+        return await asyncio.to_thread(openai_oauth.list_models, openai_oauth.valid_creds())
     if provider == "anthropic-cli":
         # Provider này chạy bằng đăng nhập OAuth của Claude Code → mượn chính token đó hỏi
         # /v1/models, nên Anthropic ra bản mới là picker thấy ngay (trước kẹt ở 4 alias tĩnh).
@@ -1693,7 +1697,7 @@ def _remember_catalog(cfg, d, ids):
         print(f"[models] không ghi được catalog {key}: {e}", file=sys.stderr)
 
 
-async def provider_models_index(provider: str) -> dict:
+async def provider_models_index(provider: str, refresh: bool = False) -> dict:
     """Lõi thuần của GET /provider/models. Dùng chung với Telegram (menu chọn model)."""
     cfg = cfgmod.read_settings()
     m = cfg.get("model", {})
@@ -1702,7 +1706,7 @@ async def provider_models_index(provider: str) -> dict:
     fallback = cat.get(d.get("catalog_key", "")) or d.get("default_models", [])
     now = time.time()
     c = _PROV_MODELS_CACHE.get(provider)
-    if c and (now - c["ts"]) < 600 and c.get("ids"):
+    if not refresh and c and (now - c["ts"]) < 600 and c.get("ids"):
         return {"models": c["ids"], "live": True, "cached": True}
     try:
         ids = await _fetch_provider_models(provider, m)
@@ -1719,9 +1723,9 @@ async def provider_models_index(provider: str) -> dict:
 
 
 @app.get("/provider/models")
-async def provider_models(provider: str = Query(...)):
-    """Model động cho 1 provider (cache 10 phút). Trả {models, live}. live=False = fallback catalog."""
-    return await provider_models_index(provider)
+async def provider_models(provider: str = Query(...), refresh: bool = Query(False)):
+    """Model động cho 1 provider. ``refresh=1`` bỏ cache để picker hỏi Codex ngay."""
+    return await provider_models_index(provider, refresh=refresh)
 
 
 @app.get("/memory/stats")

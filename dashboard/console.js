@@ -2807,7 +2807,10 @@
       if (liveCache[pid]) { draw(); return; }
       loadingProv = pid; draw();
       let res = null;
-      try { res = await (await fetch("/provider/models?provider=" + encodeURIComponent(pid))).json(); } catch (e) {}
+      try {
+        const force = pid === "openai-oauth" ? "&refresh=1" : "";
+        res = await (await fetch("/provider/models?provider=" + encodeURIComponent(pid) + force)).json();
+      } catch (e) {}
       const stat = (providers.find(x => x.id === pid) || {}).models || [];
       liveCache[pid] = (res && res.models && res.models.length)
         ? { models: res.models, live: !!res.live } : { models: stat, live: false };

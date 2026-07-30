@@ -413,9 +413,6 @@ def find_codex_cli() -> Optional[str]:
                 return envp
         except Exception:
             pass
-    cli = shutil.which("codex")
-    if cli:
-        return cli
     home = _home_dir()
     cands = [
         home / ".codex" / ".sandbox-bin" / "codex.exe",
@@ -424,12 +421,21 @@ def find_codex_cli() -> Optional[str]:
         Path(os.environ.get("APPDATA", "")) / "npm" / "codex.exe",
         home / ".codex" / ".sandbox-bin" / "codex",
     ]
+    # Windows Store có thể đặt app-execution alias ``codex.exe`` lên PATH nhưng
+    # service/tiến trình nền không được quyền chạy alias đó (WinError 5). Bản
+    # executable Codex Desktop xuất trong ~/.codex chạy được thật, nên ưu tiên
+    # nó trên Windows. POSIX vẫn tôn trọng PATH trước như thông lệ.
+    cli = shutil.which("codex")
+    if cli and (os.name != "nt" or "windowsapps" not in cli.lower()):
+        return cli
     for p in cands:
         try:
             if p.exists():
                 return str(p)
         except Exception:
             pass
+    if cli:
+        return cli
     for p in ("/usr/local/bin/codex", "~/.local/bin/codex"):
         pp = Path(p).expanduser()
         if pp.exists():

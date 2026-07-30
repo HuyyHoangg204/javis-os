@@ -4,7 +4,8 @@
   "use strict";
 
   const EFFORT = [["off", "Tắt"], ["low", "Thấp"], ["medium", "Vừa"], ["high", "Cao"]];
-  const modelCache = {};   // provider id -> [model ids] (tải live, cache trong phiên)
+  const modelCache = {};   // provider id -> {models, ts}; không giữ catalog cũ suốt cả tab
+  const MODEL_CACHE_MS = 5 * 60 * 1000;
   let state = { providers: [], main: { provider: "", model: "" }, reasoning: "off" };
   let expanded = null;     // provider đang mở rộng trong popover
   let filter = "";
@@ -38,12 +39,14 @@
   }
 
   async function fetchModels(pid) {
-    if (modelCache[pid]) return modelCache[pid];
+    const cached = modelCache[pid];
+    if (cached && Date.now() - cached.ts < MODEL_CACHE_MS) return cached.models;
     try {
-      const d = await (await fetch("/provider/models?provider=" + encodeURIComponent(pid))).json();
-      modelCache[pid] = d.models || [];
-    } catch (e) { modelCache[pid] = []; }
-    return modelCache[pid];
+      const force = pid === "openai-oauth" ? "&refresh=1" : "";
+      const d = await (await fetch("/provider/models?provider=" + encodeURIComponent(pid) + force)).json();
+      modelCache[pid] = { models: d.models || [], ts: Date.now() };
+    } catch (e) { modelCache[pid] = { models: [], ts: Date.now() }; }
+    return modelCache[pid].models;
   }
 
   async function renderPop() {

@@ -31,6 +31,7 @@ import httpx
 from urllib.parse import urlencode, urlparse, parse_qs
 
 import config as cfgmod
+import codex_models
 
 CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann"
 AUTH_BASE = "https://auth.openai.com"
@@ -258,9 +259,8 @@ def write_codex_auth():
         return False
 
 
-def list_models(creds):
-    """Lấy danh sách model account được phép (động) từ backend Codex. None → caller fallback catalog.
-    Loại model '-pro' (ChatGPT account không gọi được)."""
+def _list_models_backend(creds):
+    """Nguồn dự phòng cho Codex CLI cũ chưa có app-server ``model/list``."""
     if not creds or not creds.get("access_token"):
         return None
     headers = {
@@ -303,6 +303,24 @@ def list_models(creds):
         if ids:
             return ids
     return None
+
+
+def list_models(creds):
+    """Lấy model LIVE từ chính Codex, không ghim version model trong Javis.
+
+    Nguồn chính là ``codex app-server`` / ``model/list``: cùng catalog và cùng
+    quyền account mà model picker chính thức của Codex dùng. Endpoint backend
+    trực tiếp chỉ còn là đường tương thích cho Codex CLI cũ.
+    """
+    if not creds or not creds.get("access_token"):
+        return None
+    # Javis có luồng OAuth riêng; bắc cầu token sang kho Codex trước để
+    # app-server nhìn đúng account ngay cả khi user chưa từng chạy `codex login`.
+    write_codex_auth()
+    live = codex_models.list_models()
+    if live and live.get("models"):
+        return live["models"]
+    return _list_models_backend(creds)
 
 
 def disconnect():
