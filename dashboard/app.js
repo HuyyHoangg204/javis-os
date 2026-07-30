@@ -1547,7 +1547,7 @@ async function refreshTgStatus() {
   if (!el) return;
   try {
     const s = await (await fetch("/telegram/status")).json();
-    if (!s.enabled) el.textContent = "● Tắt";
+    if (!s.enabled) el.innerHTML = ic("circle", { cls: "ic-fill ic-dim" }) + " Tắt";
     else if (!s.token_set) el.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Đã bật nhưng chưa có token";
     else el.innerHTML = s.running ? ic("circle", { cls: "ic-fill ic-ok" }) + " Đang chạy" + (s.chat_id ? " · chỉ chat_id " + s.chat_id : " · MỌI người (nên đặt chat_id)") : ic("loader") + " Chưa chạy (lưu lại)";
   } catch (e) { el.textContent = ""; }
@@ -1681,7 +1681,7 @@ async function openSettings() {
     document.getElementById("setTgHint").textContent = (s.telegram && s.telegram.token_set) ? "(đã lưu " + s.telegram.token + ")" : "(chưa có)";
     refreshTgStatus();
     document.getElementById("setAuthUser").value = (s.auth && s.auth.username) || "";
-    document.getElementById("setAuthState").textContent = (s.auth && s.auth.has_password)
+    document.getElementById("setAuthState").innerHTML = (s.auth && s.auth.has_password)
       ? ic("check", { cls: "ic-ok" }) + " Đã đặt mật khẩu - đăng nhập bắt buộc." : ic("triangle-alert", { cls: "ic-warn" }) + " Chưa đặt mật khẩu - ai mở trang cũng dùng được. Đặt mật khẩu trước khi lên VPS.";
   } catch (e) {}
 }
@@ -1737,8 +1737,8 @@ if (document.getElementById("settingsBtn")) {
     const btn = e.target; btn.disabled = true; const old = btn.textContent; btn.textContent = "Đang gửi...";
     try {
       const r = await (await fetch("/telegram/test", { method: "POST" })).json();
-      btn.textContent = r.ok
-        ? (r.total > 1 ? `${ic("check", { cls: "ic-ok" })} Đã gửi ${r.sent}/${r.total} ID` + (r.error ? " (có lỗi)" : "") : ic("check", { cls: "ic-ok" }) + " Đã gửi (xem Telegram)")
+      btn.innerHTML = r.ok
+        ? (r.total > 1 ? `${ic("check", { cls: "ic-ok" })} Đã gửi ${Number(r.sent) || 0}/${Number(r.total) || 0} ID` + (r.error ? " (có lỗi)" : "") : ic("check", { cls: "ic-ok" }) + " Đã gửi (xem Telegram)")
         : (ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(r.error || "lỗi"));
     } catch (e) { btn.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " lỗi mạng"; }
     setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 2500);

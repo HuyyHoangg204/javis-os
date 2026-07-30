@@ -9,6 +9,11 @@ Hai lỗi test này canh, đều là loại KHÔNG thấy bằng mắt khi revie
 2. Emoji bò trở lại. Cả dashboard đã bỏ emoji để icon tự đổi màu theo tông
    SÁNG/TỐI và vẽ giống nhau trên mọi máy. Một lần thêm "canh bao ..." kèm
    emoji cho nhanh là phá lại thành quả đó, nên quét thẳng vào nguồn.
+
+3. Nhét chuỗi icon vào .textContent. Emoji thì textContent hiện ra bình thường,
+   còn icon là thẻ <svg> nên user đọc nguyên mã nguồn trên màn hình. Đây là cái
+   bẫy riêng của đợt di trú: đổi nội dung sang icon mà quên đổi textContent
+   thành innerHTML. Mắt người review rất khó thấy, nên quét bằng test.
 """
 import json
 import re
@@ -67,6 +72,63 @@ ALLOW = {
     ("task-suggest.js", "\U0001F53C"),   # ưu tiên vừa
     ("task-suggest.js", "\U0001F53D"),   # ưu tiên thấp
 }
+
+
+# Chuỗi trả về từ tầng icon: ic(...), Icons.msg/warn/ok, và các hằng *_ICON
+# dựng sẵn ở đầu console.js. Tất cả đều là HTML.
+ICON_EXPR = re.compile(r"\bic\(|\bIcons\.(?:msg|warn|ok)\(|\b[A-Z][A-Z0-9_]*_ICON\b")
+ASSIGN_TEXT = re.compile(r"\.textContent\s*\+?=\s*")
+# Bắt buộc có khoảng trắng hai bên dấu "=" để không nhặt phải thuộc tính HTML
+# nằm trong chuỗi (vd rel="noopener") - thứ luôn viết liền không có khoảng trắng.
+ASSIGN_ANY = re.compile(r"\b([A-Za-z_$][\w$]*)\s\+?=\s[^=]")
+BARE_VAR = re.compile(r"^([A-Za-z_$][\w$]*)$")
+
+
+def _stmt_at(lines, i, start):
+    """Lấy câu lệnh từ vị trí start của dòng i, nối tối đa 3 dòng nếu chưa đóng."""
+    stmt = lines[i][start:]
+    for nxt in lines[i + 1:i + 4]:
+        if ";" in stmt:
+            break
+        stmt += " " + nxt
+    return stmt.split(";")[0]
+
+
+def scan_text_content():
+    """Tìm chỗ gán HTML icon vào .textContent (phải là .innerHTML).
+
+    Hai lối lọt, canh cả hai:
+    - Icon nằm NGAY trong câu lệnh gán. Quét theo CÂU LỆNH chứ không theo dòng,
+      vì nhiều chỗ viết ternary trải 3 dòng, icon ở dòng dưới dấu "=".
+    - Icon nằm trong BIẾN dựng ở trên rồi mới gán (vd `line = ic(...)` ... rồi
+      `st.textContent = line`). Đây đúng là chỗ đã lọt thật ở thẻ Telegram.
+
+    Chưa canh được: icon truyền qua THAM SỐ hàm phụ (vd một hàm mk(label) tự
+    gán label vào textContent). Chỗ đó phải tự nhớ khi viết hàm nhận HTML.
+    """
+    hits = []
+    for path in SCAN:
+        if path.suffix != ".js":
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+
+        # Vòng 1: biến nào từng nhận chuỗi icon.
+        icon_vars = set()
+        for i, line in enumerate(lines):
+            for m in ASSIGN_ANY.finditer(line):
+                if ICON_EXPR.search(_stmt_at(lines, i, m.end() - 1)):
+                    icon_vars.add(m.group(1))
+
+        # Vòng 2: chỗ gán vào textContent - icon trực tiếp hoặc qua biến trên.
+        for i, line in enumerate(lines):
+            m = ASSIGN_TEXT.search(line)
+            if not m:
+                continue
+            stmt = _stmt_at(lines, i, m.end())
+            bare = BARE_VAR.match(stmt.strip())
+            if ICON_EXPR.search(stmt) or (bare and bare.group(1) in icon_vars):
+                hits.append((path.name, i + 1, line.strip()[:90]))
+    return hits
 
 
 def scan_emoji():
@@ -169,6 +231,12 @@ if hits:
             print(f"        {lineno}: {glyph} | {snippet}")
         if len(rows) > 4:
             print(f"        ... thêm {len(rows) - 4} chỗ")
+
+# --- 7. Không gán HTML icon vào textContent ----------------------------------
+tc_hits = scan_text_content()
+check(f"không nhét thẻ <svg> icon vào .textContent (thấy {len(tc_hits)})", not tc_hits)
+for fname, lineno, snippet in tc_hits:
+    print(f"      {fname}:{lineno} - phải đổi sang .innerHTML | {snippet}")
 
 if fails:
     raise SystemExit(f"\nFAIL - test_icons: {len(fails)} lỗi")

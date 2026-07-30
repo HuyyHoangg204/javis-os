@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.258] - 2026-07-30
+Sửa mấy chỗ hiện nguyên mã `<svg ...>` thành chữ trên màn hình - dư âm của đợt đổi emoji sang icon Lucide.
+### Sửa lỗi
+- **Trang Kênh: dòng trạng thái Telegram in ra nguyên thẻ `<svg class="ic ic-fill ic-ok" ...>`** thay vì đèn xanh. Nguyên do: nội dung dòng đó chứa icon (là HTML) nhưng vẫn gán qua `textContent`, mà `textContent` coi mọi thứ là chữ trơ. Đổi sang `innerHTML`. Cùng lỗi ở dòng báo kết quả "Gửi test", ở trạng thái mật khẩu và nút gửi test Telegram trong hộp Cài đặt nhanh, và ở hàng nút của khung xem file (sửa tên / xoá / phóng to / đóng - trước đây mỗi nút là một đoạn mã dài).
+- Nhân đây bịt luôn hai chỗ nối thẳng chuỗi lỗi từ server vào HTML (lỗi 409 của Telegram và lỗi khi gửi test): giờ escape qua `esc()`, còn `r.sent`/`r.total` ép về số.
+- Trạng thái Telegram trong hộp Cài đặt nhanh lúc TẮT còn dùng ký tự `●`, giờ dùng icon như ba nhánh còn lại nên cùng một kiểu vẽ.
+### Cải thiện
+- **`tests/python/test_icons.py` canh thêm loại lỗi này**: quét nguồn tìm chỗ gán chuỗi icon vào `.textContent`, lần theo cả biến trung gian (`line = ic(...)` rồi `st.textContent = line` - đúng ca đã lọt). Đây là lỗi mắt người review rất khó thấy vì trên code nó y như một dòng chữ bình thường.
+
 ## [0.9.257] - 2026-07-30
 Bỏ hết emoji khỏi giao diện, thay bằng bộ icon Lucide vẽ nét. Emoji do font hệ thống vẽ nên mỗi máy ra một hình, lại cứng màu nên ở tông SÁNG là chọc vào mắt; icon nét thì giống nhau trên mọi máy và tự ăn theo màu chữ.
 ### Cải thiện

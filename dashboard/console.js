@@ -3507,11 +3507,11 @@
         const n = (d.chat_ids || []).length;
         line = `${ic("circle", { cls: "ic-fill ic-ok" })} Bot đang nhận tin - ${n ? n + " chat ID được phép" : "MỌI NGƯỜI nhắn được (chưa giới hạn ID)"} - nhắn cho bot là Javis trả lời.`;
       }
-      else if (d.status === "conflict") line = ic("circle", { cls: "ic-fill ic-err" }) + " 409: " + (d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
+      else if (d.status === "conflict") line = ic("circle", { cls: "ic-fill ic-err" }) + " 409: " + esc(d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
       else if (d.status === "error") line = WARN_ICON + " Lỗi bot: " + esc(d.last_error || "");
       else if (d.status === "starting") line = ic("loader", { cls: "ic-spin" }) + " Đang khởi động bot…";
       else line = ic("circle", { cls: "ic-dim" }) + " Bot đã tắt.";
-      st.textContent = line;
+      st.innerHTML = line;  // line chứa thẻ <svg> của icon - textContent sẽ in nguyên mã ra chữ
     }
     refreshTgStatus();
     document.getElementById("tgSave").onclick = async () => {
@@ -3527,8 +3527,8 @@
       st.textContent = "Đang gửi test...";
       try {
         const r = await (await fetch("/telegram/test", { method: "POST" })).json();
-        st.textContent = r.ok
-          ? (r.total > 1 ? `${OK_ICON} Đã gửi tin test tới ${r.sent}/${r.total} ID.` + (r.error ? " Lỗi: " + r.error : "") : OK_ICON + " Đã gửi tin test.")
+        st.innerHTML = r.ok
+          ? (r.total > 1 ? `${OK_ICON} Đã gửi tin test tới ${Number(r.sent) || 0}/${Number(r.total) || 0} ID.` + (r.error ? " Lỗi: " + esc(r.error) : "") : OK_ICON + " Đã gửi tin test.")
           : Icons.warn(r.error || "Chưa cấu hình bot.");
       }
       catch (e) { st.innerHTML = WARN_ICON + " Lỗi mạng."; }
@@ -4274,7 +4274,8 @@
     await _vtRebuildReExpand(null);
   }
   function _neCommonBtns(actions, rel, it) {
-    const mk = (label, title, fn) => { const b = document.createElement("button"); b.textContent = label; if (title) b.title = title; b.onclick = fn; return b; };
+    // label là HTML (icon SVG), không phải chữ trơ - dùng innerHTML kẻo in ra mã.
+    const mk = (label, title, fn) => { const b = document.createElement("button"); b.innerHTML = label; if (title) b.title = title; b.onclick = fn; return b; };
     const ed = document.getElementById("noteEditor");
     actions.appendChild(mk(ic("pencil"), "Đổi tên file", () => _neRenameCur(rel, it)));
     actions.appendChild(mk(ic("trash-2"), "Xoá file", () => _neDeleteCur(rel, it)));
