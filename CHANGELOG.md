@@ -4,6 +4,13 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.266] - 2026-07-30
+Icon mục Kênh đổi sang máy bay giấy, và chuẩn hoá chữ trong mọi ô nhập.
+### Cải thiện
+- **Mục Kênh đổi icon từ phong bì sang máy bay giấy.** Trang này là Telegram và các kênh chat, phong bì đọc ra thành email nên sai nghĩa.
+- **Mọi placeholder trong ô nhập viết hoa chữ đầu và bỏ viết tắt.** Rà 96 chuỗi ở index.html, dashboard/*.js và system/mcp-catalog.json: "vd 123456789, 987654321" thành "Ví dụ: 123456789, 987654321", "dán API key Pancake POS..." thành "Dán API key Pancake POS...". Chuỗi mẫu kỹ thuật (key, URL, lệnh) thì không viết hoa được phần ruột vì viết hoa là sai giá trị, nên thêm tiền tố "Ví dụ: " cho vừa đúng luật vừa nói rõ đó là mẫu. Vài chỗ nhân tiện viết lại cho gọn: "để trống = không đặt mật khẩu" thành "Để trống nếu không đặt mật khẩu", "args cách nhau bằng dấu cách" thành "các tham số cách nhau bằng dấu cách".
+- Thêm `test_placeholder_ui.py` canh quy ước này. Placeholder nằm rải ba nơi và mỗi connector mới lại thêm một bộ trường riêng, nên không có test thì vài tuần là lệch lại.
+
 ## [0.9.265] - 2026-07-30
 Khách cài VPS đấu Facebook bị "URL bị chặn" vì hướng dẫn không có chỗ copy địa chỉ callback.
 ### Sửa lỗi

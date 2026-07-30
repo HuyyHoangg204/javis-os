@@ -481,8 +481,8 @@
     const groupOpts = [...new Set(_skState.skills.map(s => s.group || "Chung"))].map(g => `<option value="${esc(g)}">`).join("");
     panel.innerHTML = `<div class="panel-bar"><h3>${slug ? "Sửa skill" : "Skill mới"}</h3></div>
       <div style="display:flex;flex-direction:column;gap:12px;max-width:660px">
-        <div><label>Tên skill</label><input id="skName" class="js-input" value="${esc(sk.name)}" placeholder="VD: Viết email bán hàng"></div>
-        <div><label>Nhóm</label><input id="skGroup" class="js-input" list="skGroupList" value="${esc(sk.group || "Chung")}" placeholder="VD: Marketing">
+        <div><label>Tên skill</label><input id="skName" class="js-input" value="${esc(sk.name)}" placeholder="Ví dụ: Viết email bán hàng"></div>
+        <div><label>Nhóm</label><input id="skGroup" class="js-input" list="skGroupList" value="${esc(sk.group || "Chung")}" placeholder="Ví dụ: Marketing">
           <datalist id="skGroupList">${groupOpts}</datalist></div>
         <div><label>Mô tả (description - quyết định khi nào skill kích hoạt)</label><textarea id="skDesc" class="js-input" style="min-height:60px">${esc(sk.description || "")}</textarea></div>
         <div><label>Nội dung (SKILL.md - hướng dẫn cho AI)</label><textarea id="skBody" class="js-input" style="min-height:200px;font-family:ui-monospace,monospace">${esc(sk.body || "")}</textarea></div>

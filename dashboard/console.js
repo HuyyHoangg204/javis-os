@@ -30,7 +30,7 @@
     learn: "brain",
     kanban: "square-kanban",
     models: "cpu",
-    channels: "mail",
+    channels: "send",
     mcp: "plug",
     plugins: "toolbox",
     logs: "scroll-text",
@@ -1182,9 +1182,9 @@
           <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
             <button class="si-chip sel" data-kind="loop">${ic("repeat")} Việc lặp</button>
             <button class="si-chip" data-kind="reminder">${ic("alarm-clock")} Nhắc hẹn</button></div></div>
-          <div class="si-field"><label>Tên</label><input id="lpName" placeholder="VD: Đọc email mỗi 2 tiếng"></div>
+          <div class="si-field"><label>Tên</label><input id="lpName" placeholder="Ví dụ: Đọc email mỗi 2 tiếng"></div>
           <div class="si-field"><label id="lpBodyLabel">Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
-            <textarea id="lpBody" placeholder="VD: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
+            <textarea id="lpBody" placeholder="Ví dụ: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
           <div id="lpLoopFields">
             <div class="si-row" style="gap:14px;flex-wrap:wrap">
               <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
@@ -1196,7 +1196,7 @@
           </div>
           <div id="lpRemFields" style="display:none">
             <div class="si-row" style="gap:14px;flex-wrap:wrap">
-              <div class="si-field"><label>Khi nào</label><input id="lpRemWhen" placeholder="30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00" style="min-width:260px"></div>
+              <div class="si-field"><label>Khi nào</label><input id="lpRemWhen" placeholder="Ví dụ: 30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00" style="min-width:260px"></div>
               <div class="si-field"><label>Kiểu</label><div class="si-row" id="lpRemModes">
                 <button class="si-chip sel" data-rmode="notify">${ic("alarm-clock")} Chỉ nhắc</button>
                 <button class="si-chip" data-rmode="task">${ic("bot")} Tự làm rồi báo</button></div></div>
@@ -1327,7 +1327,7 @@
       const when = el.querySelector("#lpRemWhen");
       when.value = rem && rem.cron ? rem.cron : "";
       when.placeholder = (rem && !rem.cron)
-        ? `để trống = giữ nguyên (đang hẹn ${fmtWhen(rem.due_at)})`
+        ? `Để trống nếu giữ nguyên (đang hẹn ${fmtWhen(rem.due_at)})`
         : "30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00";
       // Job script giữ nguyên kiểu (đổi kiểu là mất tên file script) → khoá hai nút Kiểu cho khỏi
       // tưởng đang đổi được; server cũng bỏ qua trường mode với loại này.
@@ -1787,8 +1787,8 @@
           <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Đồng bộ ngay</b>. Bật tự động để định kỳ tự khớp giữa các máy.</li>
         </ol>
         <div class="si-grid">
-          <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="https://github.com/blogminhquy/javis-brain-backup"></div>
-          <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="github_pat_..."></div>
+          <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="Ví dụ: https://github.com/blogminhquy/javis-brain-backup"></div>
+          <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="Ví dụ: github_pat_..."></div>
           <div class="si-row" style="gap:14px;flex-wrap:wrap">
             <div class="si-field"><label>Nhánh</label><input id="bkBranch" value="main" style="max-width:120px"></div>
             <div class="si-field"><label>Tự đồng bộ mỗi (giờ)</label><input type="number" id="bkInterval" min="1" value="6" style="max-width:120px"></div>
@@ -1934,7 +1934,7 @@
       el.querySelector("#bkRepo").value = s.repo_url || "";
       el.querySelector("#bkBranch").value = s.branch || "main";
       el.querySelector("#bkInterval").value = s.interval_hours || 6;
-      if (s.token_set && !el.querySelector("#bkToken").value) el.querySelector("#bkToken").placeholder = "•••• (đã lưu, để trống nếu giữ nguyên)";
+      if (s.token_set && !el.querySelector("#bkToken").value) el.querySelector("#bkToken").placeholder = "Đã lưu, để trống nếu giữ nguyên";
       bkAutoOn = !!s.enabled; bkAutoBtn.classList.toggle("sel", bkAutoOn); bkAutoBtn.textContent = bkAutoOn ? "● Bật" : "○ Tắt";
       const when = s.last_backup ? new Date(s.last_backup * 1000).toLocaleString() : "chưa đồng bộ";
       const gitNote = s.has_git ? "" : " · " + WARN_ICON + " máy chưa cài git (cần git để đồng bộ)";
@@ -1991,7 +1991,7 @@
       </div>
       <div class="si-field" style="margin-bottom:14px"><label>Chế độ dispatcher</label><div class="si-row" id="knOrch"></div></div>
       <div id="knForm" style="display:none;margin-bottom:14px;padding:14px;border:1px solid var(--hairline);border-radius:10px;background:var(--surface-1)">
-        <div class="si-field"><label>Goal</label><input id="knTitle" placeholder="VD: Phân tích sản phẩm bán chạy tuần này và soạn 3 bài đăng"></div>
+        <div class="si-field"><label>Goal</label><input id="knTitle" placeholder="Ví dụ: Phân tích sản phẩm bán chạy tuần này và soạn 3 bài đăng"></div>
         <div class="si-field"><label>Ngữ cảnh và đầu ra mong muốn</label><textarea id="knIntent" placeholder="Có thể viết tự nhiên. AI specifier sẽ chuẩn hoá, chọn worker và điều kiện hoàn thành."></textarea></div>
         <div class="si-row" style="gap:14px;flex-wrap:wrap">
           <div class="si-field" style="flex:1;min-width:220px"><label>Route</label><select id="knRoute" class="loop-sel">${routeOpts}</select></div>
@@ -2546,7 +2546,7 @@
       return `<div class="prov-card ${p.is_main ? "main" : ""}">
         ${provHead(p, on, p.kind === "cli" ? "MCP/skill" : "chat", (on ? "● Đã kết nối" : "○ Chưa kết nối") + " · " + p.models.length + " model")}
         ${p.needs_key
-          ? `<div class="prov-action"><input class="js-input" id="pk-${p.id}" type="password" placeholder="${on ? "đổi key (•••" + esc(masked) + ")" : "dán API key để kết nối"}"><button class="gcard-btn" data-pk="${p.id}">${on ? "Đổi key" : "Kết nối"}</button>${on ? `<button class="gcard-btn" data-disc="${p.id}" style="background:transparent;opacity:.75">Ngắt</button>` : ""}</div>`
+          ? `<div class="prov-action"><input class="js-input" id="pk-${p.id}" type="password" placeholder="${on ? "Đổi key (•••" + esc(masked) + ")" : "Dán API key để kết nối"}"><button class="gcard-btn" data-pk="${p.id}">${on ? "Đổi key" : "Kết nối"}</button>${on ? `<button class="gcard-btn" data-disc="${p.id}" style="background:transparent;opacity:.75">Ngắt</button>` : ""}</div>`
           : `<div class="prov-note">Dùng đăng nhập Claude Code - không cần key</div>`}
       </div>`;
     };
@@ -2683,7 +2683,7 @@
         <a href="${esc(safeHref(r.url))}" target="_blank" rel="noopener" style="color:var(--link-ink);word-break:break-all">${esc(r.url || "(không có link)")}</a><br>
         <b>2)</b> Đăng nhập xong, nếu trang hiện <b>một mã code</b> thì dán vào đây:
         <div style="margin-top:6px;display:flex;gap:8px;max-width:520px">
-          <input class="js-input" id="cliCode" placeholder="dán code (nếu có)" style="flex:1">
+          <input class="js-input" id="cliCode" placeholder="Dán code (nếu có)" style="flex:1">
           <button class="gcard-btn" id="cliCodeBtn">Gửi code</button>
         </div>
         <span id="cliMsg2" class="gcard-meta"></span>
@@ -2751,7 +2751,7 @@
       + `Đăng nhập xong, trình duyệt sẽ nhảy sang <b>localhost</b> (có thể báo không tải được trang - không sao). `
       + `Copy toàn bộ đường dẫn trên thanh địa chỉ rồi dán vào đây:`
       + `<div style="display:flex;gap:6px;margin-top:6px">`
-      + `<input id="oauthCb" class="js-input" placeholder="http://localhost:1455/auth/callback?code=…" style="flex:1;min-width:180px">`
+      + `<input id="oauthCb" class="js-input" placeholder="Ví dụ: http://localhost:1455/auth/callback?code=…" style="flex:1;min-width:180px">`
       + `<button class="gcard-btn" id="oauthCbBtn">Xác nhận</button></div>`
       + `<div id="oauthCbMsg" class="gcard-meta" style="margin-top:4px;opacity:.75"></div>`;
     const btn = el.querySelector("#oauthCbBtn");
@@ -3562,17 +3562,17 @@
     let modal = document.getElementById("mcpAddModal");
     if (!modal) { modal = document.createElement("div"); modal.id = "mcpAddModal"; modal.className = "mp-overlay"; document.body.appendChild(modal); }
     const keys = edit ? (server.header_keys || []).concat(server.env_keys || []) : [];
-    const credPh = edit && keys.length ? "Để trống = giữ key cũ (" + esc(keys.join(", ")) + ")" : "Authorization: Bearer xxxxx";
+    const credPh = edit && keys.length ? "Để trống nếu giữ key cũ (" + esc(keys.join(", ")) + ")" : "Ví dụ: Authorization: Bearer xxxxx";
     modal.innerHTML = `
       <style>#mcpAddModal .mcp-lb{display:flex;flex-direction:column;gap:4px;font-size:14px;opacity:.85}#mcpAddModal .mcp-lb input,#mcpAddModal .mcp-lb select,#mcpAddModal .mcp-lb textarea{width:100%}</style>
       <div class="mp-box" style="max-width:560px">
         <div class="mp-head"><div class="mp-title">${edit ? "SỬA MCP SERVER" : "THÊM MCP SERVER"}</div><button class="mp-x" data-act="close">${X_ICON}</button></div>
         <div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px">
-          <label class="mcp-lb">Tên<input class="js-input" id="mName" placeholder="pancake-pos-shop-2" value="${edit ? esc(server.name) : ""}"></label>
+          <label class="mcp-lb">Tên<input class="js-input" id="mName" placeholder="Ví dụ: pancake-pos-shop-2" value="${edit ? esc(server.name) : ""}"></label>
           <label class="mcp-lb">Transport<select class="js-input" id="mTransport"><option value="http">HTTP</option><option value="sse">SSE</option><option value="stdio">stdio</option></select></label>
-          <label class="mcp-lb" id="mUrlWrap">URL<input class="js-input" id="mUrl" placeholder="https://mcp-pos.pancake.biz/mcp" value="${edit ? esc(server.url || "") : ""}"></label>
-          <label class="mcp-lb" id="mCmdWrap" style="display:none">Lệnh (stdio)<input class="js-input" id="mCmd" placeholder="npx my-mcp-server (args cách nhau bằng dấu cách)" value="${edit ? esc(((server.command || "") + " " + (server.args || []).join(" ")).trim()) : ""}"></label>
-          <label class="mcp-lb" id="mCredWrap">Header (mỗi dòng, vd Authorization: Bearer xxx)<textarea class="js-input" id="mCred" rows="3" placeholder="${credPh}"></textarea></label>
+          <label class="mcp-lb" id="mUrlWrap">URL<input class="js-input" id="mUrl" placeholder="Ví dụ: https://mcp-pos.pancake.biz/mcp" value="${edit ? esc(server.url || "") : ""}"></label>
+          <label class="mcp-lb" id="mCmdWrap" style="display:none">Lệnh (stdio)<input class="js-input" id="mCmd" placeholder="Ví dụ: npx my-mcp-server (các tham số cách nhau bằng dấu cách)" value="${edit ? esc(((server.command || "") + " " + (server.args || []).join(" ")).trim()) : ""}"></label>
+          <label class="mcp-lb" id="mCredWrap">Header (mỗi dòng, ví dụ Authorization: Bearer xxx)<textarea class="js-input" id="mCred" rows="3" placeholder="${credPh}"></textarea></label>
         </div>
         <div class="mp-foot"><span class="mp-note" id="mErr"></span><div><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="mSave">${edit ? "Lưu" : "Thêm"}</button></div></div>
       </div>`;
@@ -3621,9 +3621,9 @@
         <div class="gcard" style="max-width:560px">
           <label class="js-row"><span>Bật bot Telegram</span><input type="checkbox" id="tgEnabled" ${tg.enabled ? "checked" : ""}></label>
           <label class="js-lbl">Bot token ${tg.token_set ? '<span class="dim">(đã đặt)</span>' : ""}</label>
-          <input class="js-input" id="tgToken" type="password" placeholder="${tg.token_set ? "để trống nếu không đổi" : "123456:ABC..."}">
+          <input class="js-input" id="tgToken" type="password" placeholder="${tg.token_set ? "Để trống nếu không đổi" : "Ví dụ: 123456:ABC..."}">
           <label class="js-lbl">Chat ID được phép dùng <span class="dim">(nhiều ID cách nhau dấu phẩy - mỗi người /start bot rồi thêm ID vào đây)</span></label>
-          <input class="js-input" id="tgChat" value="${esc(tg.chat_id || "")}" placeholder="vd 123456789, 987654321">
+          <input class="js-input" id="tgChat" value="${esc(tg.chat_id || "")}" placeholder="Ví dụ: 123456789, 987654321">
           <div class="js-actions"><button class="gcard-btn" id="tgSave">Lưu & bật</button><button class="gcard-btn ghost" id="tgTest">Gửi test</button></div>
           <div class="gcard-meta" id="tgStatus"></div>
         </div>
@@ -3686,8 +3686,8 @@
         <h3>Tài khoản đăng nhập</h3>
         <div class="gcard" style="max-width:560px">
           <div class="gcard-meta">${auth.has_password ? ic("lock") + " Đã đặt mật khẩu · tài khoản: <b>" + esc(auth.username || "admin") + "</b>" : "Chưa đặt mật khẩu - ai mở dashboard cũng dùng được. Đặt mật khẩu nếu đưa lên VPS."}</div>
-          <label class="js-lbl">Tài khoản</label><input class="js-input" id="acUser" value="${esc(auth.username || "")}" placeholder="admin">
-          <label class="js-lbl">Mật khẩu</label><input class="js-input" id="acPass" type="password" placeholder="${auth.has_password ? "đổi mật khẩu" : "đặt mật khẩu"}">
+          <label class="js-lbl">Tài khoản</label><input class="js-input" id="acUser" value="${esc(auth.username || "")}" placeholder="Ví dụ: admin">
+          <label class="js-lbl">Mật khẩu</label><input class="js-input" id="acPass" type="password" placeholder="${auth.has_password ? "Đổi mật khẩu" : "Đặt mật khẩu"}">
           <div class="js-actions">
             <button class="gcard-btn" id="acSave">${auth.has_password ? "Đổi mật khẩu" : "Đặt mật khẩu"}</button>
             ${auth.has_password ? '<button class="gcard-btn ghost" id="acLogout">Đăng xuất</button><button class="gcard-btn ghost" id="acDisable">Tắt đăng nhập</button>' : ""}
@@ -3769,15 +3769,15 @@
         </select>
         <div id="vpOpenai" style="display:none">
           <label class="js-lbl">OpenAI API key ${oaSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
-          <input class="js-input" id="vpOaKey" type="password" placeholder="sk-...">
+          <input class="js-input" id="vpOaKey" type="password" placeholder="Ví dụ: sk-...">
           <label class="js-lbl">Giọng OpenAI</label>
           <select class="js-input" id="vpOaVoice">${oaVoices.map(x => opt(x, x, v.openai_tts_voice || "alloy")).join("")}</select>
         </div>
         <div id="vpEleven" style="display:none">
           <label class="js-lbl">ElevenLabs API key ${elSet ? '<span class="dim">(đã có - để trống nếu không đổi)</span>' : ""}</label>
-          <input class="js-input" id="vpElKey" type="password" placeholder="dán API key ElevenLabs">
+          <input class="js-input" id="vpElKey" type="password" placeholder="Dán API key ElevenLabs">
           <label class="js-lbl">Voice ID <span class="dim">(lấy ở ElevenLabs → Voices)</span></label>
-          <input class="js-input" id="vpElVoice" value="${esc(v.elevenlabs_voice || "")}" placeholder="21m00Tcm4TlvDq8ikWAM (Rachel)">
+          <input class="js-input" id="vpElVoice" value="${esc(v.elevenlabs_voice || "")}" placeholder="Ví dụ: 21m00Tcm4TlvDq8ikWAM (Rachel)">
         </div>
         <div class="js-actions"><button class="gcard-btn" id="vpSave">Lưu nhà cung cấp</button></div>
         <div class="gcard-meta" id="vpStatus">Đang dùng: <b>${esc(prov)}</b>. Provider trả phí lỗi sẽ tự về Edge. Bấm ▶ Nghe thử ở dưới để nghe.</div>
@@ -3794,7 +3794,7 @@
           </div>
           <div class="settings-links">
             <button data-settings-go="models"><span>◈</span><b>Models</b><small>Model và nhà cung cấp</small></button>
-            <button data-settings-go="channels"><span>${ic("mail")}</span><b>Kênh</b><small>Telegram và kết nối chat</small></button>
+            <button data-settings-go="channels"><span>${ic("send")}</span><b>Kênh</b><small>Telegram và kết nối chat</small></button>
             <button data-settings-go="account"><span>${ic("circle-user")}</span><b>Tài khoản</b><small>Đăng nhập và workspace</small></button>
             <button data-settings-go="logs"><span>${ic("scroll-text")}</span><b>Cập nhật</b><small>Phiên bản và nhật ký mới</small></button>
           </div>

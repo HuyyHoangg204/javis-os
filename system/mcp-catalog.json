@@ -17,7 +17,7 @@
           {
             "key": "api_key",
             "label": "API key (Composio)",
-            "placeholder": "ck_...",
+            "placeholder": "Ví dụ: ck_...",
             "header": "x-consumer-api-key: {api_key}"
           }
         ],
@@ -47,7 +47,7 @@
           {
             "key": "api_key",
             "label": "API key của cửa hàng",
-            "placeholder": "dán API key Pancake POS...",
+            "placeholder": "Dán API key Pancake POS...",
             "header": "Authorization: Bearer {api_key}"
           }
         ],
@@ -130,13 +130,13 @@
           {
             "key": "api_key",
             "label": "JWT / API key Webcake",
-            "placeholder": "dán JWT từ webcake.io...",
+            "placeholder": "Dán JWT từ webcake.io...",
             "env": "WEBCAKE_JWT"
           },
           {
             "key": "org_id",
             "label": "Org ID (tuỳ chọn - khi tài khoản có nhiều tổ chức)",
-            "placeholder": "để trống nếu chỉ có 1 tổ chức",
+            "placeholder": "Để trống nếu chỉ có 1 tổ chức",
             "env": "WEBCAKE_ORG_ID",
             "optional": true
           }
@@ -201,12 +201,12 @@
           {
             "key": "page_id",
             "label": "Page ID (trang Facebook gắn với Botcake)",
-            "placeholder": "vd 1234567890..."
+            "placeholder": "Ví dụ: 1234567890..."
           },
           {
             "key": "api_key",
             "label": "API Key của page",
-            "placeholder": "dán API key Botcake..."
+            "placeholder": "Dán API key Botcake..."
           }
         ],
         "guide": "Mở Botcake > Cấu hình > Tích hợp > Public API > Tạo API Key.\n\nLưu ý: làm mới hoặc xoá key sẽ vô hiệu các kết nối cũ.",
@@ -242,7 +242,7 @@
           {
             "key": "service_account",
             "label": "Service account JSON (dán TOÀN BỘ nội dung file key)",
-            "placeholder": "{ \"type\": \"service_account\", \"project_id\": ... }",
+            "placeholder": "Ví dụ: { \"type\": \"service_account\", \"project_id\": ... }",
             "file": true,
             "env": "SERVICE_ACCOUNT_PATH",
             "multiline": true
@@ -250,7 +250,7 @@
           {
             "key": "folder_id",
             "label": "ID thư mục Drive làm việc (đã share cho email service account)",
-            "placeholder": "lấy từ URL thư mục, vd 1AbCdEf...",
+            "placeholder": "Lấy từ URL thư mục, ví dụ 1AbCdEf...",
             "env": "DRIVE_FOLDER_ID"
           }
         ],
@@ -290,7 +290,7 @@
           {
             "key": "service_account",
             "label": "Service account JSON (dán TOÀN BỘ nội dung file key)",
-            "placeholder": "{ \"type\": \"service_account\", ... }",
+            "placeholder": "Ví dụ: { \"type\": \"service_account\", ... }",
             "file": true,
             "env": "GOOGLE_APPLICATION_CREDENTIALS",
             "multiline": true
@@ -319,19 +319,19 @@
           {
             "key": "client_id",
             "label": "OAuth Client ID",
-            "placeholder": "xxxx.apps.googleusercontent.com",
+            "placeholder": "Ví dụ: xxxx.apps.googleusercontent.com",
             "env": "GOOGLE_OAUTH_CLIENT_ID"
           },
           {
             "key": "client_secret",
             "label": "OAuth Client Secret",
-            "placeholder": "GOCSPX-...",
+            "placeholder": "Ví dụ: GOCSPX-...",
             "env": "GOOGLE_OAUTH_CLIENT_SECRET"
           },
           {
             "key": "user_email",
             "label": "Email Google của bạn (tuỳ chọn)",
-            "placeholder": "vd ten@gmail.com",
+            "placeholder": "Ví dụ: ten@gmail.com",
             "env": "USER_GOOGLE_EMAIL",
             "optional": true
           }
@@ -373,19 +373,19 @@
           {
             "key": "client_id",
             "label": "OAuth Client ID",
-            "placeholder": "xxxx.apps.googleusercontent.com",
+            "placeholder": "Ví dụ: xxxx.apps.googleusercontent.com",
             "env": "GOOGLE_OAUTH_CLIENT_ID"
           },
           {
             "key": "client_secret",
             "label": "OAuth Client Secret",
-            "placeholder": "GOCSPX-...",
+            "placeholder": "Ví dụ: GOCSPX-...",
             "env": "GOOGLE_OAUTH_CLIENT_SECRET"
           },
           {
             "key": "user_email",
             "label": "Email Google của bạn (tuỳ chọn)",
-            "placeholder": "vd ten@gmail.com",
+            "placeholder": "Ví dụ: ten@gmail.com",
             "env": "USER_GOOGLE_EMAIL",
             "optional": true
           }
@@ -453,8 +453,8 @@
         "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
         "scopes": ["ads_read", "business_management"],
         "fields": [
-          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
-          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
+          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "Ví dụ: 1122334455667788" },
+          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "Ví dụ: a1b2c3d4e5f6..." }
         ],
         "guide": "Làm 1 lần, khoảng 10 phút.\n\nTRƯỚC TIÊN nhìn cột trái trong trang app để biết bạn đang dùng giao diện nào - Meta đang chuyển dần nên mỗi người thấy một kiểu:\n- Thấy mục 'Sản phẩm' = giao diện CŨ.\n- Thấy mục 'Trường hợp sử dụng' = giao diện MỚI.\n\n1. Bấm 'Bước 1: Tạo App mới' bên dưới. Chọn trường hợp sử dụng 'Khác' (Other), loại 'Doanh nghiệp' (Business), đặt tên bất kỳ.\n2. Mở phần Đăng nhập bằng Facebook, tuỳ giao diện:\n   - Bản CŨ: 'Sản phẩm' > 'Thêm sản phẩm' > thêm 'Đăng nhập bằng Facebook' bản THƯỜNG (KHÔNG phải bản 'cho doanh nghiệp'), rồi bấm 'Cài đặt'.\n   - Bản MỚI: 'Trường hợp sử dụng' > mở 'Xác thực và yêu cầu dữ liệu từ người dùng qua phương thức Đăng nhập bằng Facebook' > 'Tùy chỉnh' > 'Cài đặt'. Mục này thường CÓ SẴN, bạn không phải thêm gì.\n3. Ô 'URI chuyển hướng OAuth hợp lệ' - làm KHÁC NHAU tuỳ nơi cài Javis:\n   - Cài trên MÁY CÁ NHÂN (địa chỉ localhost): BỎ QUA ô này, KHÔNG cần điền. Khi app ở Chế độ phát triển, Meta tự cho phép localhost nên ô này CỐ TÌNH không nhận.\n     Meta hiện chú thích 'bạn không cần phải thêm vào đây' là đúng, cứ đi tiếp bước sau. Nhớ dùng localhost chứ không phải 127.0.0.1.\n   - Cài trên VPS / TÊN MIỀN RIÊNG: BẮT BUỘC dán địa chỉ https ở nút 'Sao chép' bên dưới vào ô này rồi Lưu (vd https://javis.tenmiencuaban.com/connect/oauth/callback).\n     Ngoài localhost thì Meta không tự cho phép, thiếu bước này là đăng nhập sẽ bị từ chối.\n     Rồi thêm TÊN MIỀN trần (không https, không dấu /) vào 'Cài đặt ứng dụng' > 'Thông tin cơ bản' > 'Miền ứng dụng', bấm 'Lưu thay đổi' - thiếu là báo 'Không thể tải URL'.\n4. Nếu hiện bảng 'Invalid Scopes: ads_read, business_management' thì cứ bấm OK và ĐI TIẾP - cảnh báo này chỉ hiện cho người tạo app, KHÔNG chặn đăng nhập.\nChỉ khi kết nối xong mà Javis không thấy tài khoản quảng cáo nào thì mới cần thêm quyền:\nbản MỚI 'Thêm trường hợp sử dụng' > trường hợp về quảng cáo (Marketing API) > 'Tùy chỉnh' > tab 'Quyền' > Thêm ads_read + business_management; bản CŨ 'Sản phẩm' > 'Thêm sản phẩm' > 'Marketing API'.\n5. GIỮ app ở Chế độ phát triển và bạn phải là Quản trị viên của cả app lẫn tài khoản quảng cáo. Khi đó tự cấp được quyền ads_read, KHÔNG cần App Review.\n6. 'Cài đặt ứng dụng' > 'Thông tin cơ bản': copy App ID + Khóa bí mật dán vào ô dưới rồi bấm Kết nối.\n\nLƯU Ý bảng 'Việc cần làm' của app có gợi ý 'Xác minh doanh nghiệp' và 'Xét duyệt ứng dụng' - BỎ QUA cả hai, cách này không cần, làm chỉ mất thêm nhiều ngày chờ.\n\nToken sống khoảng 60 ngày, Javis tự gia hạn. Hết hạn thì Kết nối lại.",
         "guide_url": "https://developers.facebook.com/docs/marketing-api/get-started/authorization",
@@ -501,8 +501,8 @@
         "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
         "scopes": ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement"],
         "fields": [
-          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "vd 1122334455667788" },
-          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "vd a1b2c3d4e5f6..." }
+          { "key": "client_id", "label": "App ID (Facebook)", "placeholder": "Ví dụ: 1122334455667788" },
+          { "key": "client_secret", "label": "App Secret (Facebook)", "placeholder": "Ví dụ: a1b2c3d4e5f6..." }
         ],
         "guide": "Làm 1 lần, khoảng 5 phút. Dùng lại được app bạn đã tạo cho Meta Ads.\n\nTRƯỚC TIÊN nhìn cột trái trang app để biết giao diện nào (Meta đang chuyển dần):\n- Thấy mục 'Sản phẩm' = bản CŨ.\n- Thấy mục 'Trường hợp sử dụng' = bản MỚI.\n\n1. Bấm 'Bước 1: Tạo App mới' bên dưới, chọn loại 'Doanh nghiệp' (Business), đặt tên bất kỳ.\n2. Mở phần Đăng nhập bằng Facebook:\n   - Bản CŨ: 'Sản phẩm' > 'Thêm sản phẩm' > 'Đăng nhập bằng Facebook' bản THƯỜNG (KHÔNG phải bản 'cho doanh nghiệp').\n   - Bản MỚI: 'Trường hợp sử dụng' > mở trường hợp có Đăng nhập bằng Facebook > 'Tùy chỉnh'. Thường đã có sẵn, không phải thêm gì.\n3. Ô 'URI chuyển hướng OAuth hợp lệ' - khác nhau tuỳ nơi cài Javis:\n   - Cài trên MÁY CÁ NHÂN (localhost): BỎ QUA, không cần và cũng không điền được. App ở Chế độ phát triển thì Meta tự cho phép localhost. Dùng localhost chứ không phải 127.0.0.1.\n   - Cài trên VPS / TÊN MIỀN RIÊNG: BẮT BUỘC dán địa chỉ https ở nút 'Sao chép' bên dưới vào ô này rồi Lưu.\n     Rồi thêm TÊN MIỀN trần (không https, không dấu /) vào 'Cài đặt ứng dụng' > 'Thông tin cơ bản' > 'Miền ứng dụng', bấm 'Lưu thay đổi' - thiếu là báo 'Không thể tải URL'.\n4. GIỮ app ở Chế độ phát triển và bạn là Quản trị viên của cả app lẫn các Trang muốn quản lý. Khi đó tự cấp được quyền Trang, KHÔNG cần App Review.\n5. 'Cài đặt ứng dụng' > 'Thông tin cơ bản': copy App ID + Khóa bí mật dán vào ô dưới rồi bấm Kết nối.\n\nKhi Facebook hỏi quyền, nhớ TICK chọn các Trang.\n\nMUỐN THÊM TRANG SAU NÀY: bấm 'Kết nối lại' trên card.\nFacebook hiện lại màn 'Chọn nội dung bạn cho phép' - tick thêm Trang mới và GIỮ NGUYÊN các Trang cũ (bỏ tick Trang nào là mất quyền Trang đó).\nKhông phải xoá tài khoản đi làm lại từ đầu.\n\nNẾU lúc đăng nhập hiện bảng 'Invalid Scopes: pages_show_list, pages_read_engagement...': cứ bấm OK và ĐI TIẾP.\nĐây là cảnh báo CHỈ hiện cho người tạo app, KHÔNG chặn đăng nhập - app ở Chế độ phát triển mà bạn là Quản trị viên thì Facebook vẫn cấp đủ quyền.\nChỉ khi kết nối xong mà Javis không thấy Trang hoặc không đăng được thì mới cần thêm quyền: 'Thêm trường hợp sử dụng' > 'Quản lý mọi thứ trên Trang của bạn' > 'Tùy chỉnh' > tab 'Quyền'.\n\nLƯU Ý bảng 'Việc cần làm' gợi ý 'Xác minh doanh nghiệp' và 'Xét duyệt ứng dụng' - BỎ QUA cả hai, cách này không cần.\n\nToken sống khoảng 60 ngày, Javis tự gia hạn. Hết hạn thì Kết nối lại.",
         "guide_url": "https://developers.facebook.com/docs/pages-api/getting-started",
@@ -545,7 +545,7 @@
       "auth": {
         "type": "apikey",
         "fields": [
-          { "key": "apify_token", "label": "Apify API token", "placeholder": "apify_api_xxxxxxxx", "env": "APIFY_TOKEN" }
+          { "key": "apify_token", "label": "Apify API token", "placeholder": "Ví dụ: apify_api_xxxxxxxx", "env": "APIFY_TOKEN" }
         ],
         "guide": "Làm 1 lần:\n1. Vào apify.com đăng ký tài khoản (có gói free + trả theo lượng dùng).\n2. Vào Console > Settings > API & Integrations, copy 'Personal API token'.\n3. Dán vào ô dưới rồi bấm Kết nối.\n\nChi phí quét tính theo lượt, khoảng 2.6 USD cho 1000 bài với actor mặc định. Javis chỉ quét khi bạn hoặc loop yêu cầu.\n\nV1 hỗ trợ Trang và Nhóm CÔNG KHAI, không cần cookie. Nhóm KÍN sẽ bổ sung sau, cần thêm cookie của tài khoản là thành viên.",
         "guide_url": "https://console.apify.com/settings/integrations"
@@ -585,36 +585,36 @@
           {
             "key": "client_id",
             "label": "OAuth Client ID",
-            "placeholder": "xxxx.apps.googleusercontent.com"
+            "placeholder": "Ví dụ: xxxx.apps.googleusercontent.com"
           },
           {
             "key": "client_secret",
             "label": "OAuth Client Secret",
-            "placeholder": "GOCSPX-..."
+            "placeholder": "Ví dụ: GOCSPX-..."
           },
           {
             "key": "developer_token",
             "label": "Developer token (Google Ads API Center)",
-            "placeholder": "chuỗi 22 ký tự, lấy ở tài khoản quản lý MCC",
+            "placeholder": "Chuỗi 22 ký tự, lấy ở tài khoản quản lý MCC",
             "env": "GOOGLE_ADS_DEVELOPER_TOKEN"
           },
           {
             "key": "project_id",
             "label": "Google Cloud Project ID",
-            "placeholder": "vd my-ads-project",
+            "placeholder": "Ví dụ: my-ads-project",
             "env": "GOOGLE_PROJECT_ID"
           },
           {
             "key": "login_customer_id",
             "label": "ID tài khoản quản lý MCC (tuỳ chọn - khi tài khoản ads nằm dưới MCC/agency)",
-            "placeholder": "10 số, bỏ dấu gạch",
+            "placeholder": "Gồm 10 số, bỏ dấu gạch",
             "env": "GOOGLE_ADS_LOGIN_CUSTOMER_ID",
             "optional": true
           },
           {
             "key": "adc_json",
             "label": "Hoặc dán sẵn file ADC nếu bạn đã tự chạy gcloud (bỏ trống nếu đăng nhập ở trên)",
-            "placeholder": "{ \"type\": \"authorized_user\", \"refresh_token\": ... }",
+            "placeholder": "Ví dụ: { \"type\": \"authorized_user\", \"refresh_token\": ... }",
             "file": true,
             "env": "GOOGLE_APPLICATION_CREDENTIALS",
             "multiline": true,
@@ -650,19 +650,19 @@
           {
             "key": "app_id",
             "label": "App ID (TikTok for Business Developers)",
-            "placeholder": "vd 7123456789...",
+            "placeholder": "Ví dụ: 7123456789...",
             "env": "TIKTOK_APP_ID"
           },
           {
             "key": "app_secret",
             "label": "App Secret",
-            "placeholder": "dán secret của app...",
+            "placeholder": "Dán secret của app...",
             "env": "TIKTOK_SECRET"
           },
           {
             "key": "access_token",
             "label": "Access Token (long-term)",
-            "placeholder": "dán access token đã authorize với tài khoản ads...",
+            "placeholder": "Dán access token đã authorize với tài khoản quảng cáo...",
             "env": "TIKTOK_ACCESS_TOKEN"
           }
         ],
@@ -698,8 +698,8 @@
         "scopes": ["openid", "email", "https://www.googleapis.com/auth/calendar"],
         "authorize_params": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" },
         "fields": [
-          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
-          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
+          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "Ví dụ: xxxx.apps.googleusercontent.com" },
+          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "Ví dụ: GOCSPX-..." }
         ],
         "guide": "Server MCP Lịch của Google đang ở giai đoạn Developer Preview: phải ghi danh chương trình (miễn phí) và bật thêm API MCP riêng, thiếu là bị chặn 403 dù đăng nhập thành công.\nLàm 1 lần, khoảng 10 phút:\n1. Ghi danh Google Workspace Developer Preview Program bằng đúng tài khoản Google sẽ đăng nhập (nút bên dưới).\n2. Vào console.cloud.google.com, tạo project, bật CẢ HAI API: Google Calendar API và Google Calendar MCP API (tìm 'Calendar MCP' trong thư viện API, có nút bên dưới).\n3. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n4. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n5. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n6. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nĐăng nhập xong mà Test vẫn báo thiếu quyền thì soát lại bước 1 và bước 2, hai bước hay bị bỏ sót nhất.",
         "guide_url": "https://console.cloud.google.com/apis/credentials",
@@ -749,8 +749,8 @@
         "scopes": ["openid", "email", "https://www.googleapis.com/auth/gmail.modify"],
         "authorize_params": { "access_type": "offline", "prompt": "consent", "include_granted_scopes": "true" },
         "fields": [
-          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "xxxx.apps.googleusercontent.com" },
-          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "GOCSPX-..." }
+          { "key": "client_id", "label": "OAuth Client ID", "placeholder": "Ví dụ: xxxx.apps.googleusercontent.com" },
+          { "key": "client_secret", "label": "OAuth Client Secret", "placeholder": "Ví dụ: GOCSPX-..." }
         ],
         "guide": "Server MCP Gmail của Google đang ở giai đoạn Developer Preview: phải ghi danh chương trình (miễn phí) và bật thêm API MCP riêng, thiếu là bị chặn 403 dù đăng nhập thành công.\nLàm 1 lần, khoảng 10 phút:\n1. Ghi danh Google Workspace Developer Preview Program bằng đúng tài khoản Google sẽ đăng nhập (nút bên dưới).\n2. Vào console.cloud.google.com, tạo project, bật CẢ HAI API: Gmail API và Gmail MCP API (tìm 'Gmail MCP' trong thư viện API, có nút bên dưới).\n3. Màn hình đồng ý OAuth: chọn External, thêm email của bạn vào Test users.\n4. Thông tin xác thực > Tạo OAuth client ID loại 'Ứng dụng web'.\n5. Ở phần 'URI chuyển hướng được ủy quyền', thêm đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nNếu chạy trên VPS thì thêm cả https://<tên-miền>/connect/oauth/callback\n6. Copy Client ID + Client Secret dán vào đây rồi bấm Kết nối.\n\nTrình duyệt sẽ mở để bạn đăng nhập Google và bấm đồng ý. Gặp cảnh báo 'ứng dụng chưa được xác minh' thì bấm Nâng cao > Tiếp tục, vì đây là app của chính bạn.\n\nCó thể dùng CHUNG một OAuth client với Google Calendar, chỉ cần bật thêm Gmail API + Gmail MCP API.\nĐăng nhập xong mà Test vẫn báo thiếu quyền thì soát lại bước 1 và bước 2, hai bước hay bị bỏ sót nhất.",
         "guide_url": "https://console.cloud.google.com/apis/credentials",
@@ -799,8 +799,8 @@
         "scope_sep": ",",
         "scopes": ["openid", "email", "profile", "search:read.public", "channels:read", "channels:history", "groups:read", "users:read", "chat:write", "canvases:read"],
         "fields": [
-          { "key": "client_id", "label": "Client ID (từ Slack app)", "placeholder": "1234567890.1234567890" },
-          { "key": "client_secret", "label": "Client Secret", "placeholder": "dán client secret của app..." }
+          { "key": "client_id", "label": "Client ID (từ Slack app)", "placeholder": "Ví dụ: 1234567890.1234567890" },
+          { "key": "client_secret", "label": "Client Secret", "placeholder": "Dán client secret của app..." }
         ],
         "guide": "Slack yêu cầu MCP đi qua một app của chính bạn, không cho tự đăng ký.\n\nLàm 1 lần:\n1. Vào api.slack.com/apps > Create New App (from scratch) trong workspace của bạn.\n2. OAuth & Permissions: thêm 'Redirect URL' đúng địa chỉ này:\nhttp://localhost:7777/connect/oauth/callback\nChạy trên VPS thì thêm https://<tên-miền>/connect/oauth/callback\n3. Thêm các 'User Token Scopes' khớp với quyền cần dùng (search:read.public, channels:read, channels:history, users:read, chat:write, canvases:read...).\n4. Ở Basic Information copy Client ID + Client Secret dán vào đây.\n5. Bấm Kết nối để đăng nhập Slack và cấp quyền.\n\nNếu workspace yêu cầu admin duyệt app thì cần admin chấp thuận.",
         "guide_url": "https://docs.slack.dev/ai/slack-mcp-server/"
@@ -826,7 +826,7 @@
           {
             "key": "mcp_key",
             "label": "MCP key",
-            "placeholder": "dán MCP key từ Systeme.io...",
+            "placeholder": "Dán MCP key từ Systeme.io...",
             "header": "X-MCP-Key: {mcp_key}"
           }
         ],
@@ -857,13 +857,13 @@
           {
             "key": "app_id",
             "label": "App ID (Lark app)",
-            "placeholder": "cli_xxxxxxxxxxxx",
+            "placeholder": "Ví dụ: cli_xxxxxxxxxxxx",
             "env": "APP_ID"
           },
           {
             "key": "app_secret",
             "label": "App Secret",
-            "placeholder": "dán app secret...",
+            "placeholder": "Dán app secret...",
             "env": "APP_SECRET"
           }
         ],
@@ -916,7 +916,7 @@
           {
             "key": "bearer_token",
             "label": "Bearer Token (App-only)",
-            "placeholder": "dán App-only Bearer Token từ X Developer Portal...",
+            "placeholder": "Dán App-only Bearer Token từ X Developer Portal...",
             "header": "Authorization: Bearer {bearer_token}"
           }
         ],
@@ -946,17 +946,17 @@
           {
             "key": "publication_url",
             "label": "Địa chỉ Substack (publication URL)",
-            "placeholder": "https://tencuaban.substack.com"
+            "placeholder": "Ví dụ: https://tencuaban.substack.com"
           },
           {
             "key": "session_token",
             "label": "Session token (cookie substack.sid)",
-            "placeholder": "dán giá trị cookie substack.sid..."
+            "placeholder": "Dán giá trị cookie substack.sid..."
           },
           {
             "key": "user_id",
             "label": "User ID (dãy số)",
-            "placeholder": "vd 12345678"
+            "placeholder": "Ví dụ: 12345678"
           }
         ],
         "guide": "Cần 3 thứ:\n1. Publication URL: địa chỉ trang Substack của bạn, vd https://tencuaban.substack.com\n2. Session token: cookie 'substack.sid' lấy trong DevTools.\n3. User ID: dãy số.\n\nBấm 'Hướng dẫn' để mở trang có TRỢ LÝ lấy nhanh User ID + Publication URL, và cách bật quyền đăng bài.",
@@ -994,32 +994,32 @@
           {
             "key": "google_email",
             "label": "Email Google",
-            "placeholder": "ten@gmail.com",
+            "placeholder": "Ví dụ: ten@gmail.com",
             "env": "GOOGLE_EMAIL"
           },
           {
             "key": "app_password",
             "label": "App Password 16 ký tự (Javis tự đổi thành token, KHÔNG lưu lại chuỗi này)",
-            "placeholder": "abcd efgh ijkl mnop",
+            "placeholder": "Ví dụ: abcd efgh ijkl mnop",
             "optional": true
           },
           {
             "key": "oauth_token",
             "label": "Hoặc dán oauth_token lấy từ trình duyệt (đường lui khi Google từ chối App Password - xem cuối hướng dẫn)",
-            "placeholder": "oauth2_4/...",
+            "placeholder": "Ví dụ: oauth2_4/...",
             "optional": true
           },
           {
             "key": "master_token",
             "label": "Hoặc dán sẵn master token nếu bạn đã tự lấy (bỏ trống nếu dùng App Password ở trên)",
-            "placeholder": "aas_et/...",
+            "placeholder": "Ví dụ: aas_et/...",
             "optional": true,
             "env": "GOOGLE_MASTER_TOKEN"
           },
           {
             "key": "unsafe_mode",
             "label": "Cho sửa MỌI note - gõ true nếu muốn (để trống = chỉ sửa note do Javis tạo)",
-            "placeholder": "để trống cho an toàn",
+            "placeholder": "Để trống cho an toàn",
             "optional": true,
             "env": "UNSAFE_MODE"
           }

@@ -320,7 +320,7 @@
               <div class="popover-label">TÊN MIỀN & SSL</div>
               <div class="opt-sub dom-intro">Nhập tên miền để Javis kiểm tra DNS và hướng dẫn bật HTTPS theo đúng môi trường đang chạy.</div>
               <div class="dom-field">
-                <input id="setDomain" placeholder="vd: javis.tencuaban.com" autocomplete="off" spellcheck="false">
+                <input id="setDomain" placeholder="Ví dụ: javis.tencuaban.com" autocomplete="off" spellcheck="false">
                 <button class="s-btn" id="saveDomain">Lưu &amp; kiểm tra</button>
               </div>
               <div class="dom-status" id="domStatusRow" style="display:none">
@@ -523,11 +523,11 @@
         <div class="set-sec">
           <h4>2. Tài khoản admin <span class="dim">(khuyến nghị)</span></h4>
           <div class="set-note">Đặt mật khẩu để chặn người lạ - quan trọng nếu đưa lên VPS. Bỏ trống nếu chỉ chạy máy cá nhân.</div>
-          <label>Tài khoản</label><input id="wzUser" placeholder="admin">
-          <label>Mật khẩu</label><input id="wzPass" type="password" placeholder="để trống = không đặt mật khẩu">
+          <label>Tài khoản</label><input id="wzUser" placeholder="Ví dụ: admin">
+          <label>Mật khẩu</label><input id="wzPass" type="password" placeholder="Để trống nếu không đặt mật khẩu">
           <div id="wzTokenWrap" style="display:none">
             <label>Mã thiết lập <span class="dim">(bảo mật)</span></label>
-            <input id="wzToken" placeholder="dán MÃ THIẾT LẬP từ log server">
+            <input id="wzToken" placeholder="Dán MÃ THIẾT LẬP từ log server">
             <div class="wz-tokhelp">
               <b><i data-ic="circle-help"></i> Mã thiết lập là gì?</b> Javis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
               <br><b>Cách lấy mã (Hostinger → App terminal):</b>
@@ -563,7 +563,7 @@
           </div>
           <div id="wzOrKey" style="display:none">
             <label>OpenRouter API key <span class="dim">(có thể dán sau ở Models)</span></label>
-            <input id="wzOrKeyInput" placeholder="sk-or-v1-…  (tùy chọn)">
+            <input id="wzOrKeyInput" placeholder="Ví dụ: sk-or-v1-… (tùy chọn)">
           </div>
           <div id="wzProvHint"></div>
         </div>
@@ -614,10 +614,10 @@
             <option value="opus">Opus</option><option value="haiku">Haiku</option>
           </select>
           <label>OpenRouter API key <span class="dim" id="setKeyHint"></span></label>
-          <input id="setOrKey" type="password" placeholder="sk-or-... (để trống nếu không đổi)">
+          <input id="setOrKey" type="password" placeholder="Ví dụ: sk-or-... (để trống nếu không đổi)">
           <label>OpenRouter model <button type="button" class="set-mini" id="loadModelsBtn">↻ Tải danh sách</button></label>
           <select id="setOrModelSel"><option value="__custom__">Nhập tên model khác (custom)…</option></select>
-          <input id="setOrModel" placeholder="vd openai/gpt-4o-mini" style="display:none">
+          <input id="setOrModel" placeholder="Ví dụ: openai/gpt-4o-mini" style="display:none">
           <div class="set-note">Danh sách model tải động từ OpenRouter. Không thấy model cần? Chọn "Nhập tên khác" rồi gõ chính xác id. OpenRouter sẽ kích hoạt ở bản kế (P2).</div>
           <button class="s-btn" id="saveModel">Lưu</button>
         </div>
@@ -626,9 +626,9 @@
           <label class="loop-row" style="padding:0"><span>Bật bot Telegram</span>
             <label class="toggle"><input type="checkbox" id="setTgEnabled"><span></span></label></label>
           <label>Bot token <span class="dim" id="setTgHint"></span></label>
-          <input id="setTgToken" type="password" placeholder="123456:ABC... (để trống nếu không đổi)">
+          <input id="setTgToken" type="password" placeholder="Ví dụ: 123456:ABC... (để trống nếu không đổi)">
           <label>Chat ID được phép dùng <span class="dim">(nhiều ID cách nhau dấu phẩy)</span></label>
-          <input id="setTgChat" placeholder="vd 123456789, 987654321">
+          <input id="setTgChat" placeholder="Ví dụ: 123456789, 987654321">
           <div class="set-note" id="setTgStatus">-</div>
           <div class="set-note">Nhắn Telegram ↔ Javis. Dùng đúng engine đang chọn (CLI thì có cả MCP để hỏi doanh thu/ads qua điện thoại). Có thể dùng lại token bot Morning Briefing.</div>
           <div class="set-actions">
@@ -639,8 +639,8 @@
         <div class="set-sec">
           <h4>Tài khoản đăng nhập</h4>
           <div class="set-note" id="setAuthState"></div>
-          <label>Tài khoản</label><input id="setAuthUser" placeholder="admin">
-          <label>Mật khẩu</label><input id="setAuthPass" type="password" placeholder="đặt mật khẩu (để trống nếu không đổi)">
+          <label>Tài khoản</label><input id="setAuthUser" placeholder="Ví dụ: admin">
+          <label>Mật khẩu</label><input id="setAuthPass" type="password" placeholder="Đặt mật khẩu (để trống nếu không đổi)">
           <div class="set-actions">
             <button class="s-btn" id="savePassword">Lưu tài khoản</button>
             <button class="s-btn-ghost" id="logoutBtn">Đăng xuất</button>
