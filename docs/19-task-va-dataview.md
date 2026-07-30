@@ -17,7 +17,7 @@ Trước đây Javis chỉ hiển thị mấy ô này cho đẹp, muốn tick ph
 
 ### Tick ở đâu
 
-- **Trang Tệp tin / trang Bộ não**: mở một file `.md`, để ở chế độ **Sửa** (bản render, mặc định). Bấm checkbox là tick và tự lưu.
+- **Trang Tệp tin** (nhóm **Bộ não** trên thanh nav trái): mở một file `.md`, để ở chế độ **Sửa** (bản render, mặc định). Bấm checkbox là tick và tự lưu.
 - **Khung sửa file bung ra từ chat** (khi bấm vào link file trong câu trả lời của Javis): y hệt, tick là lưu.
 - **Trong tin nhắn chat**: checkbox chỉ để xem, không bấm được. Lý do: nội dung chat không gắn với file nào để ghi lại.
 - **Trong kết quả khối dataview**: bấm được, ghi thẳng vào file gốc chứa việc đó (xem phần 2).
@@ -170,7 +170,7 @@ TASK FROM "01 - Daily" WHERE !completed LIMIT 20
 
 ### Khối ```tasks - viết theo ngôn ngữ plugin Tasks
 
-Nếu anh quen cú pháp của plugin obsidian-tasks thì dùng thẳng, Javis hiểu luôn khối ` ```tasks `:
+Nếu bạn quen cú pháp của plugin obsidian-tasks thì dùng thẳng, Javis hiểu luôn khối ` ```tasks `:
 
 ````markdown
 ```tasks
@@ -197,11 +197,13 @@ Dòng nào chưa hỗ trợ (vd `filter by function`) thì khối hiện cảnh 
 
 ### Nút "+ Việc" - thêm task chủ động
 
-Mọi khối ra danh sách việc (` ```tasks ` hoặc `TASK`) đều có nút **+ Việc** ở góc phải đầu khối. Bấm vào là hiện ô nhập nội dung + ô chọn hạn (tuỳ chọn), Enter hoặc bấm Thêm là xong. Việc mới được ghi vào **`00 - Dashboard/Task Inbox.md`** (tự tạo nếu chưa có) kèm `📅 hạn` nếu anh chọn ngày, và mọi khối trên trang tự làm mới ngay. Task Inbox là hộp thư việc: thêm nhanh ở đó, lúc rảnh kéo về đúng sổ Daily/Weekly.
+Mọi khối ra danh sách việc (` ```tasks ` hoặc `TASK`) đều có nút **+ Việc** ở góc phải đầu khối. Bấm vào là hiện ô nhập nội dung + ô chọn hạn (tuỳ chọn), Enter hoặc bấm Thêm là xong. Việc mới được ghi vào file **`Task Inbox.md`** trong thư mục dashboard của brain, kèm `📅 hạn` nếu bạn chọn ngày, và mọi khối trên trang tự làm mới ngay. Task Inbox là hộp thư việc: thêm nhanh ở đó, lúc rảnh kéo về đúng sổ Daily/Weekly.
+
+Javis **dò** thư mục dashboard chứ không cắm cứng một tên: thư mục cấp 1 nào của brain có tên là `dashboard` (không phân biệt hoa thường, cho phép tiền tố số thứ tự kiểu `00 - Dashboard`, `01 - dashboard`, `02_Dashboard`) thì việc mới rơi vào đó. Brain chưa có thư mục nào khớp thì Javis mới tạo mới với tên `00 - Dashboard`.
 
 ### Trang Dashboard mặc định
 
-Thư mục `00 - Dashboard` nằm trong cấu trúc chuẩn của vault: brain mới có sẵn kèm hai file seed là `Dashboard.md` (các khối tasks: quá hạn, hôm nay, sắp tới, chưa có hạn) và `Task Inbox.md`. Brain cũ thiếu thì banner cấu trúc vault có nút tạo bổ sung. File seed chỉ tạo khi chưa có - anh sửa gì Javis giữ nguyên.
+Thư mục dashboard nằm trong cấu trúc chuẩn của brain: brain mới được tạo sẵn `00 - Dashboard` kèm hai file seed là `Dashboard.md` (các khối tasks: quá hạn, hôm nay, sắp tới, chưa có hạn) và `Task Inbox.md`. Brain cũ thiếu thì banner cấu trúc vault có nút tạo bổ sung. File seed chỉ tạo khi chưa có - bạn sửa gì Javis giữ nguyên.
 
 ### Chưa hỗ trợ gì
 

@@ -1,11 +1,11 @@
 // ============================================
-// JAVIS OS - Graph 2D "Tinh vân bộ não" (force-graph / d3-force, kiểu Obsidian)
-// Engine d3-force (giống Obsidian + bản 3D). Thiết kế: node = sao phát sáng, TÔ MÀU THEO DANH MỤC
+// JAVIS OS - Knowledge graph "Tinh vân bộ não" (force-graph / d3-force, kiểu Obsidian)
+// Engine d3-force. Thiết kế: node = sao phát sáng, TÔ MÀU THEO DANH MỤC
 // (thư mục cha, khớp nhãn PERSONAL/BUSINESS...), hover = rọi đèn vùng liên quan (synapse), thở nhẹ
-// lúc nghỉ, nhãn chỉ hiện khi hover / zoom sát / vài hub lớn. Cùng interface JavisGraph3D.
+// lúc nghỉ, nhãn chỉ hiện khi hover / zoom sát / vài hub lớn.
 // ============================================
 
-// --- Bảng màu danh mục: gán theo tên danh mục (ổn định, cùng thứ tự cho 2D và 3D) ---
+// --- Bảng màu danh mục: gán theo tên danh mục ổn định ---
 // Hai bảng CÙNG THỨ TỰ HUE nên một thư mục giữ nguyên "màu nhận dạng" khi đổi tông:
 // chàm vẫn là chàm, lục vẫn là lục - chỉ đổi độ đậm cho hợp nền.
 // Tối: màu rực để nổi trên nền đen. Sáng: mực sẫm cùng hue, đều đạt >=4.5:1 trên
@@ -52,8 +52,7 @@ function _catOf(node) {
 }
 function _hash(s) { let h = 0; s = String(s || ""); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
 
-// Dùng CHUNG cho bản 3D: gán màu danh mục (tuần tự theo danh mục) vào n.color của từng node.
-// Cùng thứ tự data.nodes như 2D → màu 2D và 3D khớp nhau.
+// Gán màu danh mục (tuần tự theo danh mục) vào n.color của từng node.
 // Nhớ CHỈ SỐ danh mục (không phải màu) để đổi tông chỉ là tra lại bảng khác.
 window.JavisCatColorize = function (nodes) {
   const idx = {}; let next = 0;
@@ -65,7 +64,7 @@ window.JavisCatColorize = function (nodes) {
     n.color = CAT_COLORS[idx[cat] % CAT_COLORS.length];   // ghi đè màu tím backend bằng màu danh mục
   });
   window.__javisCatIdx = idx;
-  window.__javisCatMap = _mapFromIdx(idx);   // để nhãn danh mục tô chữ khớp màu (bản 3D)
+  window.__javisCatMap = _mapFromIdx(idx);   // để nhãn danh mục tô chữ khớp màu
   return window.__javisCatMap;
 };
 
@@ -75,7 +74,7 @@ function _mapFromIdx(idx) {
   return map;
 }
 
-// Bản 3D nằm ở file khác nên không thấy CAT_COLORS (biến module) - mở một lối tra
+// Mở một lối tra màu cho nhãn danh mục trong app.js.
 // để nó lấy đúng bảng màu của tông đang bật.
 window.JavisCatColorAt = function (idx) {
   return CAT_COLORS[(idx || 0) % CAT_COLORS.length];
@@ -141,9 +140,8 @@ function _centerGravity(strength) {
 }
 
 class JavisGraph {
-  constructor(container, tooltip) {
+  constructor(container) {
     this.container = container;
-    this.tooltip = tooltip;
     this.graph = null;
     this.level = 0;
     this._thinking = false;
@@ -180,8 +178,10 @@ class JavisGraph {
   async load(query = "source=all") {
     const res = await fetch(`/graph?${query}&orphans=1`);   // 2D hiện CẢ note cô đơn (như graph view Obsidian)
     const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Không tải được đồ thị (${res.status})`);
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
     this._catMap = null;                     // gán lại màu danh mục tươi cho mỗi lần nạp
-    this._prep(data.nodes || []);
+    this._prep(nodes);
     window.__javisCatIdx = this._catMap;                    // danh mục → chỉ số
     window.__javisCatMap = _mapFromIdx(this._catMap);       // để nhãn danh mục (app.js) tô chữ khớp màu node
     const links = (data.edges || []).map(e => ({ source: e.source, target: e.target }));
@@ -249,7 +249,7 @@ class JavisGraph {
     this._fitted = false;
     this._t0 = (typeof performance !== "undefined" ? performance.now() : Date.now());
     try { this.graph.minZoom(0.05); } catch (e) {}   // mở lại giới hạn để lần fit mới không bị kẹp
-    this.graph.graphData({ nodes: data.nodes, links });
+    this.graph.graphData({ nodes, links });
     this.resize();
     return data;
   }
@@ -322,12 +322,8 @@ class JavisGraph {
     if (w && h) this.graph.width(w).height(h);
   }
 
-  // --- Interface khớp JavisGraph3D ---
-  hideTooltip() {
-    if (this.tooltip) this.tooltip.style.display = "none";
-  }
+  // --- Điều khiển vòng đời đồ thị ---
   pause() {
-    this.hideTooltip();
     if (this.graph) { try { this.graph.pauseAnimation(); } catch (e) {} }
   }
   wake() { if (this.graph) { try { this.graph.resumeAnimation(); } catch (e) {} } }

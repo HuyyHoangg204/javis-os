@@ -94,7 +94,7 @@ _DEFAULT = {
     "backup": {"enabled": False, "repo_url": "", "token": "", "branch": "main",
                "interval_hours": 6, "last_backup": 0.0, "last_status": ""},
     "dashboard": {
-        # graph_enabled=False → vào thẳng Console, KHÔNG dựng graph 3D (nhẹ cho VPS/điện thoại).
+        # graph_enabled=False → vào thẳng Console, KHÔNG dựng đồ thị (nhẹ cho VPS/điện thoại).
         # Frontend cũng tự ép lite-mode khi màn hình hẹp dù cờ này bật.
         "graph_enabled": True,
     },

@@ -35,13 +35,14 @@ Mở http://localhost:7777. Muốn HTTPS qua Caddy: thêm `-f docker-compose.htt
 
 ## Sau khi chạy
 
-- **Chọn engine/model**: trang Models (Claude Code, ChatGPT/Codex, OpenRouter, OpenAI, Anthropic API).
-- **Đấu MCP** (POS, quảng cáo, lịch...) để báo cáo số liệu thật: trang MCP - xem [docs/09](docs/09-mcp-va-so-lieu.md).
-- **Sao lưu brain lên GitHub** để không mất dữ liệu: trang Tự học - xem [docs/18](docs/18-sao-luu-github.md).
+- **Chọn engine/model**: trang **Models** (Claude Code, ChatGPT/Codex, OpenRouter, OpenAI, Google Gemini, Anthropic API).
+- **Đấu kết nối** (POS, quảng cáo, lịch, Zalo...) để báo cáo số liệu thật: trang **Kết nối** - xem [docs/09](docs/09-mcp-va-so-lieu.md).
+- **Sao lưu brain lên GitHub** để không mất dữ liệu: trang **Tự học** - xem [docs/18](docs/18-sao-luu-github.md).
+- **Theo dõi token đã dùng**: trang **Mức dùng** - xem [docs/23](docs/23-muc-dung-token.md).
 
 ## Tài liệu đầy đủ
 
-Xem [docs/README.md](docs/README.md) - hướng dẫn từng chức năng (chat/voice, đồ thị 3D, skills, agents, workflows, loop, MCP, Telegram, bảo mật, backup...).
+Xem [docs/README.md](docs/README.md) - hướng dẫn từng chức năng (chat/voice, đồ thị tri thức, skills, agents, workflows, việc định kỳ, Kanban, tự học, kết nối, Telegram, Zalo, plugins, bảo mật, backup...).
 
 ## Sự cố hay gặp
 

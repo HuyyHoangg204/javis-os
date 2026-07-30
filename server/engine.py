@@ -626,6 +626,69 @@ def _plain_vn(text):
     return "".join(c for c in s if unicodedata.category(c) != "Mn").replace("đ", "d")
 
 
+def _schedule_intent_text(messages, max_chars=600):
+    """Lấy phần user thực sự ra lệnh, bỏ marker file và từ chối suy diễn từ bài quá dài.
+
+    Gateway lịch chạy trước model và có quyền xoá dữ liệu. Vì vậy nó chỉ nên nhận câu lệnh
+    ngắn, trực tiếp; bài viết/prompt dài có thể tình cờ chứa cả "dùng", "tất cả", "nhắc",
+    "lịch"... nhưng không phải lệnh thao tác lịch.
+    """
+    last = next((m.get("content") or "" for m in reversed(messages or [])
+                 if m.get("role") == "user"), "")
+    text = str(last or "").strip()
+
+    # Dashboard đặt marker file nhiều dòng trước caption; Telegram đặt marker tải file ở
+    # dòng đầu. Control text không phải lời user và không được tham gia nhận diện mutation.
+    if text.startswith("[File đính kèm"):
+        marker_end = text.find("]\n\n")
+        if marker_end >= 0:
+            text = text[marker_end + 3:].strip()
+    elif text.startswith("[Người dùng gửi"):
+        marker_end = text.find("]\n")
+        if marker_end >= 0:
+            text = text[marker_end + 2:].strip()
+
+    if not text or len(text) > max_chars:
+        return None
+    return text
+
+
+_SCHEDULE_CANCEL_VERB_RE = re.compile(
+    r"\b(?:hủy|huỷ|huy|xóa|xoá|xoa|gỡ|go|tắt|tat|dừng|dung|bỏ|bo)\b",
+    re.IGNORECASE,
+)
+
+
+def _has_schedule_cancel_verb(text):
+    """Giữ dấu để không đánh đồng dừng/dùng, tắt/tất, gỡ/gõ."""
+    return bool(_SCHEDULE_CANCEL_VERB_RE.search(str(text or "")))
+
+
+def _direct_schedule_cancel_request(messages):
+    """Chỉ nhận câu huỷ lịch có động từ mệnh lệnh ở đầu phần user nhập."""
+    text = _schedule_intent_text(messages)
+    if text is None:
+        return None, None
+
+    # Các tiền tố hội thoại/phép lịch sự thường gặp trước động từ chính.
+    lead = (
+        r"^\s*(?:(?:javis|em|bạn|ban|ơi|oi|hãy|hay|please)\b[\s,;:!\-]*"
+        r"|(?:vui\s+lòng|vui\s+long|làm\s+ơn|lam\s+on)\b[\s,;:!\-]*"
+        r"|(?:giúp|giup|nhờ|nho)\s*(?:anh|em|tôi|toi|mình|minh)?\b[\s,;:!\-]*"
+        r"|cho\s+(?:anh|em|tôi|toi|mình|minh)\b[\s,;:!\-]*"
+        r"|(?:anh|tôi|toi|mình|minh)\s+(?:muốn|muon|cần|can)\b[\s,;:!\-]*)*"
+    )
+    match = re.match(lead + _SCHEDULE_CANCEL_VERB_RE.pattern, text, re.IGNORECASE)
+    if not match:
+        return text, None
+
+    # "dung huy..." không dấu thường là "đừng huỷ", không phải "dừng lịch".
+    command_plain = _plain_vn(text[match.start():])
+    if re.match(r"^dung\s+(?:huy|xoa|go|tat|dung|bo)\b", command_plain):
+        return text, None
+    return text, match
+
+
 def _tool_requirement(messages, mcp_tools):
     """Tool phải gọi ở vòng đầu cho câu hỏi cần dữ liệu sống; None nếu chat kiến thức thuần."""
     names = {t.get("fn") for t in (mcp_tools or [])}
@@ -637,12 +700,27 @@ def _tool_requirement(messages, mcp_tools):
         "hien co", "hom nay", "con ", "tao", "dat", "them", "huy", "xoa", "go ",
         "tat", "dung", "bat", "sua", "doi",
     ))
-    schedule = any(x in q for x in (
-        "cron", "nhac", "nhac hen", "nhac thuoc", "lich thuoc", "lich nhac", "uong thuoc",
-        "viec dinh ky", "morning briefing", "reminder",
-    ))
-    if action and schedule and "javis_schedule" in names:
-        return "javis_schedule"
+    schedule_text = _schedule_intent_text(messages)
+    if schedule_text is not None:
+        schedule_q = _plain_vn(schedule_text)
+        schedule_action = any(x in schedule_q for x in (
+            "kiem tra", "check", "xem", "doc", "liet ke", "tim", "lay", "dang chay",
+            "hien co", "hom nay", "con ", "tao", "dat", "them", "huy", "xoa",
+            "bat", "sua", "doi",
+        )) or _has_schedule_cancel_verb(schedule_text)
+        schedule = any(x in schedule_q for x in (
+            "cron", "nhac", "nhac hen", "nhac thuoc", "lich thuoc", "lich nhac", "uong thuoc",
+            "viec dinh ky", "morning briefing", "reminder",
+        ))
+        if schedule_action and schedule and "javis_schedule" in names:
+            # Phân loại theo ý định đã siết chặt thay vì chỉ dựa vào việc câu có chữ "lịch/nhắc".
+            # Nhờ vậy câu bàn về "đặt lịch tư vấn 1-1 có ổn không?" không bị ép function-call.
+            if (
+                _schedule_read_request(messages)
+                or _schedule_create_request(messages)
+                or _schedule_cancel_request(messages)
+            ):
+                return "javis_schedule"
 
     live_source = any(x in q for x in (
         "google", "gmail", "drive", "calendar", "keep", "task", "mcp", "pos",
@@ -655,24 +733,89 @@ def _tool_requirement(messages, mcp_tools):
 
 def _schedule_read_request(messages):
     """Câu hỏi chỉ-đọc lịch có thể dispatch thẳng, không phụ thuộc model biết function calling."""
-    last = next((m.get("content") or "" for m in reversed(messages or [])
-                 if m.get("role") == "user"), "")
+    last = _schedule_intent_text(messages)
+    if last is None:
+        return False
     q = _plain_vn(last)
+    conceptual = any(x in q for x in (
+        "co nen", "nen ", "lieu ", "y kien", "the nao", "co ok khong", "co on khong",
+        "hop ly khong", "thay bang", "tu van", "booking", "phuong an",
+    ))
+    if conceptual:
+        return False
     read = any(x in q for x in (
         "kiem tra", "check", "xem", "doc", "liet ke", "dang chay", "hien co", "hom nay", "con ",
     ))
     mutate = any(x in q for x in (
-        "tao", "dat", "them", "huy", "xoa", "go ", "tat", "dung", "bat", "sua", "doi",
+        "tao", "dat", "them", "huy", "xoa", "bat", "sua", "doi",
+    )) or _has_schedule_cancel_verb(last)
+    schedule = any(x in q for x in (
+        "cron", "nhac", "lich thuoc", "lich nhac", "viec dinh ky", "reminder",
+        "morning briefing", "viec gi dang chay",
     ))
-    return read and not mutate
+    return read and schedule and not mutate
+
+
+def _schedule_create_request(messages):
+    """Chỉ nhận lệnh TẠO reminder/cron trực tiếp, không nhận câu đang bàn về khái niệm "đặt lịch".
+
+    ``javis_schedule`` là lịch tự động nội bộ của Javis, khác booking/cuộc hẹn/Calendar. Model có
+    thể chủ động function-call ngay cả khi gateway không ép tool, nên điều kiện này còn được dùng
+    làm cổng chặn trước mọi lần thực thi tool.
+    """
+    last = _schedule_intent_text(messages)
+    if last is None:
+        return False
+    q = _plain_vn(last)
+
+    # Các câu hỏi/đề xuất UX, bán hàng, booking hay tư vấn chỉ cần trả lời bằng hội thoại.
+    conceptual = any(x in q for x in (
+        "co ok khong", "co on khong", "lieu ", "nen ", "thay bang", "y kien",
+        "tu van 1-1", "tu van 1:1", "booking", "dat lich tu van",
+        "gia tri uu tien", "hoi dap", "phuong an",
+    ))
+    external_calendar = any(x in q for x in (
+        "google calendar", "outlook calendar", "cuoc hop", "meeting", "su kien", "event",
+    ))
+    if conceptual or external_calendar or "?" in last:
+        return False
+
+    # Chỉ chấp nhận động từ mệnh lệnh ở đầu câu, sau vài tiền tố lịch sự thường gặp.
+    lead = (
+        r"^\s*(?:(?:javis|em|ban|oi|hay|please)\b[\s,;:!\-]*"
+        r"|(?:vui\s+long|lam\s+on)\b[\s,;:!\-]*"
+        r"|(?:giup|nho)\s*(?:anh|em|toi|minh)?\b[\s,;:!\-]*"
+        r"|cho\s+(?:anh|em|toi|minh)\b[\s,;:!\-]*"
+        r"|(?:anh|toi|minh)\s+(?:muon|can)\b[\s,;:!\-]*)*"
+    )
+    command = re.match(lead + r"(?:tao|dat|them|len\s+lich|nhac)\b", q, re.IGNORECASE)
+    time_first_command = re.match(
+        r"^\s*(?:\d{1,3}\s*(?:phut|gio)\s+nua|\d{1,2}\s*h(?:\d{1,2})?\b.*?)\s+nhac\b",
+        q,
+        re.IGNORECASE,
+    )
+    if not command and not time_first_command:
+        return False
+
+    # Một lệnh reminder thật phải có ngữ nghĩa tự động/định kỳ hoặc một mốc thời gian cụ thể.
+    schedule_semantics = any(x in q for x in (
+        "cron", "nhac", "reminder", "viec dinh ky", "moi ", "hang ngay", "hang tuan",
+        "phut nua", "gio nua", "ngay mai", "sang mai", "chieu mai", "toi mai",
+    ))
+    time_semantics = bool(re.search(
+        r"(?:\b\d{1,2}\s*(?:h|gio|phut|ngay)\b|\bluc\s+\d{1,2}\b|"
+        r"\b(?:sang|trua|chieu|toi)\b)",
+        q,
+    ))
+    return schedule_semantics or time_semantics
 
 
 def _schedule_cancel_request(messages):
     """Nhận diện yêu cầu huỷ/xoá lịch, không nhầm với câu chỉ hỏi hoặc lịch ngoài Javis."""
-    last = next((m.get("content") or "" for m in reversed(messages or [])
-                 if m.get("role") == "user"), "")
-    q = _plain_vn(last)
-    cancel = any(x in q for x in ("huy", "xoa", "go ", "tat", "dung", "bo lich", "bo nhac"))
+    last, command = _direct_schedule_cancel_request(messages)
+    if last is None or command is None:
+        return False
+    q = _plain_vn(last[command.end():])
     explicit_schedule = any(x in q for x in (
         "cron", "nhac", "lich thuoc", "lich nhac", "viec dinh ky",
         "morning briefing", "reminder", "vua bao",
@@ -685,7 +828,33 @@ def _schedule_cancel_request(messages):
     external_calendar = any(x in q for x in (
         "google calendar", "outlook calendar", "cuoc hop", "meeting", "su kien", "event",
     ))
-    return cancel and (explicit_schedule or (plain_schedule and not external_calendar))
+    return not external_calendar and (explicit_schedule or plain_schedule)
+
+
+def _schedule_tool_allowed(messages, name, args):
+    """Rào cuối: model không được tự ý đọc/sửa lịch khi user chỉ nhắc tới chữ "lịch"."""
+    if name != "javis_schedule":
+        return True
+    op = str((args or {}).get("op") or "").strip().lower()
+    if op == "list":
+        return (
+            _schedule_read_request(messages)
+            or _schedule_create_request(messages)
+            or _schedule_cancel_request(messages)
+        )
+    if op == "create":
+        return _schedule_create_request(messages)
+    if op == "cancel":
+        return _schedule_cancel_request(messages)
+    return False
+
+
+def _schedule_tool_blocked_result():
+    return (
+        "BỊ CHẶN: user chỉ đang hỏi hoặc thảo luận về việc đặt lịch, không yêu cầu đọc hay thay đổi "
+        "lịch tự động của Javis. Hãy trả lời trực tiếp câu hỏi; không liệt kê cron/reminder và không "
+        "khẳng định đã tạo, sửa hoặc huỷ lịch."
+    )
 
 
 def _schedule_candidates(result):
@@ -895,8 +1064,11 @@ async def _cc_tool_loop(url, headers, model, messages, mcp_tools, mcp_route, rea
                     args = json.loads((tc.get("function") or {}).get("arguments") or "{}")
                 except json.JSONDecodeError:
                     args = {}
-                yield {"type": "tool_call", "name": fn}
-                result = await mcp_client.call_route(mcp_route, fn, args)
+                if _schedule_tool_allowed(messages, fn, args):
+                    yield {"type": "tool_call", "name": fn}
+                    result = await mcp_client.call_route(mcp_route, fn, args)
+                else:
+                    result = _schedule_tool_blocked_result()
                 msgs.append({"role": "tool", "tool_call_id": tc.get("id"), "content": _clip_tool_result(result)})
             continue
         content = msg.get("content") or ""
@@ -1035,8 +1207,11 @@ async def responses_with_mcp(access_token, account_id, model, messages, reasonin
                         args = json.loads(fc.get("arguments") or "{}")
                     except json.JSONDecodeError:
                         args = {}
-                    yield {"type": "tool_call", "name": fc.get("name")}
-                    result = await mcp_client.call_route(mcp_route, fc.get("name"), args)
+                    if _schedule_tool_allowed(messages, fc.get("name"), args):
+                        yield {"type": "tool_call", "name": fc.get("name")}
+                        result = await mcp_client.call_route(mcp_route, fc.get("name"), args)
+                    else:
+                        result = _schedule_tool_blocked_result()
                     items.append({"type": "function_call_output", "call_id": fc.get("call_id"), "output": _clip_tool_result(result)})
                 continue
             text = ""
@@ -1109,8 +1284,12 @@ async def anthropic_chat_with_mcp(api_key, model, messages, reasoning, mcp_tools
                 conv.append({"role": "assistant", "content": blocks})
                 results = []
                 for tu in tool_uses:
-                    yield {"type": "tool_call", "name": tu.get("name")}
-                    res = await mcp_client.call_route(mcp_route, tu.get("name"), tu.get("input") or {})
+                    args = tu.get("input") or {}
+                    if _schedule_tool_allowed(messages, tu.get("name"), args):
+                        yield {"type": "tool_call", "name": tu.get("name")}
+                        res = await mcp_client.call_route(mcp_route, tu.get("name"), args)
+                    else:
+                        res = _schedule_tool_blocked_result()
                     results.append({"type": "tool_result", "tool_use_id": tu.get("id"),
                                     "content": _clip_tool_result(res)})
                 conv.append({"role": "user", "content": results})

@@ -39,6 +39,10 @@ class Select {
     if (sel === "option[data-brain]") return o.dataset.brain !== undefined;
     if (sel === "option[data-custom]") return o.dataset.custom !== undefined;
     if (sel === 'option[value="brain"]') return o.value === "brain";
+    // Thư mục ngoài giờ nằm trong <optgroup> (thẻ <option> không nhận được icon
+    // nên dùng nhóm để phân biệt). Mock này chỉ dựng Opt phẳng, không dựng
+    // optgroup, nên đúng là không khớp gì - trả false thay vì ném lỗi.
+    if (sel === "optgroup") return false;
     throw new Error("selector chưa mock: " + sel);
   }
   querySelectorAll(sel) { return this._kids.filter((o) => this._match(o, sel)); }

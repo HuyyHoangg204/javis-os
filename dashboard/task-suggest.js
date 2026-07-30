@@ -12,6 +12,11 @@
 (function () {
   "use strict";
 
+  // File nay chay hai che do: trong trinh duyet va duoi node (test require no).
+  // Duoi node khong co window nen khong co ic() - tra ve chuoi rong de phan logic
+  // van test duoc ma khong phai keo ca tang icon vao.
+  var ic = (typeof window !== "undefined" && window.ic) ? window.ic : function () { return ""; };
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -40,13 +45,18 @@
     return /^\s*[-*+]\s+\[(?: |x|X)?\]\s*$/.test(String(text == null ? "" : text).replace(/ /g, " "));
   }
 
+  // Hai thu KHAC NHAU trong bang nay, dung lan la sai:
+  //   menuIcon = ten icon Lucide, chi de HIEN trong menu goi y.
+  //   token / text = ky tu THAT duoc chen vao file .md. Day la cu phap cua
+  //     Obsidian Tasks nen BUOC phai giu nguyen emoji - doi la Obsidian khong
+  //     doc duoc nua va test_dataview_tasks.py se do.
   var MAIN = [
-    { ic: "📅", label: "Hạn chót (due)", kind: "date", token: "📅" },
-    { ic: "⏳", label: "Ngày dự kiến", kind: "date", token: "⏳" },
-    { ic: "🛫", label: "Ngày bắt đầu", kind: "date", token: "🛫" },
-    { ic: "⏫", label: "Ưu tiên cao", kind: "insert", text: "⏫ " },
-    { ic: "🔼", label: "Ưu tiên vừa", kind: "insert", text: "🔼 " },
-    { ic: "🔽", label: "Ưu tiên thấp", kind: "insert", text: "🔽 " },
+    { menuIcon: "calendar", label: "Hạn chót (due)", kind: "date", token: "📅" },
+    { menuIcon: "hourglass", label: "Ngày dự kiến", kind: "date", token: "⏳" },
+    { menuIcon: "plane-takeoff", label: "Ngày bắt đầu", kind: "date", token: "🛫" },
+    { menuIcon: "chevrons-up", label: "Ưu tiên cao", kind: "insert", text: "⏫ " },
+    { menuIcon: "chevron-up", label: "Ưu tiên vừa", kind: "insert", text: "🔼 " },
+    { menuIcon: "chevron-down", label: "Ưu tiên thấp", kind: "insert", text: "🔽 " },
   ];
 
   // ---------------------------------------------------------------- popup (chi khi co DOM)
@@ -60,7 +70,7 @@
     function renderPop() {
       pop.innerHTML = items.map(function (it, i) {
         return '<div class="ts-item' + (i === sel ? " sel" : "") + '" data-i="' + i + '">' +
-          (it.ic ? '<span class="ts-ic">' + it.ic + "</span>" : "") + esc(it.label) +
+          (it.menuIcon ? '<span class="ts-ic">' + ic(it.menuIcon) + "</span>" : "") + esc(it.label) +
           (it.date ? ' <span class="ts-date">' + esc(it.date) + "</span>" : "") + "</div>";
       }).join("");
     }

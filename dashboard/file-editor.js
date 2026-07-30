@@ -39,8 +39,10 @@
   }
   // brainRel -> path theo tran duyet (ghep home). Da la path tran thi giu nguyen.
   function ceilPath(home, brainRel) {
-    var rel = String(brainRel || "").replace(/^\.?\//, "").replace(/\/+$/, "");
-    return home ? home + "/" + rel : rel;
+    var rel = String(brainRel || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+$/, "");
+    var h = String(home || "").replace(/\\/g, "/").replace(/^\.?\//, "").replace(/\/+$/, "");
+    if (!h || rel === h || rel.indexOf(h + "/") === 0) return rel;
+    return h + "/" + rel;
   }
   function rawUrl(b, ceilRel, dl) {
     return "/files/raw?brain=" + encodeURIComponent(b) + "&path=" + encodeURIComponent(ceilRel) + (dl ? "&dl=1" : "");
@@ -125,7 +127,7 @@
   }
   function closeBtn() {
     var b = document.createElement("button");
-    b.className = "jvfe-btn icon"; b.textContent = "✕"; b.title = "Đóng (Esc)";
+    b.className = "jvfe-btn icon"; b.innerHTML = ic("x"); b.title = "Đóng (Esc)";
     b.onclick = close; return b;
   }
 
@@ -187,7 +189,7 @@
   // Nut Luu (dung getContent de lay noi dung THAT theo che do dang mo) + Tai + Dong.
   function appendSaveAndClose(b, ceil, getContent) {
     var save = document.createElement("button");
-    save.className = "jvfe-btn"; save.textContent = "💾 Lưu"; save.title = "Lưu (Ctrl+S)";
+    save.className = "jvfe-btn"; save.innerHTML = ic("save") + " Lưu"; save.title = "Lưu (Ctrl+S)";
     curSave = function () {
       var fd = new FormData();
       fd.append("brain", b); fd.append("path", ceil); fd.append("content", getContent());
@@ -197,11 +199,11 @@
         .then(function (r) {
           save.disabled = false;
           if (r && r.ok) {
-            save.textContent = "✓ Đã lưu"; save.classList.add("saved");
-            setTimeout(function () { save.textContent = "💾 Lưu"; save.classList.remove("saved"); }, 1400);
-          } else { save.textContent = "⚠ Lỗi"; setTimeout(function () { save.textContent = "💾 Lưu"; }, 1600); }
+            save.innerHTML = ic("check", { cls: "ic-ok" }) + " Đã lưu"; save.classList.add("saved");
+            setTimeout(function () { save.innerHTML = ic("save") + " Lưu"; save.classList.remove("saved"); }, 1400);
+          } else { save.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Lỗi"; setTimeout(function () { save.innerHTML = ic("save") + " Lưu"; }, 1600); }
         })
-        .catch(function () { save.disabled = false; save.textContent = "⚠ Lỗi"; setTimeout(function () { save.textContent = "💾 Lưu"; }, 1600); });
+        .catch(function () { save.disabled = false; save.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Lỗi"; setTimeout(function () { save.innerHTML = ic("save") + " Lưu"; }, 1600); });
     };
     save.onclick = curSave;
     elActions.appendChild(save);
@@ -279,5 +281,8 @@
   if (typeof window !== "undefined") {
     window.JavisEditFile = open;
     window.JavisFileEditor = { open: open, close: close };
+  }
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = { ceilPath: ceilPath };
   }
 })();

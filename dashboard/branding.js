@@ -58,7 +58,7 @@
       var j = await r.json().catch(function () { return {}; });
       if (!r.ok || !j.ok) { setStatus("brandLogoStatus", j.error || "Tải lên thất bại", true); return; }
       bustLogos();
-      setStatus("brandLogoStatus", "Đã cập nhật ảnh ✓", false);
+      setStatus("brandLogoStatus", "Đã cập nhật ảnh", false);
     } catch (e) {
       setStatus("brandLogoStatus", "Lỗi mạng khi tải lên", true);
     }
@@ -112,18 +112,18 @@
     if (check) check.textContent = "Kiểm tra lại";
     var ip = j.server_ip || "(IP máy chủ VPS)";
     var dnsRecord = "A · " + j.domain + " · " + ip;
-    var steps = '<div class="dom-step done"><span class="dom-step-num">✓</span><div><b>1. Lưu tên miền</b><p>Javis đã ghi nhận <code>' + esc(j.domain) + '</code>.</p></div></div>';
-    steps += '<div class="dom-step ' + (j.dns_ok ? "done" : "warn") + '"><span class="dom-step-num">' + (j.dns_ok ? "✓" : "2") + '</span><div><b>2. Trỏ DNS về VPS</b>' +
+    var steps = '<div class="dom-step done"><span class="dom-step-num">' + ic("check") + '</span><div><b>1. Lưu tên miền</b><p>Javis đã ghi nhận <code>' + esc(j.domain) + '</code>.</p></div></div>';
+    steps += '<div class="dom-step ' + (j.dns_ok ? "done" : "warn") + '"><span class="dom-step-num">' + (j.dns_ok ? ic("check") : "2") + '</span><div><b>2. Trỏ DNS về VPS</b>' +
       '<p>' + (j.dns_ok ? "Bản ghi A đã trỏ đúng IP máy chủ." : "Tạo hoặc sửa bản ghi này tại nơi quản lý tên miền:") + '</p>' +
       '<code>' + esc(dnsRecord) + '</code><br><button class="dom-copy" type="button" data-copy="' + esc(dnsRecord) + '">Sao chép bản ghi</button></div></div>';
     if (hostinger) {
       var envLine = "DOMAIN_NAME=" + j.domain;
       var route = j.route_domain && j.route_domain !== "localhost" ? j.route_domain : "chưa đặt";
-      steps += '<div class="dom-step ' + (j.ssl_active && !j.requires_redeploy ? "done" : "warn") + '"><span class="dom-step-num">' + (j.ssl_active && !j.requires_redeploy ? "✓" : "3") + '</span><div><b>3. Kích hoạt route HTTPS trên Hostinger</b>' +
+      steps += '<div class="dom-step ' + (j.ssl_active && !j.requires_redeploy ? "done" : "warn") + '"><span class="dom-step-num">' + (j.ssl_active && !j.requires_redeploy ? ic("check") : "3") + '</span><div><b>3. Kích hoạt route HTTPS trên Hostinger</b>' +
         '<p>Trong hPanel → VPS → Docker Manager, đặt Environment bên dưới rồi bấm <b>Redeploy</b>. Route hiện tại: <b>' + esc(route) + '</b>. Bước này do Traefik của Hostinger quản lý nên app không thể tự sửa label từ trong container.</p>' +
         '<code>' + esc(envLine) + '</code><br><button class="dom-copy" type="button" data-copy="' + esc(envLine) + '">Sao chép biến</button></div></div>';
     } else {
-      steps += '<div class="dom-step ' + (j.ssl_active ? "done" : (j.dns_ok ? "warn" : "")) + '"><span class="dom-step-num">' + (j.ssl_active ? "✓" : "3") + '</span><div><b>3. Bật HTTPS</b>' +
+      steps += '<div class="dom-step ' + (j.ssl_active ? "done" : (j.dns_ok ? "warn" : "")) + '"><span class="dom-step-num">' + (j.ssl_active ? ic("check") : "3") + '</span><div><b>3. Bật HTTPS</b>' +
         '<p>' + (j.ssl_active ? "Chứng chỉ HTTPS đang hoạt động." : "Khi DNS đã đúng, bấm Bật SSL để Javis xin chứng chỉ.") + '</p>' +
         (j.deploy_mode === "docker" && !j.ssl_active ? '<code>docker compose -f docker-compose.yml -f docker-compose.https.yml up -d</code>' : "") + '</div></div>';
     }
@@ -223,7 +223,7 @@
       var text = btn.getAttribute("data-copy") || "";
       try {
         await navigator.clipboard.writeText(text);
-        var old = btn.textContent; btn.textContent = "Đã sao chép ✓";
+        var old = btn.textContent; btn.innerHTML = "Đã sao chép " + ic("check", { cls: "ic-ok" });
         setTimeout(function () { btn.textContent = old; }, 1300);
       } catch (err) {
         setStatus("domainStatus", "Không sao chép tự động được; hãy chọn và copy dòng phía trên.", true);

@@ -4,6 +4,26 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.9.257] - 2026-07-30
+Bỏ hết emoji khỏi giao diện, thay bằng bộ icon Lucide vẽ nét. Emoji do font hệ thống vẽ nên mỗi máy ra một hình, lại cứng màu nên ở tông SÁNG là chọc vào mắt; icon nét thì giống nhau trên mọi máy và tự ăn theo màu chữ.
+### Cải thiện
+- **392 chỗ emoji trong dashboard đổi sang icon Lucide**, trải 18 file. Icon vẽ bằng `stroke="currentColor"` nên tự đổi màu theo tông SÁNG/TỐI và theo màu chữ của chỗ nó đứng - việc emoji không làm được. Cỡ icon là `1em` nên co theo cỡ chữ của khối chứa, không phải con số cứng.
+- **Vendor bộ rút gọn 115 icon, 20.7KB** (`dashboard/vendor/lucide-icons.js`) thay vì bản đầy đủ 414KB cho ~2000 icon. Không gọi mạng lúc chạy nên chạy được cả khi máy không có internet. Sinh lại bằng `python tools/gen_icons.py` sau khi thêm tên vào `dashboard/icons.manifest.json`.
+- **Thay 24 icon SVG vẽ tay** trong thanh điều hướng bằng Lucide, và gộp chỗ khai trùng: trước đây mỗi trang khai icon hai lần (`ICON` + `VIEW_META`) nên đã lệch thật - Việc (Kanban) trùng icon với Tệp tin, Tài khoản trùng với Cài đặt. Giờ cả hai lấy từ một bảng `VIEW_ICON` duy nhất.
+- **Bộ chọn brain dùng `<optgroup>`**: thẻ `<option>` chỉ nhận chữ nên không nhét được SVG. Thư mục ngoài giờ xếp vào nhóm `Thư mục ngoài` - cách gốc của HTML, giữ trọn thông tin mà icon thư mục đang mang, hiển thị đúng trên mọi máy.
+- Icon dùng được cả trong `content:` của CSS (dấu tích ở bước workflow, chấm đầu dòng nhật ký cập nhật) qua mặt nạ + biến `--ic-*` do script sinh ra, nên vẫn ăn `currentColor` chứ không phải màu cứng.
+### Bảo mật
+- `Icons.msg()` / `Icons.warn()` / `Icons.ok()` tự escape phần chữ. Việc đổi icon buộc hàng chục chỗ chuyển từ `textContent` sang `innerHTML`, mà nhiều chỗ nối thẳng chuỗi lỗi từ server - đó là đường mở lỗ XSS ở đúng những chỗ trước đây an toàn. Ba hàm này bịt hẳn đường đó, có test canh.
+### Sửa lỗi
+- Biến cục bộ tên `ic` trong `iconInner()` che mất hàm `ic()` toàn cục, đổi tên để không xung đột.
+- `chip()` tự escape nội dung nên nhận TÊN icon thay vì HTML, không thể vô tình nhét HTML thô qua đường này.
+### Giữ nguyên có lý do
+- Cú pháp Obsidian Tasks (`ngày hạn`, `ưu tiên`, `ngày hoàn thành`...) trong file `.md` vẫn là emoji vì đó là ĐỊNH DẠNG DỮ LIỆU, đổi là Obsidian không đọc được. Phần hiển thị các mốc đó trên giao diện thì đã dùng icon. Emoji trong tin Telegram cũng giữ vì Telegram tự render đều trên mọi thiết bị.
+### Kiểm chứng
+- `tests/python/test_icons.py`: quét nguồn báo lỗi nếu emoji bò trở lại (danh sách ngoại lệ ngắn, ghi rõ lý do từng dòng), và đối chiếu mọi tên icon gọi trong nguồn với bộ đã vendor - chặn lỗi gõ sai tên thành icon vô hình.
+- `tests/js/test_icons.mjs`: chạy thật `ic()` / `Icons.msg()` trong DOM tối thiểu, gồm cả rào XSS.
+- Kiểm trên app đang chạy: 17/17 trang render icon, không thẻ nào sót, không tên icon nào sai, không lỗi console, icon đúng cỡ và đúng hàng chữ ở cả hai tông.
+
 ## [0.9.256] - 2026-07-30
 Webcake có thêm cách đấu dễ hơn: bấm Kết nối rồi đăng nhập, không dán JWT, không cần Node.js.
 ### Thêm mới

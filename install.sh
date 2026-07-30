@@ -140,7 +140,7 @@ echo ""
 ok "Javis OS is up at: http://127.0.0.1:7777"
 log "Remote access (SSH tunnel): ssh -L 7777:localhost:7777 $(whoami)@<vps-ip>"
 echo ""
-log "Truy cập từ xa qua Cloudflare Tunnel (không cần mở port, có HTTPS - như Hermes):"
+log "Truy cập từ xa qua Cloudflare Tunnel (không cần mở port, có HTTPS):"
 echo "    1) Đặt MẬT KHẨU trong Dashboard → Tài khoản TRƯỚC (Claude chạy full quyền!)."
 if command -v cloudflared >/dev/null 2>&1; then
   echo "    2) cloudflared tunnel --url http://localhost:7777   → mở URL https://<random>.trycloudflare.com"

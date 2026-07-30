@@ -8,7 +8,7 @@
 // Giá trị cũ "dim" (tông tối-nhạt, đã gỡ ở 0.9.250) được quy về "dark" và ghi đè
 // lại vào localStorage để lần sau không phải quy đổi nữa.
 //
-// Các lớp vẽ bằng canvas (starfield, graph 2D, graph 3D) KHÔNG đọc được biến CSS,
+// Các lớp vẽ bằng canvas (starfield, knowledge graph) KHÔNG đọc được biến CSS,
 // nên chúng nghe sự kiện "javis-theme-change" rồi tự vẽ lại bằng bảng màu tương ứng.
 (function () {
   var KEY = "javis.theme";

@@ -20,6 +20,13 @@
   var OPEN = String.fromCharCode(0xE000), CLOSE = String.fromCharCode(0xE001);   // sentinel placeholder (private-use, khong xuat hien trong text)
 
   // ---------------------------------------------------------------- helpers
+  // File này chạy hai chế độ: trong trình duyệt và dưới node (test require nó).
+  // Dưới node không có window nên không có ic() - trả về chuỗi rỗng để phần logic
+  // vẫn test được mà không phải kéo cả tầng icon vào. Trong trình duyệt thì
+  // icons.js đã nạp trước (index.html bảo đảm thứ tự, có test canh) nên lấy
+  // được hàm thật.
+  var ic = (typeof window !== "undefined" && window.ic) ? window.ic : function () { return ""; };
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -33,8 +40,9 @@
     try { return (typeof currentBrainPath === "function") ? currentBrainPath() : ""; }
     catch (e) { return ""; }
   }
-  function fileUrl(p) {
-    return "/files/raw?brain=" + encodeURIComponent(brainPath()) +
+  function fileUrl(p, brainOverride) {
+    var b = brainOverride == null ? brainPath() : brainOverride;
+    return "/files/raw?brain=" + encodeURIComponent(b) +
       "&path=" + encodeURIComponent(String(p || "").replace(/^\.?\//, ""));
   }
   function resolveSrc(s) {
@@ -46,12 +54,76 @@
     p = String(p == null ? "" : p).trim();
     return !!p && !/^(https?:|mailto:|data:|blob:|\/)/i.test(p);
   }
+  function decodeQueryPart(s) {
+    try { return decodeURIComponent(String(s || "").replace(/\+/g, " ")); }
+    catch (e) { return ""; }
+  }
+  function currentBrainMatches(name) {
+    var b = String(brainPath() || "").replace(/\\/g, "/").replace(/\/+$/, "");
+    var base = b === "brain" ? "Brain Default" : b.split("/").pop();
+    return String(base || "").toLowerCase() === String(name || "").toLowerCase();
+  }
+  // Link file noi bo co the do server tao dung (/files/raw), do AI ghi sai theo duong dan dia
+  // (/brains/<ten brain>/<file>), hoac la URL day du cung origin. Chuan hoa ve {brain,path};
+  // link /brains chi doi khi dung CHINH brain dang chat, tranh mo nham file trung ten o brain khac.
+  function appFileRef(href) {
+    href = String(href == null ? "" : href).trim();
+    if (/^https?:\/\//i.test(href) && typeof window !== "undefined" && window.location) {
+      try {
+        var u = new URL(href, window.location.href);
+        if (u.origin !== window.location.origin) return null;
+        href = u.pathname + u.search;
+      } catch (e) { return null; }
+    }
+    if (/^\/files\/(?:raw|download)(?:\?|$)/i.test(href)) {
+      var q = href.indexOf("?") >= 0 ? href.slice(href.indexOf("?") + 1) : "";
+      var pm = /(?:^|&)path=([^&]*)/i.exec(q);
+      if (!pm) return null;
+      var bm = /(?:^|&)brain=([^&]*)/i.exec(q);
+      var path = decodeQueryPart(pm[1]).replace(/\\/g, "/").replace(/^\.?\//, "");
+      return path ? { path: path, brain: bm ? decodeQueryPart(bm[1]) : brainPath() } : null;
+    }
+    var direct = /^\/brains\/([^/]+)\/(.+)$/i.exec(href);
+    if (direct) {
+      var brainName = decodeQueryPart(direct[1]);
+      var rel = decodeQueryPart(direct[2]).replace(/\\/g, "/").replace(/^\/+/, "");
+      if (rel && currentBrainMatches(brainName)) return { path: rel, brain: brainPath() };
+    }
+    var legacy = /^\/brain\/(.+)$/i.exec(href);
+    if (legacy && brainPath() === "brain") {
+      var legacyRel = decodeQueryPart(legacy[1]).replace(/\\/g, "/").replace(/^\/+/, "");
+      if (legacyRel) return { path: legacyRel, brain: "brain" };
+    }
+    return null;
+  }
+  function appFilePath(href) {
+    var ref = appFileRef(href);
+    return ref ? ref.path : "";
+  }
+  // File thanh pham/media trong brain: click o chat la TAI VE. Note .md va file nguon text
+  // van mo editor; URL http(s) duoc xu ly rieng va luon mo tab moi.
+  var DOWNLOAD_EXT_RE = /\.(?:html?|svg|png|jpe?g|gif|webp|bmp|ico|mp4|webm|mov|avi|mkv|m4v|mp3|wav|m4a|ogg|flac|pdf|docx?|xlsx?|pptx?|zip|rar|7z|tar|gz)$/i;
+  function isDownloadFile(rawpath) {
+    var clean = String(rawpath || "").split(/[?#]/)[0].replace(/\/+$/, "");
+    return DOWNLOAD_EXT_RE.test(clean);
+  }
+  function vaultDownload(rawpath, extraCls, brainOverride) {
+    var clean = String(rawpath || "").replace(/^\.?\//, "");
+    return 'href="' + esc(fileUrl(clean, brainOverride) + "&dl=1") + '" data-vault-path="' + esc(clean) +
+      '" class="jv-fdownload' + (extraCls ? " " + extraCls : "") +
+      '" download title="Tải file về"';
+  }
   // Thuoc tinh <a> mo trang Tep tin dung vi tri file/thu muc. Giu href deep-link (#open=..) de
   // Ctrl/giua chuot mo tab trinh duyet moi cung nhay dung cho; bam thuong -> mo trong app.
   function vaultLoc(rawpath, extraCls) {
     var clean = String(rawpath || "").replace(/^\.?\//, "");
     return 'href="#open=' + esc(encodeURIComponent(clean)) + '" data-vault-path="' + esc(clean) +
       '" class="jv-floc' + (extraCls ? " " + extraCls : "") + '" title="Mo vi tri trong Tep tin"';
+  }
+  function vaultLink(rawpath, extraCls, brainOverride) {
+    return isDownloadFile(rawpath)
+      ? vaultDownload(rawpath, extraCls, brainOverride)
+      : vaultLoc(rawpath, extraCls);
   }
   // Inline code chua DUONG DAN FILE vault (vd `Javis/loops/x.md`)? Tra ve path da chuan hoa, "" neu khong phai.
   // Chi nhan khi trong giong path that: co duoi file + (co thu muc / la .md tran), khong ky tu cam cua ten file
@@ -127,7 +199,7 @@
     return "Ma " + ((lang || "text").toUpperCase());
   }
   function artIcon(type) {
-    return type === "html" ? "🌐" : type === "svg" ? "🖼" : type === "mermaid" ? "📊" : "📄";
+    return ic(type === "html" ? "globe" : type === "svg" ? "image" : type === "mermaid" ? "chart-column" : "file");
   }
   function artifactCard(type, lang, code) {
     var id = hashId(type + "" + code);
@@ -151,7 +223,7 @@
   // attribute), dataview.js tu phat hien va chay. contenteditable=false de trong WYSIWYG khong sua
   // nham ket qua; turndown rule (console.js) tra lai dung fence goc khi luu.
   function dataviewHtml(lang, code) {
-    var title = lang === "tasks" ? "☑ Việc (tasks)" : "▦ Dataview";
+    var title = lang === "tasks" ? ic("list-todo") + " Việc (tasks)" : ic("table-2") + " Dataview";
     return '<div class="jv-dataview" contenteditable="false" data-dv-lang="' + esc(lang) +
       '" data-dv-q="' + esc(encodeURIComponent(code)) + '">' +
       '<div class="jv-dv-head"><span class="jv-dv-title">' + title + "</span></div>" +
@@ -180,8 +252,8 @@
   function imgHtml(u, alt, rawpath) {
     var img = '<img class="chat-img" src="' + esc(u) + '" alt="' + esc(alt || "") + '"' +
       ' loading="lazy" onerror="jvImgGone(this)">';
-    // Anh trong vault: bam mo VI TRI trong Tep tin (thay vi tai anh tho); van hien anh inline.
-    if (rawpath && isVaultRel(rawpath)) return '<a ' + vaultLoc(rawpath) + ">" + img + "</a>";
+    // Anh trong vault van hien inline; bam vao thi tai file goc ve.
+    if (rawpath && isVaultRel(rawpath)) return '<a ' + vaultDownload(rawpath) + ">" + img + "</a>";
     var h = safeHref(u);
     return h ? '<a href="' + esc(h) + '" target="_blank" rel="noopener">' + img + "</a>" : img;
   }
@@ -303,7 +375,7 @@
     raw = raw.replace(/`([^`\n]+)`/g, function (_m, c) {
       var code = "<code>" + esc(c) + "</code>";
       var p = codeFilePath(c);
-      if (p) return put("<a " + vaultLoc(p, "jv-fcode") + ">" + code + "</a>");
+      if (p) return put("<a " + vaultLink(p, "jv-fcode") + ">" + code + "</a>");
       return put(code);
     });
     // 3) anh vault ![[..]] + anh markdown ![]() (giu URL qua placeholder de khong bi escape)
@@ -324,8 +396,10 @@
     // 4) link []() : URL ngoai -> tab moi; file/thu muc vault -> mo dung vi tri trong Tep tin; con lai giu cu
     raw = raw.replace(/\[([^\]]+)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g, function (_m, t, href) {
       href = href.replace(/\s+(["']).*\1\s*$/, "").trim();
+      var appRef = appFileRef(href);
+      if (appRef) return put('<a ' + vaultLink(appRef.path, "", appRef.brain) + ">" + esc(t) + "</a>");
       if (/^(https?:|mailto:)/i.test(href)) return put('<a href="' + esc(href) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
-      if (isVaultRel(href)) return put('<a ' + vaultLoc(href) + ">" + esc(t) + "</a>");
+      if (isVaultRel(href)) return put('<a ' + vaultLink(href) + ">" + esc(t) + "</a>");
       return put('<a href="' + esc(resolveSrc(href)) + '" target="_blank" rel="noopener">' + esc(t) + "</a>");
     });
     // 4b) URL tran (AI go thang, khong boc markdown) -> tu thanh link mo tab moi. Chay SAU khi link/anh/
@@ -369,7 +443,7 @@
         '<span class="jv-ap-actions">' +
           '<button class="jv-ap-btn" data-act="copy" title="Copy ma nguon">⧉</button>' +
           '<button class="jv-ap-btn" data-act="download" title="Tai ve">⇩</button>' +
-          '<button class="jv-ap-btn jv-ap-close" data-act="close" title="Dong (Esc)">✕</button>' +
+          '<button class="jv-ap-btn jv-ap-close" data-act="close" title="Dong (Esc)">' + ic("x") + '</button>' +
         "</span>" +
       "</div>" +
       '<div class="jv-ap-body"></div>';
@@ -457,7 +531,7 @@
       try { document.execCommand("copy"); } catch (e) {}
       ta.remove();
     }).then(function () {
-      if (btn) { var o = btn.textContent; btn.textContent = "✓"; setTimeout(function () { btn.textContent = o; }, 1000); }
+      if (btn) { var o = btn.textContent; btn.innerHTML = ic("check", { cls: "ic-ok" }); setTimeout(function () { btn.textContent = o; }, 1000); }
     });
   }
   function extFor(art) {
@@ -666,6 +740,7 @@
       get: function (id) { return registry[id] || null; } };
   }
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { mdToHtml: mdToHtml, highlight: highlight, wkResolve: wkResolve };
+    module.exports = { mdToHtml: mdToHtml, highlight: highlight, wkResolve: wkResolve,
+      appFilePath: appFilePath, isDownloadFile: isDownloadFile };
   }
 })();

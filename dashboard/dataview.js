@@ -12,12 +12,20 @@
    Chua ho tro: dataviewjs, FLATTEN, dur(...), lien ket [[..]] trong FROM.
 
    Task trong ket qua TICK DUOC: goi POST /files/taskcheck ghi thang vao file goc
-   (kem expect de chong ghi de khi file da doi). Ngay 📅/⏳/🛫/✅ va do uu tien
-   🔺⏫🔼🔽⏬ da duoc server boc san trong chi muc.
+   (kem expect de chong ghi de khi file da doi). Cac dau Obsidian Tasks (ngay han,
+   ngay du kien, ngay bat dau, ngay hoan thanh, do uu tien) da duoc server boc san
+   trong chi muc, file nay chi HIEN THI - khong tu doc dau tu markdown tho.
 
    Ghi chu: KHONG dung ky tu em dash o bat ky dau. */
 (function () {
   "use strict";
+
+  // File này chạy hai chế độ: trong trình duyệt và dưới node (test require nó).
+  // Dưới node không có window nên không có ic() - trả về chuỗi rỗng để phần logic
+  // vẫn test được mà không phải kéo cả tầng icon vào. Trong trình duyệt thì
+  // icons.js đã nạp trước (index.html bảo đảm thứ tự, có test canh) nên lấy
+  // được hàm thật.
+  var ic = (typeof window !== "undefined" && window.ic) ? window.ic : function () { return ""; };
 
   function esc(s) {
     return String(s == null ? "" : s)
@@ -385,17 +393,25 @@
     return '<a class="jv-floc dv-flink" href="#open=' + esc(encodeURIComponent(path)) +
       '" data-vault-path="' + esc(path) + '" title="' + esc(path) + '">' + esc(name) + "</a>";
   }
-  var PRIO_ICON = { 0: "🔺", 1: "⏫", 2: "🔼", 4: "🔽", 5: "⏬" };
+  // Do uu tien -> [ten icon, lop mau]. Cung thang mau voi trang Viec (Kanban):
+  // cang gap cang do, cang thap cang mo di cho khoi tranh chu y.
+  var PRIO_ICON = {
+    0: ["chevrons-up", "ic-err"],
+    1: ["chevron-up", "ic-err"],
+    2: ["chevron-up", "ic-warn"],
+    4: ["chevron-down", "ic-dim"],
+    5: ["chevrons-down", "ic-dim"],
+  };
   function taskItemHtml(t, f) {
     var badges = "";
     if (t.priority != null && t.priority !== 3 && PRIO_ICON[t.priority])
-      badges += ' <span class="dv-badge dv-prio">' + PRIO_ICON[t.priority] + "</span>";
+      badges += ' <span class="dv-badge dv-prio">' + ic(PRIO_ICON[t.priority][0], { cls: PRIO_ICON[t.priority][1] }) + "</span>";
     if (t.due) {
       var over = !t.checked && t.due < todayIso(0);
-      badges += ' <span class="dv-badge dv-due' + (over ? " dv-over" : "") + '">📅 ' + esc(t.due) + "</span>";
+      badges += ' <span class="dv-badge dv-due' + (over ? " dv-over" : "") + '">' + ic("calendar") + " " + esc(t.due) + "</span>";
     }
-    if (t.scheduled) badges += ' <span class="dv-badge">⏳ ' + esc(t.scheduled) + "</span>";
-    if (t.done) badges += ' <span class="dv-badge dv-donedate">✅ ' + esc(t.done) + "</span>";
+    if (t.scheduled) badges += ' <span class="dv-badge">' + ic("hourglass") + " " + esc(t.scheduled) + "</span>";
+    if (t.done) badges += ' <span class="dv-badge dv-donedate">' + ic("circle-check", { cls: "ic-ok" }) + " " + esc(t.done) + "</span>";
     return '<li class="dv-task' + (t.checked ? " task-done" : "") + '">' +
       '<input type="checkbox" class="md-cb dv-cb" data-dv-path="' + esc(f.path) +
       '" data-dv-line="' + (t.line || 0) + '" data-dv-raw="' + esc(encodeURIComponent(String(t.raw || "").trim())) + '"' +
@@ -464,7 +480,7 @@
 
   // ---------------------------------------------------------------- ve khoi
   function errHtml(msg, q) {
-    return '<div class="dv-err">⚠ ' + esc(msg) + '</div><pre class="dv-src">' + esc(q) + "</pre>";
+    return '<div class="dv-err">' + ic("triangle-alert", { cls: "ic-warn" }) + " " + esc(msg) + '</div><pre class="dv-src">' + esc(q) + "</pre>";
   }
   function run(el) {
     el.setAttribute("data-dv-done", "1");
@@ -528,12 +544,12 @@
           });
           scheduleScan();
         } else {
-          go.textContent = "⚠"; go.title = (d && d.error) || "Không thêm được";
+          go.innerHTML = ic("triangle-alert", { cls: "ic-warn" }); go.title = (d && d.error) || "Không thêm được";
           setTimeout(function () { go.textContent = "Thêm"; }, 1600);
         }
       })
       .catch(function () {
-        go.disabled = false; go.textContent = "⚠";
+        go.disabled = false; go.innerHTML = ic("triangle-alert", { cls: "ic-warn" });
         setTimeout(function () { go.textContent = "Thêm"; }, 1600);
       });
   }

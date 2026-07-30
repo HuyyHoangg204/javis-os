@@ -139,12 +139,12 @@
       var chLabel = ch === "telegram" ? "TG" : (ch && ch !== "web" ? ch.slice(0, 8) : "");
       var isRun = !!(window.JavisRunning && window.JavisRunning.has(s.id));
       var item = el('<div class="cside-item' + (s.id === cur ? " active" : "") + (isRun ? " running" : "") + '">' +
-        '<div class="ci-title">' + (isRun ? '<span class="ci-run" title="Đang trả lời">⏳</span> ' : '') + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
+        '<div class="ci-title">' + (isRun ? '<span class="ci-run" title="Đang trả lời">' + ic("loader", { cls: "ic-spin" }) + '</span> ' : '') + esc(s.title || s.preview || "(chưa đặt tên)") + '</div>' +
         '<div class="ci-meta"><span>' + fmtT(s.updated_at) + '</span>' +
         (chLabel ? '<span class="ci-badge">' + esc(chLabel) + '</span>' : '') +
         (eng ? '<span class="ci-badge">' + esc(eng) + '</span>' : '') +
         '<span>' + (s.msg_count || 0) + ' tin</span>' +
-        '<span class="act"><span class="ren" title="Đổi tên">✎</span><span class="del" title="Xoá">🗑</span></span>' +
+        '<span class="act"><span class="ren" title="Đổi tên">' + ic("pencil") + '</span><span class="del" title="Xoá">' + ic("trash-2") + '</span></span>' +
         '</div></div>');
       item.onclick = function (e) {
         if (e.target.classList.contains("del")) { e.stopPropagation(); delSession(s); return; }
@@ -209,7 +209,7 @@
     if (gs) gs.addEventListener("change", refresh);
     // Nút "Lịch sử" → mở thẳng workspace với sidebar. Đặt INLINE trong hàng nút header
     // (.hud-actions) để không đè lên nút Cài đặt/Reset; fallback về body nếu chưa có header.
-    var btn = el('<div id="jv-sess-btn" title="Lịch sử hội thoại">🕘 <span>Lịch sử</span></div>');
+    var btn = el('<div id="jv-sess-btn" title="Lịch sử hội thoại">' + ic("history") + ' <span>Lịch sử</span></div>');
     btn.onclick = function () { if (window.JavisChatStage) window.JavisChatStage.showSide(); };
     var host = document.querySelector(".hud-actions");
     (host || document.body).appendChild(btn);

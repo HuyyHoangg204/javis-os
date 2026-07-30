@@ -14,7 +14,9 @@
     // notes_capped = server dừng đếm ở trần, con số là SÀN chứ không phải tổng thật.
     // Thêm dấu + để không nói dối; brain thường không bao giờ chạm trần này.
     const n = b.notes ? " · " + b.notes + (b.notes_capped ? "+" : "") : "";
-    return "🧠 " + b.name + n;
+    // Không gắn icon: <option> chỉ nhận chữ. Thư mục ngoài được app.js xếp vào
+    // <optgroup> riêng nên vẫn phân biệt được mà không cần ký hiệu nào.
+    return b.name + n;
   }
 
   // Chuẩn hoá path để so trùng: bỏ dấu phân cách cuối, \ -> /, thường hoá (Windows không phân biệt hoa/thường).
@@ -37,7 +39,7 @@
     }
   }
 
-  // Dọn danh sách folder ngoài (📁, localStorage) đã hỏng: bỏ entry TRÙNG path với 1 não thật,
+  // Dọn danh sách thư mục ngoài (localStorage) đã hỏng: bỏ entry TRÙNG path với 1 não thật,
   // và entry mà path KHÔNG còn là thư mục (đã xoá khỏi ổ đĩa). Giữ folder ngoài hợp lệ + entry
   // chưa xác định được (tránh xoá nhầm khi server chớp lỗi). Nguồn sự thật là localStorage nên
   // dọn cả nó → lần app.js render sau vẫn đúng, không "sống lại" qua update.
@@ -50,7 +52,7 @@
     const kept = [];
     for (const b of list) {
       if (!b || !b.path) continue;
-      if (realPaths.has(normPath(b.path))) continue;   // đã là 🧠 não thật → bỏ 📁 trùng
+      if (realPaths.has(normPath(b.path))) continue;   // đã là não thật -> bỏ thư mục ngoài trùng
       const chk = await pathExists(b.path);
       if (chk && chk.is_dir === true) { kept.push(b); continue; }   // còn thư mục → giữ
       if (chk && chk.exists === null) { kept.push(b); continue; }   // chưa xác định → giữ
@@ -59,7 +61,7 @@
     if (kept.length !== list.length) {
       localStorage.setItem("javis.brains", JSON.stringify(kept));
     }
-    // Gỡ các option 📁 (do app.js đã render) không còn trong danh sách giữ lại.
+    // Gỡ các option thư mục ngoài (do app.js đã render) không còn trong danh sách giữ lại.
     const keepVals = new Set(kept.map((b) => "path:" + b.path));
     [...sel.querySelectorAll("option[data-custom]")].forEach((o) => {
       if (keepVals.has(o.value)) return;
@@ -69,6 +71,11 @@
         sel.dispatchEvent(new Event("change"));
       }
       o.remove();
+    });
+    // Gỡ hết option trong nhóm thì gỡ luôn nhóm, kẻo menu còn trơ lại cái nhãn
+    // "Thư mục ngoài" không có gì bên dưới.
+    [...sel.querySelectorAll("optgroup")].forEach((g) => {
+      if (!g.querySelector || !g.querySelector("option")) g.remove();
     });
   }
 
@@ -130,9 +137,9 @@
     await loadBrains(r.path, false);
   }
 
-  // Gỡ 1 folder ngoài (📁) khỏi danh sách - CHỈ khỏi menu + localStorage, KHÔNG đụng ổ đĩa.
+  // Gỡ 1 thư mục ngoài khỏi danh sách - CHỈ khỏi menu + localStorage, KHÔNG đụng ổ đĩa.
   function removeCustomFromList(opt) {
-    const name = opt.textContent.replace(/^📁\s*/, "");
+    const name = opt.textContent.trim();
     if (!window.confirm('Bỏ folder ngoài "' + name + '" khỏi danh sách?\n\n' +
         "Chỉ gỡ khỏi menu chọn não, KHÔNG xoá dữ liệu trên ổ đĩa.")) return;
     let list;
@@ -153,16 +160,16 @@
     const opt = sel.options[sel.selectedIndex];
     if (sel.value === "brain") { alert("Không thể xoá Brain mặc định (não khởi đầu)."); return; }
     if (!opt || !opt.dataset.brain) {
-      // Folder ngoài (📁): cho GỠ khỏi danh sách (không xoá ổ đĩa). Trước đây chỉ báo lỗi mà
+      // Thư mục ngoài: cho GỠ khỏi danh sách (không xoá ổ đĩa). Trước đây chỉ báo lỗi mà
       // không có cách gỡ nào → entry kẹt vĩnh viễn kể cả sau khi folder đã bị xoá.
       if (opt && opt.dataset.custom) { removeCustomFromList(opt); return; }
-      alert("Chỉ xoá được brain trong danh sách. Folder ngoài (📁) thì bỏ khỏi danh sách, không xoá ổ đĩa.");
+      alert("Chỉ xoá được brain trong danh sách. Thư mục ngoài thì bỏ khỏi danh sách, không xoá ổ đĩa.");
       return;
     }
     const name = opt.dataset.brainName;
     // Xác nhận KỸ: gõ đúng tên - vì đây là TOÀN BỘ tri thức trong não này, mất là không lấy lại được.
     const typed = window.prompt(
-      "⚠️ XOÁ BRAIN \"" + name + "\"\n\n" +
+      "XOÁ BRAIN \"" + name + "\"\n\n" +
       "Não này sẽ được chuyển vào THÙNG RÁC (giữ 30 ngày rồi tự xoá hẳn), và việc xoá sẽ ĐỒNG BỘ sang mọi máy khác.\n\n" +
       "Gõ CHÍNH XÁC tên brain để xác nhận:"
     );

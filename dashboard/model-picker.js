@@ -54,7 +54,7 @@
     for (const p of state.providers) {
       const on = !!p.configured;
       html += `<div class="mb-prov ${on ? "" : "off"}" data-prov="${on ? p.id : ""}">
-                 <span>${p.label}${p.is_main ? " ✓" : ""}</span><span>${on ? (p.id === expanded ? "▾" : "▸") : "🔒"}</span></div>`;
+                 <span>${p.label}${p.is_main ? " " + ic("check", { cls: "ic-ok" }) : ""}</span><span>${on ? ic(p.id === expanded ? "chevron-down" : "chevron-right") : ic("lock", { cls: "ic-dim" })}</span></div>`;
       if (!on) { html += `<div class="mb-link" data-goto="models">+ Thêm API key ở trang Models để mở khoá</div>`; continue; }
       if (p.id === expanded) {
         let ids = await fetchModels(p.id);
@@ -65,7 +65,7 @@
         for (const id of ids.slice(0, 60)) {
           const cur = p.id === state.main.provider && id === state.main.model;
           html += `<div class="mb-item ${cur ? "cur" : ""}" data-prov="${p.id}" data-model="${id.replace(/"/g, "&quot;")}">
-                     <span class="tick">${cur ? "✓" : ""}</span><span>${short(id)}</span></div>`;
+                     <span class="tick">${cur ? ic("check", { cls: "ic-ok" }) : ""}</span><span>${short(id)}</span></div>`;
         }
       }
     }

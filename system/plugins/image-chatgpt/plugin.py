@@ -1,7 +1,7 @@
 """Plugin bundled: tạo ảnh bằng gói ChatGPT (OAuth) cho MỌI engine.
 
-Đây là câu trả lời cho "Hermes tạo ảnh bằng ChatGPT mà Javis chưa": đăng ký tool
-javis_generate_image, gọi image_gen.generate_chatgpt (Codex Responses + tool image_generation).
+Đăng ký tool javis_generate_image, gọi image_gen.generate_chatgpt
+(Codex Responses + tool image_generation) bằng chính gói ChatGPT đã đăng nhập.
 Bất kỳ engine nào (Claude Code/Codex/API) khi user bảo "tạo ảnh ..." đều gọi được tool này.
 
 - min_mode=safe: coi như thao tác GHI (tạo file + dùng quota) → chặn ở chế độ suggest.

@@ -90,7 +90,7 @@
   function render(el) {
     injectCss();
     state.el = el;
-    el.innerHTML = '<div class="tk-wrap"><div class="cview-placeholder" style="min-height:220px"><div class="ph-ico">📊</div><div class="dim">Đang dựng chỉ số token...</div></div></div>';
+    el.innerHTML = '<div class="tk-wrap"><div class="cview-placeholder" style="min-height:220px"><div class="ph-ico">' + ic("loader", { cls: "ic-xl ic-spin" }) + '</div><div class="dim">Đang dựng chỉ số token...</div></div></div>';
     load(true);
   }
 
@@ -105,7 +105,7 @@
     ]).then(function (res) {
       paint(res[0] || {}, (res[1] || {}).items || [], res[2] || {});
     }).catch(function () {
-      if (state.el) state.el.innerHTML = '<div class="tk-wrap"><div class="cview-placeholder"><div class="ph-ico">📊</div><div>Không tải được số liệu token.</div></div></div>';
+      if (state.el) state.el.innerHTML = '<div class="tk-wrap"><div class="cview-placeholder"><div class="ph-ico">' + ic("chart-column", { cls: "ic-xl ic-dim" }) + '</div><div>Không tải được số liệu token.</div></div></div>';
     });
   }
 
@@ -199,7 +199,7 @@
     var insHtml = "";
     if (insights && insights.length) {
       insHtml = '<div class="tk-sec">Đề xuất</div><div class="tk-ins">' + insights.map(function (i) {
-        var ico = i.level === "warn" ? "⚠️" : "💡";
+        var ico = i.level === "warn" ? ic("triangle-alert", { cls: "ic-warn" }) : ic("lightbulb", { cls: "ic-accent" });
         return '<div class="item ' + (i.level === "warn" ? "warn" : "info") + '"><div class="ico">' + ico + '</div>'
           + '<div><div class="t">' + esc(i.title) + '</div><div class="d">' + esc(i.detail) + "</div></div></div>";
       }).join("") + "</div>";

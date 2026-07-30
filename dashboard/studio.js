@@ -123,7 +123,7 @@
     // Card chuyển sang trạng thái running
     const badge = card && card.querySelector(".wf-badge");
     if (card) { card.classList.add("running"); }
-    if (badge) { badge.className = "wf-badge running"; badge.textContent = "⏳ Đang chạy..."; }
+    if (badge) { badge.className = "wf-badge running"; badge.innerHTML = ic("loader", { cls: "ic-spin" }) + " Đang chạy..."; }
 
     const endRun = () => {
       if (card) { card.classList.remove("running"); }
@@ -149,7 +149,7 @@
           card.querySelectorAll(".wf-pstep").forEach(el => el.classList.remove("active"));
           const ps = card.querySelector(`.wf-pstep[data-i="${d.i}"]`);
           if (ps) ps.classList.add("active");
-          if (badge) badge.textContent = `⏳ Bước ${d.i + 1}/${w.steps.length}`;
+          if (badge) badge.innerHTML = `${ic("loader", { cls: "ic-spin" })} Bước ${d.i + 1}/${w.steps.length}`;
         }
         const div = document.createElement("div");
         div.className = "run-step";
@@ -161,14 +161,14 @@
         if (out) { out.textContent += d.content; stepsEl.scrollTop = stepsEl.scrollHeight; }
       } else if (d.type === "step_tool") {
         const div = stepDivs[d.i];
-        if (div) div.querySelector(".rs-head").insertAdjacentHTML("beforeend", `<span class="rs-tool">⚙ ${esc(d.tool)}</span>`);
+        if (div) div.querySelector(".rs-head").insertAdjacentHTML("beforeend", `<span class="rs-tool">${ic("settings")} ${esc(d.tool)}</span>`);
       } else if (d.type === "step_verify") {
         const div = stepDivs[d.i];
         if (div) div.querySelector(".rs-head").insertAdjacentHTML("beforeend",
-          `<span class="rs-verify" id="rs-vf-${d.i}">🔍 ${esc(d.agent)} đang kiểm chứng${d.attempt ? ` (lần ${d.attempt + 1})` : ""}...</span>`);
+          `<span class="rs-verify" id="rs-vf-${d.i}">${ic("search")} ${esc(d.agent)} đang kiểm chứng${d.attempt ? ` (lần ${d.attempt + 1})` : ""}...</span>`);
       } else if (d.type === "step_verify_result") {
         const vf = document.getElementById(`rs-vf-${d.i}`);
-        if (vf) { vf.className = "rs-verify " + (d.passed ? "ok" : "fail"); vf.textContent = (d.passed ? "✓ Đạt" : "✗ Chưa đạt") + (d.reason ? ": " + d.reason : ""); vf.removeAttribute("id"); }
+        if (vf) { vf.className = "rs-verify " + (d.passed ? "ok" : "fail"); vf.innerHTML = (d.passed ? ic("check", { cls: "ic-ok" }) + " Đạt" : ic("circle-x", { cls: "ic-err" }) + " Chưa đạt") + (d.reason ? ": " + esc(d.reason) : ""); vf.removeAttribute("id"); }
       } else if (d.type === "step_retry") {
         const out = document.getElementById(`rs-out-${d.i}`);
         if (out) out.insertAdjacentHTML("beforebegin", `<div class="rs-retry">↻ Sửa lại lần ${d.attempt}...</div>`);
@@ -181,16 +181,16 @@
         const div = stepDivs[d.i];
         if (div) {
           div.classList.add("done");
-          const sp = div.querySelector(".rs-spin"); if (sp) sp.outerHTML = `<span class="rs-ok">✓</span>`;
-          if (d.verified === false) div.insertAdjacentHTML("beforeend", `<div class="rs-warn">⚠ Chưa đạt kiểm chứng sau số lần thử - xem lại kết quả</div>`);
+          const sp = div.querySelector(".rs-spin"); if (sp) sp.outerHTML = `<span class="rs-ok">${ic("check", { cls: "ic-ok" })}</span>`;
+          if (d.verified === false) div.insertAdjacentHTML("beforeend", `<div class="rs-warn">${ic("triangle-alert", { cls: "ic-warn" })} Chưa đạt kiểm chứng sau số lần thử - xem lại kết quả</div>`);
           const out = document.getElementById(`rs-out-${d.i}`); if (out && !out.textContent.trim()) out.textContent = d.output;
         }
       } else if (d.type === "step_error") {
-        const out = document.getElementById(`rs-out-${d.i}`); if (out) out.innerHTML += `<div class="rs-err">⚠ ${esc(d.content)}</div>`;
+        const out = document.getElementById(`rs-out-${d.i}`); if (out) out.innerHTML += `<div class="rs-err">${ic("triangle-alert", { cls: "ic-warn" })} ${esc(d.content)}</div>`;
       } else if (d.type === "done") {
         es.close();
         endRun();
-        stepsEl.insertAdjacentHTML("beforeend", `<div class="run-info done">✓ Workflow hoàn tất</div>`);
+        stepsEl.insertAdjacentHTML("beforeend", `<div class="run-info done">${ic("check", { cls: "ic-ok" })} Workflow hoàn tất</div>`);
         stepsEl.scrollTop = stepsEl.scrollHeight;
       }
     };
@@ -242,7 +242,7 @@
             <select class="st-agent">${opts(st.agent)}</select>
             <button class="st-move" data-d="-1" title="Lên" ${i === 0 ? "disabled" : ""}>↑</button>
             <button class="st-move" data-d="1" title="Xuống" ${i === steps.length - 1 ? "disabled" : ""}>↓</button>
-            <button class="st-del" title="Xoá bước">✕</button>
+            <button class="st-del" title="Xoá bước">${ic("x")}</button>
           </div>
           <div class="step-body">
             <textarea class="st-task" rows="3" placeholder="Nhiệm vụ... dùng {{input}} = đầu vào, {{prev}} = kết quả bước trước">${esc(st.task)}</textarea>
@@ -301,7 +301,7 @@
     cards.innerHTML = "";
     d.agents.forEach(a => {
       const div = document.createElement("div"); div.className = "ag-card";
-      div.innerHTML = `<div class="ag-name">🤖 ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost exp" title="Xuất gói .zip (kèm skill) để chia sẻ">⤓ Xuất</button><button class="s-btn-ghost del">Xoá</button></div>`;
+      div.innerHTML = `<div class="ag-name">${ic("bot")} ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost exp" title="Xuất gói .zip (kèm skill) để chia sẻ">⤓ Xuất</button><button class="s-btn-ghost del">Xoá</button></div>`;
       div.querySelector(".exp").onclick = () => exportItem("agent", a.slug);
       div.querySelector(".edit").onclick = () => editAgent(a);
       div.querySelector(".del").onclick = async () => { if (confirm(`Xoá agent "${a.name}"?`)) { await api("/agents/delete", { method: "POST", body: fd({ slug: a.slug, brain: brain() }) }); loadAgents(); } };
@@ -455,7 +455,7 @@
         usageHtml = ` · <span class="sk-usage sk-stale" title="Javis chỉ đếm được skill nạp qua tool javis_use_skill. Claude Code nạp native qua .claude/skills thì không đếm được, nên đây chỉ là tham khảo - không có nghĩa skill vô dụng.">chưa thấy dùng</span>`;
       }
       div.innerHTML = `<input type="checkbox" class="sk2-tog" ${on ? "checked" : ""} title="${on ? "Đang bật - bấm để tắt" : "Đang tắt - bấm để bật"}">
-        <div class="sk2-info"><div class="nm">🧩 ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">📂 ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}${usageHtml}</div></div>
+        <div class="sk2-info"><div class="nm">${ic("puzzle")} ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">${ic("folder-open")} ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}${usageHtml}</div></div>
         <div class="sk2-act"><button class="edit">Sửa</button>${s.system ? "" : `<button class="exp" title="Xuất gói .zip để chia sẻ">⤓ Xuất</button><button class="del danger">Xoá</button>`}</div>`;
       div.querySelector(".sk2-tog").onchange = (e) => toggleSkill(s, e.target.checked);
       div.querySelector(".edit").onclick = () => openSkillForm(s.slug);
@@ -486,7 +486,7 @@
           <datalist id="skGroupList">${groupOpts}</datalist></div>
         <div><label>Mô tả (description - quyết định khi nào skill kích hoạt)</label><textarea id="skDesc" class="js-input" style="min-height:60px">${esc(sk.description || "")}</textarea></div>
         <div><label>Nội dung (SKILL.md - hướng dẫn cho AI)</label><textarea id="skBody" class="js-input" style="min-height:200px;font-family:ui-monospace,monospace">${esc(sk.body || "")}</textarea></div>
-        <div style="display:flex;gap:10px"><button class="s-btn" id="skSave">💾 Lưu</button><button class="s-btn-ghost" id="skCancel">Huỷ</button></div>
+        <div style="display:flex;gap:10px"><button class="s-btn" id="skSave">${ic("save")} Lưu</button><button class="s-btn-ghost" id="skCancel">Huỷ</button></div>
       </div>`;
     panel.querySelector("#skCancel").onclick = () => loadSkills();
     panel.querySelector("#skSave").onclick = async () => {

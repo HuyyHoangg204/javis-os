@@ -26,8 +26,9 @@ Rất nhiều lỗi biến mất sau một trong hai việc này, nên thử tr�
 | Mở app **báo cần MÃ THIẾT LẬP** | Lấy mã trong App terminal của container: `cat /data/state/.setup_token`. Nếu chạy trên host: `docker compose logs javis` rồi tìm dòng có `SETUP TOKEN`. Cách khỏi cần mã: đặt sẵn env `JAVIS_ADMIN_USER` và `JAVIS_ADMIN_PASSWORD` lúc deploy để đăng nhập luôn. |
 | **Claude báo chưa đăng nhập** (Javis không trả lời được) | Đăng nhập lại "bộ não" Claude 1 lần. Cách trong app: mở **Models**, ở thẻ Claude Code bấm **Đăng nhập Claude**, mở link, dán code nếu được yêu cầu. Cách bằng lệnh: `claude auth login --claudeai` (Docker: chạy trong App terminal). |
 | **Trang Tệp tin báo lỗi ở "Đang tải..."** | Máy chủ chưa có endpoint Tệp tin (báo lỗi 404). **Khởi động lại server** để nạp endpoint mới, rồi nhấn **Ctrl+Shift+R**. |
+| Ảnh trong hội thoại cũ hiện ô xám **Ảnh đã hết hạn** | Đúng thiết kế: `attachments/` và `inbox/` là vùng cache, file quá 30 ngày (hoặc khi vượt trần 300MB) bị dọn. Xem mục "Ảnh và file cũ biến mất" bên dưới để biết cách giữ lại hoặc tắt hẳn. |
 | Voice / micro không bật được | Trình duyệt chỉ cấp quyền micro trên **HTTPS** (hoặc localhost). Mở qua `http://<ip>:7777` sẽ luôn bị chặn. Dùng URL `https://` (Hostinger `*.hstgr.cloud`, Cloudflare Tunnel, hoặc tên miền riêng có SSL). Xem [Thương hiệu & tên miền riêng](15-thuong-hieu-ten-mien.md). |
-| Cập nhật trong app xong mà **phiên bản không đổi** | Đợi thêm; nếu vẫn báo bản cũ, kiểm tra log cập nhật: xem `update.log` hoặc `docker compose logs`. |
+| Cập nhật trong app xong mà **phiên bản không đổi** | Đợi thêm; nếu vẫn báo bản cũ, kiểm tra log cập nhật: `update.log` trong thư mục state (`server/update.log` khi chạy local, `/data/state/update.log` trên Docker), hoặc `docker compose logs`. |
 
 Các mục dưới đây giải thích chi tiết hơn từng dòng trong bảng.
 
@@ -61,7 +62,7 @@ Khi deploy bằng Hostinger Docker Manager mà nó không tải được image, 
 
 ## Mở app báo cần MÃ THIẾT LẬP
 
-Khi Javis chạy public (Docker/VPS/Hostinger), lần đầu mở app sẽ ra màn tạo tài khoản admin và có thể hỏi **MÃ THIẾT LẬP**. Đây là cơ chế chống người lạ chỉ có URL cũng tạo được tài khoản (vì Claude chạy toàn quyền trên máy). Lấy mã như sau:
+Khi Javis chạy public (Docker/VPS/Hostinger), lần đầu mở app sẽ ra màn tạo tài khoản admin và có thể hỏi **MÃ THIẾT LẬP**. Đây là cơ chế chống người lạ chỉ có URL cũng tạo được tài khoản (vì engine chạy toàn quyền trên máy). Lấy mã như sau:
 
 1. **Trong App terminal của container** (terminal này ở BÊN TRONG container nên không có lệnh `docker`): chạy `cat /data/state/.setup_token`, copy chuỗi, dán vào ô MÃ THIẾT LẬP.
 2. **Trên host (ngoài container)**: chạy `docker compose logs javis` rồi tìm dòng có chữ `SETUP TOKEN`.
@@ -71,50 +72,89 @@ Chi tiết bảo mật và cách đặt mật khẩu xem [Bảo mật & tài kho
 
 ## Claude báo chưa đăng nhập
 
-"Bộ não" của Javis là Claude Code CLI, đăng nhập 1 lần và giữ qua mọi restart/update. Nếu Javis không trả lời hoặc báo chưa đăng nhập:
+Khi bạn chạy engine Claude, Javis mượn đúng phiên đăng nhập của `claude` CLI trên máy: đăng nhập 1 lần và giữ qua mọi restart/update. Nếu Javis không trả lời hoặc báo chưa đăng nhập:
 
-1. **Cách trong giao diện:** mở **Models** ở thanh nav trái. Ở thẻ Claude Code, dòng trạng thái sẽ hiện **○ Chưa đăng nhập**. Bấm **Đăng nhập Claude**, app hiện một link; mở link để đăng nhập claude.ai; nếu trang hiện một mã code thì dán vào ô rồi bấm **Gửi code**. Khi xong, trạng thái đổi thành **● Đã kết nối**. Có nút **↻ Kiểm tra lại** để làm mới trạng thái.
+1. **Cách trong giao diện:** mở **Models** (nhóm **Kết nối** trên thanh nav trái). Ở thẻ Claude Code, dòng trạng thái sẽ hiện **○ Chưa đăng nhập**. Bấm **Đăng nhập Claude**, app hiện một link; mở link để đăng nhập claude.ai; nếu trang hiện một mã code thì dán vào ô rồi bấm **Gửi code**. Khi xong, trạng thái đổi thành **● Đã kết nối**. Có nút **↻ Kiểm tra lại** để làm mới trạng thái.
 2. **Cách bằng lệnh:** chạy `claude auth login --claudeai` một lần (trên Docker thì chạy trong **App terminal**), mở link, dán code.
 
 Token đăng nhập nằm trong `~/.claude` (Docker: volume `claude-auth`) nên không mất khi update. Nếu đã đăng nhập trên máy khác, có thể copy thư mục `~/.claude` sang. Xem thêm [Models & engine](10-models-va-engine.md).
 
 ## Trang Tệp tin báo lỗi ở "Đang tải..."
 
-Nếu vào **Tệp tin** mà chỗ danh sách file báo lỗi thay vì lên danh sách, thường do máy chủ đang chạy bản cũ chưa có endpoint Tệp tin (lỗi 404). Bản thân giao diện sẽ nhắc: hãy **khởi động lại server** (Windows: `stop-javis.bat` rồi `start-javis.vbs`) rồi **tải lại trang** bằng Ctrl+Shift+R.
+Nếu vào **Tệp tin** (nhóm **Bộ não**) mà chỗ danh sách file báo lỗi thay vì lên danh sách, thường do máy chủ đang chạy bản cũ chưa có endpoint Tệp tin (lỗi 404). Bản thân giao diện sẽ nhắc: hãy **khởi động lại server** (Windows: `stop-javis.bat` rồi `start-javis.vbs`) rồi **tải lại trang** bằng Ctrl+Shift+R.
 
 Nếu hiện dòng báo phiên đăng nhập hết hạn (lỗi 401), chỉ cần tải lại trang và đăng nhập lại. Hướng dẫn dùng Tệp tin đầy đủ ở [Quản lý tệp tin](05-quan-ly-tep-tin.md).
 
-## Xem Logs ở đâu
+## Ảnh và file cũ biến mất (ô xám "Ảnh đã hết hạn")
+
+Cuộn lại một hội thoại cũ mà thấy chỗ ảnh chỉ còn một ô xám ghi **Ảnh đã hết hạn**, hoặc file bạn từng gửi lên không mở được nữa: đây là hành vi cố ý, không phải lỗi.
+
+Hai thư mục `attachments/` và `inbox/` của brain (ảnh Javis tạo, file bạn gửi qua chat hoặc Telegram) được coi là **vùng cache**, không phải tri thức. Tri thức là file `.md`. Javis tự dọn chúng theo hai luật:
+
+| Luật | Mặc định | Ý nghĩa |
+|---|---|---|
+| Tuổi file | 30 ngày | File trong `attachments/` + `inbox/` già hơn ngần này bị xoá. |
+| Trần dung lượng | 300 MB | Nếu tổng vùng cache vượt trần, xoá từ cũ tới mới cho tới khi xuống dưới trần. |
+| Thư mục stage tạm | 3 ngày | Nơi file bạn dán/tải lên khung chat rơi xuống trước khi engine đọc (`.staging` trong thư mục state). Ở đây file `.md` cũng bị dọn. |
+
+Lượt dọn chạy nền **6 tiếng một lần**. File `.md` lạc trong `attachments/` và `inbox/` thì **không bao giờ bị xoá** (chỉ riêng thư mục stage tạm là dọn cả `.md`).
+
+**Muốn giữ lâu dài:** đừng để ảnh nằm trong vùng cache. Đọc xong thì rút nội dung ra note `.md` trong brain, hoặc đưa file sang một thư mục khác của brain (chỉ `attachments/`, biến thể của nó, và `inbox/` mới bị dọn), hoặc lưu ở kho ngoài.
+
+**Muốn tắt hẳn việc dọn:** mở file `settings.json` trong thư mục state (`server/settings.json` khi chạy local, `/data/state/settings.json` trên Docker) và thêm khối `media`:
+
+```json
+"media": { "enabled": false }
+```
+
+Đặt `"enabled": false` là không dọn gì cả. Muốn nới thay vì tắt thì chỉnh số: `"max_age_days": 90`, `"max_mb": 2000`, `"staging_days": 7`; đặt `max_age_days` hoặc `max_mb` bằng 0 là tắt riêng luật đó. Sửa xong **khởi động lại server**.
+
+Lưu ý nếu bạn đang bật đồng bộ GitHub: `attachments/` và `inbox/` VẪN nằm trong phạm vi đồng bộ, nên việc dọn cũng lan sang repo backup và sang máy khác ở lần đồng bộ sau. Xem [Sao lưu brain lên GitHub](18-sao-luu-github.md).
+
+## Xem nhật ký (log) ở đâu
 
 Có vài nơi xem "nhật ký" tùy loại thông tin:
 
-1. **Nhật ký hoạt động của Javis khi tự chạy nền**: mở **Tự cải thiện** ở thanh nav trái, kéo xuống mục **Nhật ký gần đây**. Đây là nơi ghi lại các lượt Javis tự thức làm nhiệm vụ. Xem [Tự cải thiện](08-tu-cai-thien.md).
-2. **Mục Logs ở thanh nav** ("Nhật ký hoạt động"): đây là khung điều hướng dành sẵn, hiện đang phát triển; nội dung chi tiết theo dõi ở mục Tự cải thiện phía trên.
-3. **Log kỹ thuật của server** (khi cần soi lỗi sâu):
+1. **Nhật ký Javis tự chạy nền**: mở nhóm **Việc** ở thanh nav trái, chọn **Việc định kỳ**, kéo xuống mục **Nhật ký gần đây**. Đây là nơi ghi lại các lượt Javis tự thức làm nhiệm vụ, lọc được theo từng loop. Xem [Việc định kỳ & Nhắc hẹn](08-viec-dinh-ky.md).
+2. **Nhật ký tự học**: trang **Tự học** (nhóm **Bộ não**) có hai khung riêng là **Javis đã tự học gì (commit gần nhất)** và **Nhật ký học**. Xem [Tự học](22-tu-hoc.md).
+3. **Trang Cập nhật** (nhóm **Hệ thống**, tiêu đề trang là **Nhật ký cập nhật**): đây là nơi xem phiên bản đang chạy và lịch sử tính năng mới theo từng bản. Không còn trang "Logs" hay "Nhật ký hoạt động" riêng nào nữa; mục `logs` trên rail chính là trang này.
+4. **Log kỹ thuật của server** (khi cần soi lỗi sâu):
    - Windows chạy ngầm bằng `start-javis.vbs`: log ghi ở `server\javis.log`.
    - Docker / VPS: `docker compose logs javis` (thêm `-f` để xem trực tiếp: `docker compose logs -f`).
    - Linux systemd: `journalctl -u javis -f`.
-   - Log cập nhật khi bấm nút cập nhật trong app: `update.log`.
+5. **Log cập nhật** khi bấm nút cập nhật trong app: file `update.log` nằm trong thư mục state, tức `server/update.log` khi chạy local và `/data/state/update.log` trên Docker (đường dẫn theo biến `JAVIS_STATE_DIR`). Thường bạn không cần mở tệp: khi cập nhật lỗi, giao diện đã hiện sẵn thông báo và app cũng đọc 50 dòng cuối của tệp này để báo trạng thái.
 
 ## Câu hỏi thường gặp (FAQ)
 
 ### Dữ liệu có mất khi cập nhật không?
 
-Không, nếu chạy bằng Docker. Mọi ghi chú, vault, settings và cả token đăng nhập Claude nằm trong **Docker volume** (`javis-data`, `claude-auth`), tách khỏi image. Khi bạn cập nhật (bấm **⬆ Cập nhật ngay** trong **Cập nhật**, Redeploy trên Hostinger, hoặc chạy `./update.sh` trên VPS), image được thay mới nhưng volume giữ nguyên nên dữ liệu **không mất**. Với bản cài native, dữ liệu nằm trong thư mục brain/vault của repo, cũng không bị `git pull` xoá.
+Không, nếu chạy bằng Docker. Mọi ghi chú, brain, settings và cả token đăng nhập Claude nằm trong **Docker volume** (`javis-data`, `claude-auth`), tách khỏi image. Khi bạn cập nhật (bấm **⬆ Cập nhật ngay** trong **Cập nhật**, Redeploy trên Hostinger, hoặc chạy `./update.sh` trên VPS), image được thay mới nhưng volume giữ nguyên nên dữ liệu **không mất**. Với bản cài native, dữ liệu nằm trong thư mục `brains/` của repo, cũng không bị `git pull` xoá.
 
 ### Cập nhật trong app hoạt động thế nào?
 
-Mở **Cập nhật**; khung **Javis OS** hiện phiên bản đang chạy và tự kiểm tra bản mới trên GitHub. Nếu có bản mới, dòng trạng thái hiện **🆕 Có bản mới** và nút **⬆ Cập nhật ngay** xuất hiện khi môi trường hỗ trợ. Bấm nút, xác nhận, app sẽ tự tải bản mới và khởi động lại (khoảng 20 đến 40 giây), sau đó tự tải lại trang. Hostinger không hỗ trợ Watchtower nên khung sẽ hướng dẫn **Redeploy**; VPS Docker cần bật profile `update` để dùng cập nhật một chạm.
+Mở **Cập nhật** (nhóm **Hệ thống**); thẻ **Javis OS** hiện phiên bản đang chạy và tự kiểm tra bản mới trên GitHub. Nếu có bản mới, dòng trạng thái hiện **🆕 Có bản mới** kèm khung **Bản mới có gì**, và nút **⬆ Cập nhật ngay** xuất hiện khi môi trường hỗ trợ. Bấm nút, xác nhận, app chạy qua 6 bước hiện trên thanh tiến trình (Chuẩn bị, Tải code, Cài thư viện, Khởi động lại, Kiểm tra sức khoẻ, Xong) rồi tự tải lại trang. Nếu bản mới lỗi, Javis **tự quay về bản cũ** và báo **↩ Bản mới lỗi, đã tự quay về bản cũ**. Bên dưới thẻ là timeline nhật ký cập nhật của các bản đã ra.
+
+Bản cài trực tiếp trên máy (Windows, Linux, macOS) luôn tự cập nhật được. Bản Docker chỉ tự cập nhật tại chỗ khi container **Watchtower** (profile `update`) đang chạy; không có thì khung bỏ nút và hướng dẫn **Redeploy** bằng `docker compose up -d --pull always` hoặc Docker Manager của Hostinger.
 
 ### Chạy nhiều brain (second brain) được không?
 
-Được. Javis hỗ trợ nhiều brain trong cùng một thư mục. Ở dropdown chọn brain trên giao diện, bạn có thể:
+Được. Javis quản lý nhiều brain trong thư mục `brains/`. Ở dropdown chọn brain trên giao diện, bạn có thể:
 
 1. Tạo brain mới: bấm nút thêm brain, đặt tên khi được hỏi.
 2. Chuyển brain: chọn brain khác trong dropdown; mọi thao tác Tệp tin, đồ thị và bộ nhớ sẽ theo brain đang chọn.
 3. Xoá brain: chọn brain cần xoá rồi bấm nút xoá, giao diện yêu cầu **gõ chính xác tên brain** để xác nhận (chống xoá nhầm). Không xoá được **Brain mặc định**.
 
 Xem chi tiết ở [Second Brain: bộ nhớ, Wiki, INGEST](13-second-brain-bo-nho-wiki.md).
+
+### Lỡ xoá brain thì cứu được không?
+
+Được, trong 30 ngày. Xoá brain không phải là xoá vĩnh viễn: Javis chuyển cả thư mục brain vào **thùng rác cục bộ** `brain-trash` nằm trong thư mục state (`server/brain-trash` khi chạy local, `/data/state/brain-trash` trên Docker), đặt tên dạng `<tên brain>__<ngày giờ>`. Bản sao này được giữ 30 ngày rồi mới bị dọn, và nó **không** đi lên repo đồng bộ. Muốn cứu, copy thư mục đó trở lại `brains/` rồi tải lại trang.
+
+Ngược lại, việc xoá sẽ được **lan sang các máy khác** đang đồng bộ chung repo (Javis ghi một "giấy báo tử" để máy kia không hồi sinh brain đã xoá). Nên nếu muốn phục hồi, làm sớm và làm trên máy còn giữ bản trong thùng rác.
+
+### Ảnh và file gửi lên có được giữ mãi không?
+
+Không. `attachments/` và `inbox/` là vùng cache: mặc định file quá **30 ngày** hoặc phần vượt trần **300 MB** sẽ bị dọn, thư mục stage tạm thì **3 ngày**. Ảnh đã bị dọn hiện thành ô xám **Ảnh đã hết hạn** trong hội thoại cũ. Cách giữ lại hoặc tắt hẳn xem mục "Ảnh và file cũ biến mất" ở trên.
 
 ### Đổi giọng nói của Javis thế nào?
 
@@ -133,7 +173,7 @@ Trình duyệt bắt buộc **HTTPS** mới cho cấp quyền micro (trừ local
 
 ## Vẫn chưa xử lý được?
 
-1. Thu thập log server (xem mục "Xem Logs ở đâu" phía trên) để biết lỗi cụ thể.
+1. Thu thập log server (xem mục "Xem nhật ký (log) ở đâu" phía trên) để biết lỗi cụ thể.
 2. Thử lần lượt: khởi động lại server, rồi Ctrl+Shift+R.
 3. Kiểm tra biến môi trường trong `.env` có đặt đúng không, xem [Cấu hình .env](16-cau-hinh-env.md).
-4. Kiểm tra "bộ não" Claude còn đăng nhập không (mục **Models**, thẻ Claude Code phải hiện **● Đã kết nối**).
+4. Kiểm tra "bộ não" còn đăng nhập không (mục **Models**, thẻ engine bạn đang dùng phải hiện **● Đã kết nối**).

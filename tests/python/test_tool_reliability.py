@@ -48,6 +48,26 @@ check("câu chỉ xem lịch -> nhận ra đường read-only",
 check("câu tạo lịch -> không dispatch nhầm thành read-only",
       not engine._schedule_read_request(
           [{"role": "user", "content": "Tạo lịch nhắc thuốc lúc 8h"}]))
+check("câu tạo reminder trực tiếp -> nhận đúng create",
+      engine._schedule_create_request(
+          [{"role": "user", "content": "Tạo lịch nhắc thuốc lúc 8h"}]))
+check("câu nhắc sau 30 phút -> nhận đúng create",
+      engine._schedule_create_request(
+          [{"role": "user", "content": "30 phút nữa nhắc anh gọi khách"}]))
+_booking_question = [{"role": "user", "content":
+    "Cái khung hơi xấu và giá trị ưu tiên hỏi đáp quá đắt, liệu thay bằng việc đặt lịch tư vấn 1-1 có ok không?"}]
+check("bàn phương án đặt lịch tư vấn -> không phải lệnh tạo lịch Javis",
+      not engine._schedule_create_request(_booking_question))
+check("bàn phương án đặt lịch tư vấn -> không ép javis_schedule",
+      engine._tool_requirement(_booking_question, schedule_tool) is None)
+check("model tự xin list trong câu tư vấn -> cổng thực thi chặn",
+      not engine._schedule_tool_allowed(_booking_question, "javis_schedule", {"op": "list"}))
+check("hỏi có nên xem lịch nhắc -> không tự đọc kho lịch",
+      not engine._schedule_read_request(
+          [{"role": "user", "content": "Có nên xem lịch nhắc mỗi ngày để tối ưu quy trình không?"}]))
+check("hỏi ý kiến về tạo reminder -> không tự tạo",
+      not engine._schedule_create_request(
+          [{"role": "user", "content": "Tạo reminder như vậy có hợp lý không?"}]))
 check("câu XÓA cron -> ép đúng javis_schedule",
       engine._tool_requirement(
           [{"role": "user", "content": "Xóa cron brainstorm cách làm việc giúp anh"}],
@@ -67,6 +87,30 @@ check("câu 'tắt lịch' không cần nói cron/reminder -> vào gateway huỷ
 check("lịch Google Calendar -> không bị gateway reminder cướp",
       not engine._schedule_cancel_request(
           [{"role": "user", "content": "Huỷ lịch họp trên Google Calendar giúp anh"}]))
+check("bài dài có 'ứng dụng' + 'nhắc hẹn' -> không bị hiểu chữ dụng thành dừng",
+      not engine._schedule_cancel_request([{"role": "user", "content":
+          "Hãy biên tập bài dưới đây thành một bài viết tự nhiên hơn.\n\n"
+          + ("Nội dung nói về cách ứng dụng automation để nhắc hẹn khách hàng. " * 20)}]))
+check("câu mô tả ngắn về huỷ reminder -> không phải lệnh huỷ",
+      not engine._schedule_cancel_request(
+          [{"role": "user", "content": "Viết hướng dẫn về cách hủy reminder trong một ứng dụng"}]))
+check("'đừng huỷ lịch' -> không chạy mutation",
+      not engine._schedule_cancel_request(
+          [{"role": "user", "content": "Đừng hủy lịch uống thuốc của anh"}]))
+check("'tất cả lịch nhắc' không bị hiểu chữ tất thành tắt",
+      not engine._schedule_cancel_request(
+          [{"role": "user", "content": "Tất cả lịch nhắc hẹn hoạt động như thế nào?"}]))
+check("bài nội dung không bị ép gọi javis_schedule",
+      engine._tool_requirement(
+          [{"role": "user", "content": "Viết hướng dẫn về cách hủy reminder trong một ứng dụng"}],
+          schedule_tool) is None)
+check("lệnh không dấu 'dung lich' vẫn được nhận",
+      engine._schedule_cancel_request(
+          [{"role": "user", "content": "Dung lich lam viec tai cafe giup anh"}]))
+check("caption huỷ sau marker file dashboard vẫn được nhận",
+      engine._schedule_cancel_request([{"role": "user", "content":
+          "[File đính kèm để ĐỌC (đường dẫn):\n- /tmp/a.txt\n"
+          "Mặc định: chỉ đọc file rồi trả lời.]\n\nHuỷ lịch làm việc tại cafe giúp anh"}]))
 
 
 class FakeResponse:
@@ -102,7 +146,10 @@ async def tool_loop_tests():
     old_call = mcp_client.call_route
     engine.httpx.AsyncClient = FakeClient
 
+    actual_calls = []
+
     async def fake_call(route, name, args):
+        actual_calls.append((name, dict(args)))
         return "Lịch thật từ tool"
 
     mcp_client.call_route = fake_call
@@ -138,6 +185,33 @@ async def tool_loop_tests():
                   for e in ignored))
         check("không phát nội dung đoán khi model bỏ tool",
               not any(e.get("type") == "text" for e in ignored))
+
+        # Model vẫn có thể tự function-call dù gateway không ép. Cổng cuối phải trả tool-result
+        # "bị chặn" cho model tự sửa câu trả lời, nhưng tuyệt đối không chạm kho lịch thật.
+        actual_calls.clear()
+        FakeClient.payloads = []
+        FakeClient.responses = [
+            FakeResponse({"choices": [{"message": {
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_bad_schedule",
+                    "type": "function",
+                    "function": {"name": "javis_schedule", "arguments": '{"op":"list"}'},
+                }],
+            }}]}),
+            FakeResponse({"choices": [{"message": {
+                "content": "Đây là một phương án offer hợp lý; mình nên cân đối biên lợi nhuận."
+            }}]}),
+        ]
+        blocked = [e async for e in engine._cc_tool_loop(
+            "https://fake", {}, "free-model", _booking_question,
+            schedule_tool, {"javis_schedule": {}}, {}, "OpenRouter")]
+        check("function-call lịch sai ý định không được thực thi", actual_calls == [])
+        check("function-call lịch bị chặn không hiện như một tool đã chạy",
+              not any(e.get("type") == "tool_call" for e in blocked))
+        check("sau khi chặn, model quay lại trả lời đúng câu hỏi",
+              any(e.get("type") == "text" and "phương án offer" in e.get("content", "")
+                  for e in blocked))
     finally:
         engine.httpx.AsyncClient = old_client
         mcp_client.call_route = old_call

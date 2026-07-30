@@ -293,7 +293,7 @@ def build_system_prompt(brain: str = "brain") -> str:
         f"- SKILL: tạo/sửa tại `{sk}/<slug>/SKILL.md` (tự mirror sang .claude/skills cho Claude native)\n"
         "Khi user yêu cầu tạo/sửa agent, workflow hoặc loop qua chat, ghi file .md đúng định dạng "
         "(xem mục 'Tạo/sửa Agent & Workflow qua chat' và 'Điều phối' trong system prompt) bằng "
-        "ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. Studio/trang Tự cải thiện sẽ tự nhận file mới."
+        "ĐƯỜNG DẪN TUYỆT ĐỐI ở trên. Trang Agents/Workflows/Việc định kỳ sẽ tự nhận file mới."
     )
     # Quét cây skill MỘT lần cho cả hai khối dưới. Trước đây _javis_capability_summary
     # gọi list_skills còn _skill_router_block gọi list_enabled_meta (vốn chỉ là list_skills
@@ -1414,9 +1414,6 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
         cfg.setdefault("dashboard", {})
         if "graph_enabled" in patch:
             cfg["dashboard"]["graph_enabled"] = bool(patch["graph_enabled"])
-        if "graph_mode" in patch:
-            gm = str(patch["graph_mode"]).lower()
-            cfg["dashboard"]["graph_mode"] = gm if gm in ("2d", "3d") else "2d"
     elif section == "image":
         cfg.setdefault("image", {})
         if "strip_c2pa" in patch:
@@ -2845,9 +2842,118 @@ async def files_download(brain: str = Query("brain"), path: str = Query(...)):
         f = _safe_serve_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
+    if f.is_dir():
+        return await zip_dir_response(brain, path)   # trỏ vào thư mục → tự nén .zip
     if not f.is_file():
         return JSONResponse({"error": "Không tìm thấy file"}, status_code=404)
     return FileResponse(str(f), filename=f.name)
+
+
+# Trần an toàn khi nén thư mục: trên localhost trần duyệt có thể là CẢ Ổ ĐĨA, một cú bấm nhầm
+# ở thư mục gốc sẽ nén hàng trăm nghìn file. Dừng SỚM ngay khi vượt, không nén nửa vời.
+_ZIP_MAX_BYTES = 2 * 1024 * 1024 * 1024      # 2GB dữ liệu thô
+_ZIP_MAX_FILES = 20000                       # 20 nghìn file
+
+
+class _ZipTooBig(Exception):
+    """Thư mục vượt trần _ZIP_MAX_* - dừng nén, báo người dùng chọn thư mục con."""
+
+
+def _zip_scan(src: Path, zf=None):
+    """Duyệt src, đếm (số file, tổng byte); nếu zf khác None thì ghi luôn vào zip đó.
+    Bỏ qua symlink để không đi vòng ra ngoài trần duyệt. Ném _ZipTooBig khi vượt trần.
+    Chạy trong threadpool (I/O nặng) - KHÔNG gọi thẳng trên event loop."""
+    files = total = 0
+    for dirpath, dirnames, filenames in os.walk(src, followlinks=False):
+        dirnames[:] = [d for d in dirnames if not os.path.islink(os.path.join(dirpath, d))]
+        if zf is not None:
+            rel_dir = Path(dirpath).relative_to(src)
+            arc_dir = src.name if str(rel_dir) == "." else (Path(src.name) / rel_dir).as_posix()
+            zf.writestr(arc_dir + "/", b"")          # giữ cả thư mục rỗng
+        for fn in filenames:
+            p = Path(dirpath) / fn
+            if p.is_symlink():
+                continue
+            try:
+                size = p.stat().st_size
+            except OSError:
+                continue                              # file bị khoá/biến mất giữa chừng: bỏ qua
+            files += 1
+            total += size
+            if files > _ZIP_MAX_FILES or total > _ZIP_MAX_BYTES:
+                raise _ZipTooBig()
+            if zf is not None:
+                try:
+                    zf.write(p, (Path(src.name) / p.relative_to(src)).as_posix())
+                except (OSError, ValueError):
+                    continue
+    return files, total
+
+
+def _zip_dir_sync(src: Path, dst: str):
+    """Nén CẢ thư mục src vào file zip dst. Trả (số file, tổng byte thô)."""
+    import zipfile
+    with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        return _zip_scan(src, zf)
+
+
+def _rm_quiet(p):
+    try:
+        os.unlink(p)
+    except OSError:
+        pass
+
+
+def _zip_too_big_msg():
+    return (f"Thư mục quá lớn để nén (trần {_ZIP_MAX_FILES:,} file hoặc "
+            f"{_ZIP_MAX_BYTES // (1024 ** 3)}GB). Hãy tải từng thư mục con.")
+
+
+async def zip_dir_response(brain: str, path: str, probe: bool = False):
+    """Lõi thuần của /files/zip (route handler KHÔNG được gọi nhau như hàm thường, xem
+    test_handler_khong_goi_truc_tiep). Trả JSON đo khi probe=True, còn lại trả file .zip.
+
+    Zip dựng ra file TẠM trong threadpool (không chặn event loop) rồi gửi; file tạm xoá
+    sau khi gửi xong qua BackgroundTask."""
+    import tempfile
+    from starlette.background import BackgroundTask
+    from starlette.concurrency import run_in_threadpool
+    try:
+        d = _safe_serve_path(brain, path)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    if not d.is_dir():
+        return JSONResponse({"error": "Không phải thư mục"}, status_code=404)
+    name = (d.name or "brain") + ".zip"
+    if probe:
+        try:
+            files, total = await run_in_threadpool(_zip_scan, d, None)
+        except _ZipTooBig:
+            return JSONResponse({"error": _zip_too_big_msg()}, status_code=413)
+        except Exception as e:
+            return JSONResponse({"error": f"Không đọc được thư mục: {e}"}, status_code=500)
+        return {"ok": True, "files": files, "bytes": total, "name": name}
+    fd, tmp = tempfile.mkstemp(prefix="javis-zip-", suffix=".zip")
+    os.close(fd)
+    try:
+        await run_in_threadpool(_zip_dir_sync, d, tmp)
+    except _ZipTooBig:
+        _rm_quiet(tmp)
+        return JSONResponse({"error": _zip_too_big_msg()}, status_code=413)
+    except Exception as e:
+        _rm_quiet(tmp)
+        return JSONResponse({"error": f"Nén thất bại: {e}"}, status_code=500)
+    return FileResponse(tmp, media_type="application/zip", filename=name,
+                        background=BackgroundTask(_rm_quiet, tmp))
+
+
+@app.get("/files/zip")
+async def files_zip(brain: str = Query("brain"), path: str = Query(""), probe: int = Query(0)):
+    """Tải CẢ một thư mục về máy dưới dạng .zip (File Manager + cây file: nút ⤓).
+
+    probe=1 chỉ ĐO trước (số file, dung lượng) và trả JSON - dashboard hỏi trước để báo
+    lỗi tử tế / xin xác nhận khi thư mục nặng, thay vì để trình duyệt tải về một trang lỗi."""
+    return await zip_dir_response(brain, path, probe=bool(probe))
 
 
 @app.get("/files/raw")
@@ -2868,6 +2974,25 @@ async def files_raw(brain: str = Query("brain"), path: str = Query(...), dl: int
     resp.headers["Content-Disposition"] = "inline"      # hiển thị trong trình duyệt, không ép tải
     resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
+
+
+@app.get("/brains/{brain_name}/{path:path}")
+async def brain_file_compat(brain_name: str, path: str, dl: int = Query(0)):
+    """Tương thích link file cũ do chat/AI đã xuất dạng ``/brains/<tên>/<path>``.
+
+    Route chuẩn vẫn là /files/raw. Link cũ đã nằm trong lịch sử chat hoặc đã được copy ra ngoài
+    không thể sửa lại, nên server ánh xạ tên brain trực tiếp sang đúng thư mục con của BRAINS_DIR.
+    Chỉ nhận đúng một thư mục con thật (không symlink/không traversal), rồi dùng lại toàn bộ rào
+    _safe_serve_path của /files/raw.
+    """
+    safe_name = _safe_brain_name(brain_name)
+    if not safe_name or safe_name != str(brain_name or "").strip():
+        return JSONResponse({"error": "Tên brain không hợp lệ"}, status_code=400)
+    base = Path(BRAINS_DIR).resolve()
+    root = (base / safe_name).resolve()
+    if root.parent != base or not root.is_dir():
+        return JSONResponse({"error": "Không tìm thấy brain"}, status_code=404)
+    return await files_raw(brain=str(root), path=path, dl=dl)
 
 
 # ============================================================

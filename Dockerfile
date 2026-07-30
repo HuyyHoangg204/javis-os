@@ -3,8 +3,8 @@
 # Javis OS - container image
 # "Brain" = Claude Code CLI (npm global). FastAPI app served by uvicorn.
 # Code tree is immutable; ALL mutable state lives on the /data volume and the
-# Claude auth volume (~/.claude). Pattern adapted from Hermes Agent's Dockerfile
-# (Node-from-official-image, immutable-code + writable-data split, tini PID 1).
+# Claude auth volume (~/.claude). Node comes from the official image (Debian's
+# nodejs lags LTS), and tini runs as PID 1 so signals reach uvicorn cleanly.
 # ============================================================================
 
 # ---------- Stage 1: Node 22 LTS source ----------

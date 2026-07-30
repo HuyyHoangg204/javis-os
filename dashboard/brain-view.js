@@ -39,7 +39,6 @@
   }
 
   // Nút timelapse "cuộc đời brain": chiếu lại note mọc dần theo thời gian tạo.
-  // Chỉ đồ thị 2D có startTimelapse; đang ở chế độ 3D thì báo nhẹ qua title thay vì chết im.
   function initTimelapse() {
     var btn = document.getElementById("graphTimelapseBtn");
     if (!btn) return;
@@ -54,7 +53,7 @@
     btn.addEventListener("click", function () {
       var g = window.__javisGraph;
       if (!g || typeof g.startTimelapse !== "function") {
-        btn.title = "Timelapse chỉ chạy ở đồ thị 2D - hãy chuyển về chế độ 2D";
+        btn.title = "Đồ thị chưa sẵn sàng";
         return;
       }
       if (g.timelapseRunning) { g.stopTimelapse(); return; }   // sự kiện end sẽ tự tắt trạng thái nút

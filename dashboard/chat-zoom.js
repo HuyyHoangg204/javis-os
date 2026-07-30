@@ -2,7 +2,7 @@
    gần full màn hình, 2 cột = sidebar Lịch sử trái (sessions-ui.js render qua
    window.JavisChatSide) + cột chat chính. Di chuyển CHÍNH các node #chatArea +
    #attachBar + #modelBar + #hudVoice vào lớp nổi (giữ nguyên mọi handler đã gắn), Esc hoặc
-   nút ✕ để thu nhỏ. Tách riêng để không đụng app.js. */
+   nút đóng để thu nhỏ. Tách riêng để không đụng app.js. */
 (function () {
   "use strict";
   var stage = null, expanded = false, slots = [];
@@ -33,10 +33,10 @@
     stage.innerHTML =
       '<div class="chat-stage-head">' +
       '<span class="cs-actions">' +
-      '<button class="cs-side-toggle" type="button" title="Ẩn/hiện lịch sử hội thoại">🕘 Lịch sử</button>' +
+      '<button class="cs-side-toggle" type="button" title="Ẩn/hiện lịch sử hội thoại">' + ic("history") + ' Lịch sử</button>' +
       '</span>' +
       '<span>HỘI THOẠI</span>' +
-      '<button class="chat-stage-close" type="button">✕ Thu nhỏ (Esc)</button></div>' +
+      '<button class="chat-stage-close" type="button">' + ic("x") + ' Thu nhỏ (Esc)</button></div>' +
       '<div class="chat-stage-main">' +
       '<aside class="chat-side" id="chatSide"></aside>' +
       '<div class="chat-stage-body"></div>' +

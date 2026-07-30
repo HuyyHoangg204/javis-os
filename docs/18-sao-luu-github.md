@@ -4,7 +4,7 @@ Tính năng này đồng bộ **TẤT CẢ brain trong thư mục brains** (mọ
 
 > Nên để **mọi brain nằm trong thư mục brains** (tạo brain mới qua nút ➕ là tự vào đó). Đồng bộ lấy nguyên thư mục brains làm một khối, nên brain nào nằm ngoài (chọn folder ngoài bằng nút 📁) sẽ KHÔNG được đồng bộ chung - hãy chuyển nó vào brains.
 
-Mở tại: trang **Tự học** (thanh bên trái), kéo xuống mục **⇅ Đồng bộ brain với GitHub**.
+Mở tại: trang **Tự học** (nhóm **Bộ não** trên thanh nav trái), kéo xuống mục **⇅ Đồng bộ brain với GitHub (2 chiều)**.
 
 ## Vì sao nên bật
 
@@ -40,13 +40,27 @@ Brain là toàn bộ tri thức Javis tích luỹ được về bạn và công 
 
 ### Bước 3 - Dán vào Javis
 
-1. Mở trang **Tự học** → mục **Đồng bộ brain với GitHub**.
-2. Dán **URL repo** và **token** vào ô tương ứng.
-3. Bấm **🔌 Kiểm tra kết nối** - phải hiện "Kết nối OK".
-4. Bấm **⇅ Đồng bộ ngay** cho lần đầu.
-5. Muốn tự động: bật công tắc **Tự động**, đặt số giờ (mặc định 6), rồi **💾 Lưu cấu hình**.
+1. Mở trang **Tự học** → mục **⇅ Đồng bộ brain với GitHub (2 chiều)**.
+2. Dán **URL repo (https)** và **GitHub token (fine-grained, quyền Contents)** vào ô tương ứng.
+3. Kiểm tra ô **Nhánh**: mặc định là `main`. Repo của bạn dùng nhánh mặc định khác (ví dụ `master`) thì sửa ở đây, không thì đẩy lên sẽ trật nhánh.
+4. Bấm **🔌 Kiểm tra kết nối** - phải hiện "Kết nối OK".
+5. Bấm **⇅ Đồng bộ ngay** cho lần đầu.
+6. Muốn tự động: bật công tắc **Tự động**, đặt **Tự đồng bộ mỗi (giờ)** (mặc định 6), rồi **💾 Lưu cấu hình**.
 
-Dùng nhiều máy: làm đúng 3 bước này trên TỪNG máy (cùng repo, cùng token hoặc token riêng đều được). Bật Tự động ở cả hai nơi - các máy sẽ tự khớp nhau theo chu kỳ.
+Dùng nhiều máy: làm đúng 3 bước này trên TỪNG máy (cùng repo, cùng nhánh, cùng token hoặc token riêng đều được). Bật Tự động ở cả hai nơi - các máy sẽ tự khớp nhau theo chu kỳ.
+
+## Bảng tra nhanh ô nhập và nút
+
+| Ô / nút | Việc nó làm |
+|---|---|
+| **URL repo (https)** | Repo GitHub riêng tư nhận backup, dạng `https://github.com/<bạn>/<repo>`. |
+| **GitHub token (fine-grained, quyền Contents)** | Token đẩy/kéo. Lưu nội bộ trong `settings.json` ở dạng mã hoá, không bao giờ lên repo. |
+| **Nhánh** | Nhánh sẽ đẩy lên, mặc định `main`. Ứng với khoá `backup.branch` trong `settings.json`. |
+| **Tự đồng bộ mỗi (giờ)** | Chu kỳ tự chạy, mặc định 6. |
+| **Tự động** | Công tắc bật/tắt chạy định kỳ, hiện **○ Tắt** khi đang tắt. |
+| **🔌 Kiểm tra kết nối** | Thử kết nối repo + token, không đẩy gì. |
+| **⇅ Đồng bộ ngay** | Chạy một lượt đồng bộ đầy đủ ngay lập tức. |
+| **💾 Lưu cấu hình** | Ghi lại toàn bộ ô trên (kể cả công tắc Tự động và số giờ). |
 
 ## Cách nó hoạt động
 
@@ -60,13 +74,26 @@ Mỗi lượt đồng bộ làm 4 việc theo thứ tự:
 Ghi chú an toàn của cơ chế:
 
 - Token **không** được lưu vào brain hay đẩy lên repo. Nó nằm trong `settings.json` nội bộ (đã git bỏ qua). Thông báo lỗi cũng tự che token.
-- File nhạy cảm bị loại khỏi đồng bộ: hội thoại gốc (`memory/conversations`), log loop/learn, khoá lock, file `.tmp`, và `.git` riêng của từng brain. Những file này chỉ nằm trên máy tạo ra chúng.
+- File nhạy cảm bị loại khỏi đồng bộ: hội thoại gốc (`memory/conversations`), log loop/learn (`Javis/loop-log`, `Javis/learn-log`, `Javis/learn-staging`), thống kê dùng skill (`Javis/skill-usage.json`), khoá lock, file `.tmp`, và `.git` riêng của từng brain. Những file này chỉ nằm trên máy tạo ra chúng.
+- Thùng rác brain (`brain-trash` trong thư mục state) nằm NGOÀI vùng đồng bộ nên không lên repo.
 - Máy có thư mục brains **trống** (máy mới, volume mới) được coi là KHÔI PHỤC: chỉ nhận dữ liệu về, không bao giờ đẩy "trạng thái trống" lên đè mất backup.
 - Xoá file/brain trên một máy thì lần đồng bộ sau các máy khác cũng xoá theo (đó là nghĩa của sync). Nhờ repo là git, mọi thứ vẫn nằm trong lịch sử commit - khôi phục được khi cần.
 
+## Ảnh và file đính kèm: đẩy lên repo, nhưng tự hết hạn
+
+Đây là chỗ dễ bất ngờ nhất, đọc kỹ một lần rồi thôi.
+
+**Ảnh và file VẪN lên repo backup.** Hai thư mục `attachments/` và `inbox/` của brain (ảnh Javis tạo, file bạn gửi qua chat hoặc Telegram) **không** nằm trong danh sách loại trừ ở trên, nên chúng được chép nguyên vào bản sao và đẩy lên GitHub như file thường. Hệ quả thực tế: repo backup có thể phình nhanh vì ảnh, và mỗi tấm ảnh là một blob nằm vĩnh viễn trong lịch sử git.
+
+**Trong khi đó, git RIÊNG của từng brain lại bỏ qua chúng.** Từ 0.9.247, `.gitignore` của mỗi brain có sẵn `attachments/`, `Attachments/`, `*attachments/`, `inbox/`, và Javis gỡ chúng khỏi index một lần cho brain cũ. Hai cơ chế này khác nhau và đều đúng theo thiết kế: git của brain là để version **tri thức đã chưng cất** (facts, Wiki, skill), còn repo backup là bản sao đầy đủ để cứu hộ.
+
+**Media tự hết hạn, và việc xoá đó lan lên repo.** Javis coi `attachments/` và `inbox/` là vùng cache: cứ 6 tiếng một lần, file quá **30 ngày** bị xoá, và nếu tổng vượt trần **300 MB** thì xoá từ cũ tới mới cho tới khi xuống dưới trần. Vì hai thư mục này vẫn trong phạm vi đồng bộ, lần đồng bộ kế tiếp sẽ đẩy luôn việc xoá đó lên GitHub và sang máy còn lại.
+
+Nghĩa là: **lời hứa "bản sao ngoài an toàn" đúng với ghi chú `.md`, nhưng không đúng với ảnh sau 30 ngày.** Ảnh cũ chỉ còn lấy lại được từ lịch sử commit của repo, không còn ở nhánh hiện tại. Muốn giữ ảnh lâu dài thì rút nội dung ra note `.md`, chuyển file sang thư mục khác của brain, hoặc nới/tắt luật dọn (khoá `media` trong `settings.json`). Chi tiết cách tắt ở [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md).
+
 ## Khôi phục brain trên máy mới
 
-Không cần thao tác git tay: cài Javis, vào **Tự học → Đồng bộ brain với GitHub**, dán repo + token, bấm **⇅ Đồng bộ ngay** - toàn bộ brain về lại đủ. (Cách cũ `git clone` thẳng vào thư mục brains vẫn dùng được.)
+Không cần thao tác git tay: cài Javis, vào **Tự học → ⇅ Đồng bộ brain với GitHub (2 chiều)**, dán repo + token + đúng nhánh, bấm **⇅ Đồng bộ ngay** - toàn bộ brain về lại đủ. (Cách cũ `git clone` thẳng vào thư mục brains vẫn dùng được.)
 
 ## Xử lý file .conflict-*
 
@@ -78,7 +105,7 @@ Khi hai máy sửa cùng một file giữa hai lần đồng bộ, bạn sẽ th
 
 ## Lưu ý an toàn
 
-- **Luôn dùng repo Private.** Brain có thể chứa số liệu kinh doanh, tên khách hàng, đôi khi cả khoá bạn lỡ dán trong hội thoại.
+- **Luôn dùng repo Private.** Brain có thể chứa số liệu kinh doanh, tên khách hàng, đôi khi cả khoá bạn lỡ dán trong hội thoại - và như mục trên đã nói, cả ảnh/file bạn gửi lên chat cũng đi theo.
 - Token nên đặt thời hạn và chỉ cấp quyền **Contents** cho đúng repo đó - không cấp rộng hơn.
 - Một repo dùng cho MỘT bộ brains. Đừng trỏ 2 hệ thống Javis khác mục đích (dữ liệu khác nhau hoàn toàn) vào cùng repo - chúng sẽ trộn dữ liệu vào nhau đúng như thiết kế sync.
 
@@ -88,11 +115,14 @@ Khi hai máy sửa cùng một file giữa hai lần đồng bộ, bạn sẽ th
 |---|---|
 | "máy chưa cài git" | Cài git trên máy/VPS. Docker image chính thức đã có sẵn. |
 | Kiểm tra kết nối báo lỗi 403 | Token thiếu quyền Contents: Read and write, hoặc chưa chọn đúng repo. |
+| Đẩy được nhưng trên GitHub không thấy file ở nhánh quen thuộc | Ô **Nhánh** đang khác nhánh mặc định của repo (mặc định Javis dùng `main`). Sửa ô Nhánh cho khớp rồi Lưu cấu hình và đồng bộ lại. |
 | "push liên tục bị vượt" | Nhiều máy đồng bộ cùng lúc liên tục. Bấm lại sau ít phút - cơ chế tự hoà sẽ khớp. |
 | "Áp bản đồng bộ về máy lỗi N file" | Có file đang bị khoá/không ghi được trên máy (vd đang mở trong app khác). Lần này KHÔNG đẩy gì lên (an toàn), đóng app đang giữ file rồi đồng bộ lại. |
 | Thấy nhiều file `.conflict-*` | Hai máy hay sửa cùng file giữa hai lần đồng bộ. Rút ngắn chu kỳ Tự động, hoặc chia việc mỗi máy một mảng; xử lý file conflict theo mục ở trên. |
+| Repo backup phình rất nhanh | Ảnh trong `attachments/`/`inbox/` cũng được đẩy lên. Xem mục "Ảnh và file đính kèm" ở trên; cân nhắc để luật dọn media chạy thay vì tắt nó. |
+| Ảnh cũ biến mất khỏi repo | Đúng thiết kế: media quá 30 ngày bị dọn trên máy rồi lan lên repo. Lấy lại từ lịch sử commit, hoặc nới `media.max_age_days` trong `settings.json`. |
 | Muốn ngừng tự động | Tắt công tắc Tự động rồi Lưu cấu hình. Vẫn bấm "Đồng bộ ngay" thủ công được. |
 
 ---
 
-Liên quan: [08 - Tự cải thiện](08-tu-cai-thien.md) · [13 - Second Brain: bộ nhớ, Wiki](13-second-brain-bo-nho-wiki.md) · [17 - Khắc phục sự cố](17-khac-phuc-su-co.md)
+Liên quan: [08 - Việc định kỳ & Nhắc hẹn](08-viec-dinh-ky.md) · [13 - Second Brain: bộ nhớ, Wiki](13-second-brain-bo-nho-wiki.md) · [22 - Tự học](22-tu-hoc.md) · [17 - Khắc phục sự cố](17-khac-phuc-su-co.md)

@@ -29,7 +29,7 @@
 
     var qs = $("qsTts"); if (qs) qs.addEventListener("change", function () { applyState(qs.checked); });
 
-    // Nút loa trên khung chat: bấm là bật/tắt luôn (đi qua khung chat / màn 3D đều thấy).
+    // Nút loa trên khung chat: bấm là bật/tắt luôn (đi qua khung chat / màn Javis đều thấy).
     var bar = $("ttsToggleBar");
     if (bar) bar.addEventListener("click", function () { applyState(isOff()); });   // đang OFF → bật, đang ON → tắt
 

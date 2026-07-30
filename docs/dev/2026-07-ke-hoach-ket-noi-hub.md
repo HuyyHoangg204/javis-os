@@ -5,7 +5,7 @@
 ## 1. Mục tiêu (3 việc)
 
 1. **Kho MCP mẫu (catalog)**: người dùng mở trang, thấy sẵn Pancake POS, Zalo, Botcake, Webcake Landing... bấm "Kết nối" là xong. Không phải tự gõ URL, transport, header như hiện nay.
-2. **Một connector nối được NHIỀU tài khoản** (multi-account kiểu Hermes): cùng Pancake POS nhưng 3 cửa hàng, cùng Zalo nhưng 2 tài khoản. Mỗi tài khoản đăng nhập dễ như Claude: dán key hoặc quét QR hoặc bấm OAuth, có xác nhận "Đã kết nối: <tên shop>".
+2. **Một connector nối được NHIỀU tài khoản** (multi-account): cùng Pancake POS nhưng 3 cửa hàng, cùng Zalo nhưng 2 tài khoản. Mỗi tài khoản đăng nhập dễ như Claude: dán key hoặc quét QR hoặc bấm OAuth, có xác nhận "Đã kết nối: <tên shop>".
 3. **Mọi engine đều dùng được mọi thứ**: MCP, skill, loop, đọc/ghi file chạy như nhau dù Main Model là Claude Code, Codex, OpenRouter, OpenAI API hay Anthropic API. Javis là agent thực thụ, Claude Code chỉ là MỘT trong các bộ não.
 
 ## 2. Hiện trạng (đọc code ngày 2026-07-04)

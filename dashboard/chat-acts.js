@@ -14,6 +14,13 @@
 
   var THU = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"];
 
+  // File này chạy hai chế độ: trong trình duyệt và dưới node (test require nó).
+  // Dưới node không có window nên không có ic() - trả về chuỗi rỗng để phần logic
+  // vẫn test được mà không phải kéo cả tầng icon vào. Trong trình duyệt thì
+  // icons.js đã nạp trước (index.html bảo đảm thứ tự, có test canh) nên lấy
+  // được hàm thật.
+  var ic = (typeof window !== "undefined" && window.ic) ? window.ic : function () { return ""; };
+
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -58,7 +65,7 @@
       var retryTitle = role === "user" ? "Gửi lại câu này" : "Trả lời lại câu hỏi phía trên";
       send = '<button class="msg-act" type="button" data-act="retry" title="' + esc(retryTitle) + '">↻</button>' +
         (role === "user"
-          ? '<button class="msg-act" type="button" data-act="edit" title="Sửa lại rồi gửi">✎</button>'
+          ? '<button class="msg-act" type="button" data-act="edit" title="Sửa lại rồi gửi">' + ic("pencil") + '</button>'
           : "");
     }
     return '<div class="msg-acts">' + time + send +

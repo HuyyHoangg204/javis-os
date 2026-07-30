@@ -1,7 +1,7 @@
 // ============================================
 // JAVIS OS - Console layer (sidebar + router)
 // Bọc ngoài cockpit: rail điều hướng + trang quản lý. KHÔNG sửa app.js.
-// Graph 3D tự pause khi rời cockpit (qua window.__javisGraph). Alpine cho UI.
+// Đồ thị tự pause khi rời cockpit (qua window.__javisGraph). Alpine cho UI.
 // Thêm trang mới = thêm 1 mục vào RAIL_ITEMS + 1 case trong renderPage().
 // ============================================
 (function () {
@@ -11,39 +11,62 @@
   // type 'view' = render trong cview ; có launch() = nút mở overlay/modal sẵn có.
   const APP_VERSION = "0.4.3";   // fallback hiển thị tức thời; nguồn thật là /version (file VERSION)
 
-  // Icon SVG line-style đồng bộ (thay cho lẫn lộn emoji + ký tự)
-  const _svg = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
-  const ICON = {
-    home:        _svg('<path d="M12 2l8.66 5v10L12 22 3.34 17V7L12 2z"/>'),
-    chat:        _svg('<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.5 8.5 0 1 1 21 11.5z"/>'),
-    workflows:   _svg('<path d="M13 2L4.5 13.5H11l-1 8.5L19.5 10H13l0-8z"/>'),
-    agents:      _svg('<rect x="5" y="7" width="14" height="13" rx="2"/><path d="M12 7V3M8 3h8"/><circle cx="9.2" cy="13" r="1.1"/><circle cx="14.8" cy="13" r="1.1"/>'),
-    skills:      _svg('<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4L12 3z"/>'),
-    models:      _svg('<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>'),
-    channels:    _svg('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>'),
-    mcp:         _svg('<path d="M9 2v6M15 2v6"/><path d="M7 8h10v3a5 5 0 0 1-10 0V8z"/><path d="M12 16v6"/>'),
-    logs:        _svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>'),
-    account:     _svg('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6.5 8-6.5s8 2.5 8 6.5"/>'),
-    files:       _svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>'),
-    selfimprove: _svg('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>'),
-    plugins:     _svg('<path d="M14 4a2 2 0 1 0-4 0v2H6a1 1 0 0 0-1 1v3H4a2 2 0 1 0 0 4h1v3a1 1 0 0 0 1 1h3v-1a2 2 0 1 1 4 0v1h3a1 1 0 0 0 1-1v-4h1a2 2 0 1 0 0-4h-1V7a1 1 0 0 0-1-1h-3V4z"/>'),
-    learn:       _svg('<path d="M12 3v18"/><path d="M5 7h14"/><path d="M4 12h16"/><circle cx="12" cy="12" r="9"/>'),
-    kanban:      _svg('<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="10" rx="1"/><rect x="17" y="4" width="4" height="13" rx="1"/>'),
-    usage:       _svg('<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6" rx="0.5"/><rect x="12" y="7" width="3" height="10" rx="0.5"/><rect x="17" y="13" width="3" height="4" rx="0.5"/>'),
-    settings:    _svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
+  // Icon của TỪNG TRANG, khai MỘT LẦN ở đây. Cả thanh rail (ICON) lẫn tiêu đề
+  // trang (VIEW_META) đều lấy từ bảng này, nên hai chỗ không bao giờ lệch nhau -
+  // trước đây mỗi trang khai icon hai lần và đã lệch thật (Kanban trùng icon
+  // với Tệp tin, Tài khoản trùng với Cài đặt).
+  //
+  // Giá trị là TÊN icon Lucide. Tra tên tại https://lucide.dev/icons/, thêm vào
+  // dashboard/icons.manifest.json rồi chạy python tools/gen_icons.py.
+  const VIEW_ICON = {
+    home: "hexagon",
+    chat: "message-circle",
+    settings: "settings",
+    workflows: "workflow",
+    agents: "bot",
+    skills: "puzzle",
+    files: "folder-tree",
+    selfimprove: "repeat",
+    learn: "brain",
+    kanban: "square-kanban",
+    models: "cpu",
+    channels: "mail",
+    mcp: "plug",
+    plugins: "toolbox",
+    logs: "scroll-text",
+    account: "circle-user",
+    usage: "chart-column",
   };
+  // Cỡ icon rail do CSS lo (.rail-ico svg { width: 19px }), độ ưu tiên chọn tử
+  // cao hơn .ic nên không cần truyền cỡ ở đây.
+  const ICON = Object.fromEntries(
+    Object.entries(VIEW_ICON).map(([id, name]) => [id, ic(name)])
+  );
 
-  // Icon cho TẦNG 1 (nhãn nhóm) - cùng phong cách line-style; chỉ dùng ở header nhóm rail.
+  // Icon cho TẦNG 1 (nhãn nhóm) - chỉ dùng ở header nhóm rail.
   const GICON = {
-    "Trợ lý":   _svg('<path d="M12 3l1.8 4.7L18.5 9.5 13.8 11.3 12 16l-1.8-4.7L5.5 9.5l4.7-1.8L12 3z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7L19 15z"/>'),
-    "Bộ não":   _svg('<path d="M8.5 4A3.5 3.5 0 0 0 5 7.5 3 3 0 0 0 4 13a3 3 0 0 0 2 4.5A3 3 0 0 0 12 19V5.5A2.5 2.5 0 0 0 8.5 4z"/><path d="M15.5 4A3.5 3.5 0 0 1 19 7.5 3 3 0 0 1 20 13a3 3 0 0 1-2 4.5A3 3 0 0 1 12 19"/>'),
-    "Năng lực": _svg('<path d="M12 2c3 1.2 5 4.2 5 8 0 2.2-1 4-2 5l-3 2-3-2c-1-1-2-2.8-2-5 0-3.8 2-6.8 5-8z"/><circle cx="12" cy="9" r="1.6"/><path d="M9 16l-2 4M15 16l2 4"/>'),
-    "Việc":     _svg('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M8.5 11l2 2 4-4"/>'),
-    "Kết nối":  _svg('<path d="M9 15l6-6"/><path d="M10.5 7.5l1-1a3.5 3.5 0 0 1 5 5l-1 1M13.5 16.5l-1 1a3.5 3.5 0 0 1-5-5l1-1"/>'),
-    "Hệ thống": _svg('<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><circle cx="4" cy="12" r="1.8"/><circle cx="12" cy="6" r="1.8"/><circle cx="20" cy="14" r="1.8"/>'),
+    "Trợ lý": ic("sparkles"),
+    "Bộ não": ic("brain"),
+    "Năng lực": ic("lightbulb"),
+    "Việc": ic("clipboard-check"),
+    "Kết nối": ic("link"),
+    "Hệ thống": ic("sliders-horizontal"),
   };
-  // Icon nút thu/mở sidebar: kiểu "panel sidebar" (khung chia 2, cột trái có dòng nội dung). Tĩnh, không xoay.
-  const COLLAPSE_ICON = _svg('<rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M10 3v18"/><path d="M5.6 8h2.6M5.6 11.2h2.6M5.6 14.4h2.6"/>');
+  // Icon nút thu/mở sidebar: kiểu "panel sidebar". Tĩnh, không xoay.
+  const COLLAPSE_ICON = ic("panel-left");
+
+  // Ba icon trạng thái dùng dày đặc trong file này (~80 chỗ). Khai sẵn thành
+  // hằng cho câu ngắn và khỏi lặp lời gọi dài. ic() trả về chuỗi nên đây chỉ là
+  // chuỗi hằng, ghép thoải mái.
+  //
+  // Khi chữ đi kèm là chuỗi TỪ SERVER thì đừng ghép tay: dùng Icons.warn(text)
+  // hoặc Icons.ok(text) để chữ được escape. Ghép tay chỉ dành cho chữ tĩnh
+  // hoặc chữ đã qua esc() rồi.
+  const WARN_ICON = ic("triangle-alert", { cls: "ic-warn" });
+  const OK_ICON = ic("circle-check", { cls: "ic-ok" });
+  const CHECK_ICON = ic("check", { cls: "ic-ok" });
+  const SAVE_ICON = ic("save");
+  const X_ICON = ic("x");
 
   const RAIL_ITEMS = [
     { id: "home",        icon: ICON.home,        label: "Javis" },
@@ -97,24 +120,26 @@
     return g ? g.label : (RAIL_GROUPS[0] && RAIL_GROUPS[0].label) || "";
   }
 
+  // icon lấy từ VIEW_ICON ở đầu file - đừng khai icon riêng ở đây, hai bảng
+  // lệch nhau là lỗi đã xảy ra một lần rồi.
   const VIEW_META = {
-    home:        { icon: "⬡", label: "Javis OS", sub: "" },
-    chat:        { icon: "💬", label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
-    settings:    { icon: "⚙", label: "Cài đặt", sub: "Hệ thống · giao diện · giọng nói · truy cập" },
-    workflows:   { icon: "⚡", label: "Workflows", sub: "Chuỗi agent tự động" },
-    agents:      { icon: "🤖", label: "Agents", sub: "Trợ lý chuyên biệt" },
-    skills:      { icon: "🧩", label: "Skills", sub: "Kỹ năng khả dụng" },
-    files:       { icon: "🗂", label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    selfimprove: { icon: "♻", label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
-    learn:       { icon: "🧠", label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
-    kanban:      { icon: "🗂", label: "Việc (Kanban)", sub: "AI tự đặc tả, điều phối và chạy task nền" },
-    models:      { icon: "◈", label: "Models", sub: "Main model & providers" },
-    channels:    { icon: "✉", label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
-    mcp:         { icon: "🔌", label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
-    plugins:     { icon: "🧰", label: "Plugins", sub: "Tool/hook native cho mọi engine" },
-    logs:        { icon: "🗒", label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
-    account:     { icon: "⚙", label: "Tài khoản", sub: "Đăng nhập & workspace" },
-    usage:       { icon: "📊", label: "Mức dùng", sub: "Token & chi phí theo ngày, theo nhà cung cấp" },
+    home:        { icon: VIEW_ICON.home, label: "Javis OS", sub: "" },
+    chat:        { icon: VIEW_ICON.chat, label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
+    settings:    { icon: VIEW_ICON.settings, label: "Cài đặt", sub: "Hệ thống · giao diện · giọng nói · truy cập" },
+    workflows:   { icon: VIEW_ICON.workflows, label: "Workflows", sub: "Chuỗi agent tự động" },
+    agents:      { icon: VIEW_ICON.agents, label: "Agents", sub: "Trợ lý chuyên biệt" },
+    skills:      { icon: VIEW_ICON.skills, label: "Skills", sub: "Kỹ năng khả dụng" },
+    files:       { icon: VIEW_ICON.files, label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
+    selfimprove: { icon: VIEW_ICON.selfimprove, label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
+    learn:       { icon: VIEW_ICON.learn, label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
+    kanban:      { icon: VIEW_ICON.kanban, label: "Việc (Kanban)", sub: "AI tự đặc tả, điều phối và chạy task nền" },
+    models:      { icon: VIEW_ICON.models, label: "Models", sub: "Main model & providers" },
+    channels:    { icon: VIEW_ICON.channels, label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
+    mcp:         { icon: VIEW_ICON.mcp, label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
+    plugins:     { icon: VIEW_ICON.plugins, label: "Plugins", sub: "Tool/hook native cho mọi engine" },
+    logs:        { icon: VIEW_ICON.logs, label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
+    account:     { icon: VIEW_ICON.account, label: "Tài khoản", sub: "Đăng nhập & workspace" },
+    usage:       { icon: VIEW_ICON.usage, label: "Mức dùng", sub: "Token & chi phí theo ngày, theo nhà cung cấp" },
   };
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
@@ -157,28 +182,18 @@
   function navigateTo(id) {
     const store = Alpine.store("nav");
     if (store.active === id) return;   // đang ở trang này → khỏi đổi (tránh nháy + mượn/trả node thừa)
-    // Ẩn TRƯỚC khi View Transition chụp khung cũ. Đợi tới swap()/pause() thì tooltip
-    // đang hover đã lọt vào ảnh chụp chuyển cảnh, dính lại trên trang mới.
-    try {
-      const g = window.__javisGraph;
-      if (g && g.hideTooltip) g.hideTooltip();
-      else {
-        const tip = document.getElementById("graphTooltip");
-        if (tip) tip.style.display = "none";
-      }
-    } catch (e) {}
     const swap = () => {
       const leave = _pageLeave; _pageLeave = null;
       if (leave) { try { leave(); } catch (e) {} }   // dọn trang cũ trước khi thay nội dung
       store.active = id;
-      // Nút điều khiển cockpit (⚙🔊↻) chỉ hiện ở trang Javis, không hiện navbar trang quản lý
+      // Nút điều khiển cockpit (cài đặt, giọng nói, làm mới) chỉ hiện ở trang Javis, không hiện navbar trang quản lý
       document.body.classList.toggle("in-console", id !== "home");
       // Rời trang Cài đặt → cất #quickSet về holder TRƯỚC khi cviewBody bị ghi đè (giữ node + handler).
       if (id !== "settings") parkQuickSet();
       if (id !== "home") renderPage(id);
       recomputeGraph();
     };
-    // Dính tab Trò chuyện thì BỎ View Transition: nó chụp snapshot cảnh 3D nặng của home rồi
+    // Dính tab Trò chuyện thì bỏ View Transition: nó chụp snapshot đồ thị của home rồi
     // cross-fade → loé orb ~1s (bitmap chụp trước cả khi ẩn graph). Swap thẳng cho sạch, tức thì.
     const skipVT = (id === "chat" || store.active === "chat");
     if (document.startViewTransition && !skipVT) document.startViewTransition(swap);
@@ -255,7 +270,7 @@
   function placeholder(id, note) {
     const m = VIEW_META[id] || {};
     return `<div class="cview-placeholder">
-      <div class="ph-ico">${m.icon || "✦"}</div>
+      <div class="ph-ico">${ic(m.icon || "sparkles", { cls: "ic-xl" })}</div>
       <div><b>${esc(m.label || id)}</b> - đang phát triển</div>
       <div style="max-width:380px;font-size:14px;opacity:.7">${esc(note || "Trang này là chỗ cắm chức năng mở rộng sau. Khung điều hướng đã sẵn sàng.")}</div>
     </div>`;
@@ -302,10 +317,10 @@
     // Ủy quyền sang module mới nếu đã nạp; nếu chưa thì rơi về bảng cũ (usage_store 30 ngày).
     if (window.JavisUsage && window.JavisUsage.render) { try { return window.JavisUsage.render(el); } catch (e) {} }
     _injectUsageCss();
-    el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder" style="min-height:200px"><div class="ph-ico">📊</div><div class="dim">Đang tải mức dùng...</div></div></div>`;
+    el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder" style="min-height:200px"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div class="dim">Đang tải mức dùng...</div></div></div>`;
     let d;
     try { d = await (await fetch("/usage")).json(); }
-    catch (e) { el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder"><div class="ph-ico">📊</div><div>Không tải được dữ liệu mức dùng.</div></div></div>`; return; }
+    catch (e) { el.innerHTML = `<div class="uz-wrap"><div class="cview-placeholder"><div class="ph-ico">${ic("chart-column", { cls: "ic-xl ic-dim" })}</div><div>Không tải được dữ liệu mức dùng.</div></div></div>`; return; }
     const daily = d.daily || [];
     const today = d.today || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
     const all = d.all_time || { items: [], total: { in: 0, out: 0, cost: 0, turns: 0 } };
@@ -382,9 +397,13 @@
     .cl-sec ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px}
     .cl-sec li{font-size:14.5px;color:var(--text);line-height:1.5;padding-left:24px;position:relative}
     .cl-sec li:before{position:absolute;left:0;top:0}
-    .cl-sec.feat li:before{content:"✨"} .cl-sec.fix li:before{content:"🔧"}
-    .cl-sec.imp li:before{content:"⚡"} .cl-sec.sec li:before{content:"🔒"}
-    .cl-sec.doc li:before{content:"📖"} .cl-sec.other li:before{content:"•"}
+    .cl-sec li:before{content:"";display:inline-block;width:1em;height:1em;vertical-align:-.14em;background-color:currentColor;mask-position:center;mask-size:contain;mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat}
+    .cl-sec.feat li:before{mask-image:var(--ic-sparkles);-webkit-mask-image:var(--ic-sparkles)}
+    .cl-sec.fix li:before{mask-image:var(--ic-wrench);-webkit-mask-image:var(--ic-wrench)}
+    .cl-sec.imp li:before{mask-image:var(--ic-zap);-webkit-mask-image:var(--ic-zap)}
+    .cl-sec.sec li:before{mask-image:var(--ic-lock);-webkit-mask-image:var(--ic-lock)}
+    .cl-sec.doc li:before{mask-image:var(--ic-book-open);-webkit-mask-image:var(--ic-book-open)}
+    .cl-sec.other li:before{mask-image:none;content:"•";width:auto;height:auto;background:none}
     .cl-empty{color:var(--text3);font-size:15px}
     .cl-pager{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 6px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07)}
     .cl-pg{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text);font-size:13.5px;font-weight:600;padding:7px 15px;border-radius:9px;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
@@ -469,7 +488,7 @@
         <div class="upd-changes" id="updVerChangelog"></div>
         <div class="js-actions">
           <button class="gcard-btn ghost" id="updVerCheck">Kiểm tra lại</button>
-          <button class="gcard-btn" id="updVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
+          <button class="gcard-btn" id="updVerUpdate" style="display:none">${ic("upload-cloud")} Cập nhật ngay</button>
         </div>
         <div class="upd-progress" id="updVerProgress"></div>
         <div class="gcard-meta" id="updVerStatus"></div>
@@ -511,7 +530,7 @@
       const normalized = phase === "rolling_back" ? "health_check" : phase;
       let at = UPDATE_STEPS.findIndex(x => x[0] === normalized); if (at < 0) at = 0;
       box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px">${
-        UPDATE_STEPS.map((s, i) => `<span style="${i === at ? "font-weight:600" : "opacity:.7"}">${i < at ? "✅" : (i === at ? "⏳" : "○")} ${esc(s[1])}</span>`).join('<span style="opacity:.4"> → </span>')
+        UPDATE_STEPS.map((s, i) => `<span style="${i === at ? "font-weight:600" : "opacity:.7"}">${i < at ? OK_ICON : (i === at ? ic("loader", { cls: "ic-spin" }) : ic("circle", { cls: "ic-dim" }))} ${esc(s[1])}</span>`).join('<span style="opacity:.4"> → </span>')
       }</div>${phase === "rolling_back" ? '<div style="margin-top:6px;color:var(--red)">↩ Bản mới lỗi, đang tự quay về bản cũ…</div>' : ""}${extra ? `<div style="margin-top:6px;opacity:.85">${esc(extra)}</div>` : ""}`;
     };
     const loadChanges = async () => {
@@ -530,7 +549,7 @@
       if (!tag || !meta || !update) return;
       meta.textContent = "Đang kiểm tra bản mới…";
       let j = {}; try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
-      catch (e) { meta.textContent = "⚠ Không kiểm tra được phiên bản."; return; }
+      catch (e) { meta.innerHTML = WARN_ICON + " Không kiểm tra được phiên bản."; return; }
       tag.textContent = "v" + (j.current || "?");
       root.dataset.currentVersion = j.current || "";
       root.dataset.previousVersion = j.previous_version || "";
@@ -546,7 +565,7 @@
         }
         loadChanges();
       } else {
-        meta.innerHTML = j.latest ? `✅ Đang dùng bản mới nhất (v${esc(j.current)}) · ${esc(mode)}` : `v${esc(j.current)} · ${esc(mode)}${j.error ? " · chưa so được với GitHub" : ""}`;
+        meta.innerHTML = j.latest ? `${OK_ICON} Đang dùng bản mới nhất (v${esc(j.current)}) · ${esc(mode)}` : `v${esc(j.current)} · ${esc(mode)}${j.error ? " · chưa so được với GitHub" : ""}`;
         update.style.display = "none";
       }
     };
@@ -562,33 +581,33 @@
       catch (e) { resp = { ok: true }; }
       if (resp && resp.ok === false) {
         update.disabled = false; q("updVerProgress").style.display = "none";
-        status.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
+        status.innerHTML = WARN_ICON + " " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
         return;
       }
-      status.textContent = "⏳ Đang cập nhật… đừng tắt trang.";
+      status.innerHTML = ic("loader", { cls: "ic-spin" }) + " Đang cập nhật… đừng tắt trang.";
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
         let state = null; try { state = await (await fetch("/update/status", { cache: "no-store" })).json(); } catch (e) {}
         if (state && state.state && state.state.phase) {
           const phase = state.state.phase, result = state.state.result;
-          const stash = state.state.stashed ? "📦 Sửa đổi cục bộ đã được cất vào git stash." : "";
+          const stash = state.state.stashed ? ic("package") + " Sửa đổi cục bộ đã được cất vào git stash." : "";
           progress(phase, stash);
-          if (result === "success") { clearInterval(poll); status.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
+          if (result === "success") { clearInterval(poll); status.innerHTML = OK_ICON + " Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
           if (result === "rolled_back") { clearInterval(poll); status.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>."; update.disabled = false; return; }
           if (["pull_failed", "rollback_failed", "error"].includes(result)) {
             clearInterval(poll); q("updVerProgress").style.display = "none";
-            status.innerHTML = "⚠ " + esc(state.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>."; update.disabled = false; return;
+            status.innerHTML = WARN_ICON + " " + esc(state.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>."; update.disabled = false; return;
           }
         }
         try {
           const v = await (await fetch("/version", { cache: "no-store" })).json();
           const docker = root.dataset.updateMode === "docker";
           if ((docker || !(state && state.state && state.state.phase)) && v.update_available === false && v.current && v.current !== oldCur) {
-            clearInterval(poll); status.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
+            clearInterval(poll); status.innerHTML = OK_ICON + " Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
           if (docker && tries >= 12 && v.current === oldCur) {
-            clearInterval(poll); status.textContent = "⚠ Bản mới chưa lên sau một lúc - có thể lỗi.";
+            clearInterval(poll); status.innerHTML = WARN_ICON + " Bản mới chưa lên sau một lúc - có thể lỗi.";
             if (rollback) {
               const prev = root.dataset.previousVersion || v.previous_version || "";
               rollback.style.display = "";
@@ -606,17 +625,49 @@
   const fbrain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
 
   // ============================================
+  // Tải về (dùng chung cho trang Tệp tin + cây file)
+  // ============================================
+  // Bấm tải bằng thẻ <a download> ẩn thay vì window.open: không dính chặn popup, không mở
+  // tab trắng rồi tự đóng (trên điện thoại tab trắng đó hay làm mất luôn file).
+  function _dlGo(url) {
+    const a = document.createElement("a");
+    a.href = url; a.rel = "noopener"; a.style.display = "none";
+    document.body.appendChild(a); a.click();
+    setTimeout(() => a.remove(), 0);
+  }
+  const _dlFileUrl = (rel) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}&dl=1`;
+  const _dlZipUrl = (rel) => `/files/zip?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`;
+  const _dlFile = (rel) => _dlGo(_dlFileUrl(rel));
+  // Tải CẢ thư mục: hỏi /files/zip?probe=1 để ĐO trước (số file + dung lượng) rồi mới nén.
+  // Nhờ vậy thư mục quá lớn báo được bằng lời, và thư mục nặng thì xin xác nhận trước khi chờ.
+  async function _dlFolder(rel, name) {
+    let d = {};
+    try {
+      const r = await fetch(_dlZipUrl(rel) + "&probe=1");
+      d = await r.json().catch(() => ({}));
+    } catch (e) { alert("Không đọc được thư mục: " + e.message); return; }
+    if (d.error) { alert(d.error); return; }
+    if (!d.files) { alert(`Thư mục "${name}" không có file nào để tải.`); return; }
+    const mb = (d.bytes || 0) / 1048576;
+    if (mb > 200 && !confirm(`"${name}" có ${d.files} file, khoảng ${mb.toFixed(0)} MB.\nNén thành .zip và tải về?`)) return;
+    _dlGo(_dlZipUrl(rel));
+  }
+
+  // ============================================
   // Trang Tệp tin (File Manager)
   // ============================================
   function _humanSize(n) { if (n < 1024) return n + " B"; if (n < 1048576) return (n / 1024).toFixed(1) + " KB"; return (n / 1048576).toFixed(1) + " MB"; }
   function _fileIcon(ext) {
-    if ([".md", ".txt"].includes(ext)) return "📝";
-    if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"].includes(ext)) return "🖼";
-    if ([".json", ".yaml", ".yml", ".toml", ".ini", ".env"].includes(ext)) return "⚙";
-    if ([".js", ".ts", ".py", ".sh", ".bat", ".css", ".html"].includes(ext)) return "📜";
-    if ([".mp3", ".wav", ".ogg"].includes(ext)) return "🎵";
-    if (ext === ".pdf") return "📕";
-    return "📄";
+    return ic(_fileIconName(ext));
+  }
+  function _fileIconName(ext) {
+    if ([".md", ".txt"].includes(ext)) return "file-text";
+    if ([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp"].includes(ext)) return "image";
+    if ([".json", ".yaml", ".yml", ".toml", ".ini", ".env"].includes(ext)) return "settings";
+    if ([".js", ".ts", ".py", ".sh", ".bat", ".css", ".html"].includes(ext)) return "file-code";
+    if ([".mp3", ".wav", ".ogg"].includes(ext)) return "file-audio";
+    if (ext === ".pdf") return "file-type";
+    return "file";
   }
   let _fmCss = false;
   function _injectExtraCss() {
@@ -648,7 +699,8 @@
     .fm-row.fm-target{box-shadow:inset 3px 0 0 var(--link-ink);background:rgba(120,180,255,.10);animation:fmFlash 1.7s ease}
     @keyframes fmFlash{0%,45%{background:rgba(120,180,255,.42)}100%{background:rgba(120,180,255,.10)}}
     .fm-size{color:var(--text3);font-size:13px;min-width:60px;text-align:right}
-    .fm-row-act{display:flex;gap:5px;opacity:0;transition:.15s} .fm-row:hover .fm-row-act{opacity:1}
+    .fm-row-act{display:flex;gap:5px;opacity:.6;transition:.15s} .fm-row:hover .fm-row-act,.fm-row:focus-within .fm-row-act{opacity:1}
+    @media(hover:none){.fm-row-act{opacity:1}}
     .fm-row-act button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text3);cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:var(--text-hi);border-color:rgba(120,180,255,.5)}
     .fm-row-act button.danger:hover{color:var(--red);border-color:rgba(255,120,120,.5)}
     .fm-modal{position:fixed;inset:0;z-index:9999;display:none;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px}
@@ -699,9 +751,9 @@
     el.innerHTML = `<div class="cview-section">
       <div class="fm-search-tools">
         <div class="vault-search fm-search">
-          <span class="vs-ico">🔍</span>
+          <span class="vs-ico">${ic("search")}</span>
           <input id="fmSearch" type="search" placeholder="Tìm file trong toàn brain..." spellcheck="false" autocomplete="off">
-          <button class="vs-clear" id="fmSearchClear" title="Xoá tìm kiếm" hidden>✕</button>
+          <button class="vs-clear" id="fmSearchClear" title="Xoá tìm kiếm" hidden>${X_ICON}</button>
         </div>
         <div class="vault-modes fm-search-modes" aria-label="Phạm vi tìm kiếm">
           <button class="vs-chip active" id="fmSearchName" data-mode="name" title="Tìm theo tên file">Tên</button>
@@ -713,10 +765,11 @@
         <div class="fm-crumb" id="fmCrumb"></div>
         <div class="fm-actions">
           <button class="s-btn-ghost" id="fmUp">↑ Lên</button>
-          <button class="s-btn-ghost" id="fmHome" title="Về thư mục brain">⌂ Brain</button>
+          <button class="s-btn-ghost" id="fmHome" title="Về thư mục brain">${ic("house")} Brain</button>
           <button class="s-btn-ghost" id="fmNewDir">+ Thư mục</button>
           <button class="s-btn-ghost" id="fmNewFile">+ File</button>
-          <label class="s-btn-ghost fm-uplabel">⤓ Tải lên<input type="file" id="fmUpload" hidden multiple></label>
+          <label class="s-btn-ghost fm-uplabel">⤒ Tải lên<input type="file" id="fmUpload" hidden multiple></label>
+          <button class="s-btn-ghost" id="fmZipCur" title="Nén cả thư mục đang mở thành .zip rồi tải về">⤓ Tải thư mục</button>
           <button class="s-btn-ghost" id="fmRefresh">↻</button>
         </div>
       </div>
@@ -758,7 +811,7 @@
           ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-javis.bat → start-javis.vbs) rồi tải lại trang."
           : resp.status === 401 ? "Phiên đăng nhập hết hạn - tải lại trang & đăng nhập."
           : "Lỗi máy chủ (" + resp.status + ").");
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">⚠ ${esc(msg)}</div>`; return;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">${WARN_ICON} ${esc(msg)}</div>`; return;
       }
       cur = d.path || ""; upTarget = d.parent;
       const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
@@ -769,7 +822,7 @@
     }
     function crumb(rootName) {
       const parts = cur ? cur.split("/") : []; let acc = "";
-      let html = `<a data-p="">🏠 ${esc(rootName || "brain")}</a>`;
+      let html = `<a data-p="">${ic("house")} ${esc(rootName || "brain")}</a>`;
       parts.forEach(p => { acc = acc ? acc + "/" + p : p; html += ` / <a data-p="${esc(acc)}">${esc(p)}</a>`; });
       crumbEl.innerHTML = html;
       crumbEl.querySelectorAll("a").forEach(a => a.onclick = () => load(a.dataset.p));
@@ -813,7 +866,7 @@
       }
       if (seq !== searchSeq) return;
       if (!resp.ok || d.error) {
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">⚠ ${esc(d.error || "Không tìm kiếm được.")}</div>`;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">${WARN_ICON} ${esc(d.error || "Không tìm kiếm được.")}</div>`;
         searchMeta.textContent = "Tìm kiếm thất bại";
         return;
       }
@@ -841,7 +894,7 @@
           ${it.snippet ? `<span class="fm-search-snip">${esc(it.snippet)}</span>` : ""}
         </span>
         <span class="fm-search-kind">${esc(match)}</span>
-        <span class="fm-row-act"><button data-act="open">Mở</button><button data-act="loc">Vị trí</button></span>`;
+        <span class="fm-row-act"><button data-act="open">Mở</button><button data-act="dl" title="Tải file về máy">⤓ Tải</button><button data-act="loc">Vị trí</button></span>`;
       const openHit = () => {
         if (editable || viewable) openFile(it.path, target);
         else window.open(rawUrl(it.path), "_blank");
@@ -849,6 +902,7 @@
       div.querySelector(".fm-search-main").onclick = openHit;
       div.querySelector(".fm-ico").onclick = openHit;
       div.querySelector('[data-act="open"]').onclick = (e) => { e.stopPropagation(); openHit(); };
+      div.querySelector('[data-act="dl"]').onclick = (e) => { e.stopPropagation(); _dlFile(it.path); };
       div.querySelector('[data-act="loc"]').onclick = async (e) => {
         e.stopPropagation();
         const parts = String(it.path || "").split("/");
@@ -868,9 +922,12 @@
       else if (viewable) acts += '<button data-act="view" title="Xem trước">Xem</button>';
       else if (it.type === "file") acts += '<button data-act="open" title="Mở trong tab mới">Mở</button>';
       acts += '<button data-act="ren" title="Đổi tên">Đổi tên</button>';
-      if (it.type === "file") acts += '<button data-act="dl" title="Tải về">Tải</button>';
+      // Tải: MỌI loại file (không riêng .md); thư mục thì nén .zip rồi mới tải.
+      acts += it.type === "dir"
+        ? '<button data-act="zip" title="Tải cả thư mục về máy (nén .zip)">⤓ Zip</button>'
+        : '<button data-act="dl" title="Tải file về máy">⤓ Tải</button>';
       acts += '<button data-act="del" class="danger" title="Xoá">Xoá</button>';
-      div.innerHTML = `<span class="fm-ico">${it.type === "dir" ? "📁" : _fileIcon(it.ext)}</span>
+      div.innerHTML = `<span class="fm-ico">${it.type === "dir" ? ic("folder") : _fileIcon(it.ext)}</span>
         <span class="fm-name">${esc(it.name)}</span>
         <span class="fm-size">${it.type === "dir" ? "" : _humanSize(it.size)}</span>
         <span class="fm-row-act">${acts}</span>`;
@@ -883,7 +940,8 @@
         e.stopPropagation(); const a = b.dataset.act;
         if (a === "edit" || a === "view") openFile(rel, it);
         else if (a === "open") window.open(rawUrl(rel), "_blank");
-        else if (a === "dl") window.open(rawUrl(rel, 1), "_blank");
+        else if (a === "dl") _dlFile(rel);
+        else if (a === "zip") _dlFolder(rel, it.name);
         else if (a === "ren") doRename(rel, it.name);
         else if (a === "del") doDelete(rel, it.name);
       });
@@ -892,7 +950,7 @@
     async function openFile(rel, it) {
       modal.classList.add("open");
       const _raw = rawUrl(rel), _ext = it.ext || "";
-      const _vhead = `<div class="fm-vhead"><b>${esc(it.name)}</b><span><a href="${_raw}" target="_blank"><button>↗ Tab mới</button></a> <a href="${rawUrl(rel, 1)}"><button>⤓ Tải</button></a> <button id="fmVClose">✕</button></span></div>`;
+      const _vhead = `<div class="fm-vhead"><b>${esc(it.name)}</b><span><a href="${_raw}" target="_blank"><button>↗ Tab mới</button></a> <a href="${rawUrl(rel, 1)}"><button title="Tải file về máy">⤓ Tải</button></a> <button id="fmVClose">${X_ICON}</button></span></div>`;
       // Ảnh / PDF: xem trước ngay qua /files/raw (không cần đọc dạng text).
       if (IMG_EXTS.includes(_ext)) {
         card.innerHTML = _vhead + `<div class="fm-readbox" style="text-align:center;overflow:auto"><img src="${_raw}" alt="${esc(it.name)}" style="max-width:100%;height:auto;border-radius:8px"></div>`;
@@ -902,7 +960,7 @@
         card.innerHTML = _vhead + `<iframe src="${_raw}" style="width:100%;height:72vh;border:0;background:#fff"></iframe>`;
         card.querySelector("#fmVClose").onclick = closeModal; return;
       }
-      card.innerHTML = `<div class="fm-vhead"><b>${esc(it.name)}</b><button id="fmVClose">✕</button></div><div class="fm-readbox">Đang mở...</div>`;
+      card.innerHTML = `<div class="fm-vhead"><b>${esc(it.name)}</b><button id="fmVClose">${X_ICON}</button></div><div class="fm-readbox">Đang mở...</div>`;
       card.querySelector("#fmVClose").onclick = closeModal;
       let resp, d;
       try { resp = await fetch(`/files/read?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`); d = await resp.json().catch(() => ({})); }
@@ -914,13 +972,15 @@
         card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${_raw}" target="_blank" style="color:var(--link-ink)">Mở trong tab mới</a> · <a href="${rawUrl(rel, 1)}" style="color:var(--link-ink)">Tải về</a></span>`;
         return;
       }
-      const head = `<div class="fm-vhead"><b>${esc(d.name)}</b><span>${d.editable ? '<button id="fmSave">💾 Lưu</button>' : '<a href="' + dlUrl + '" target="_blank"><button>⤓ Tải</button></a>'}<button id="fmVClose">✕</button></span></div>`;
+      // Nút Tải luôn có, kể cả file đang sửa được (.md...) - trước đây file sửa được chỉ có nút Lưu.
+      const dlBtn = `<a href="${dlUrl}"><button title="Tải file về máy">⤓ Tải</button></a>`;
+      const head = `<div class="fm-vhead"><b>${esc(d.name)}</b><span>${d.editable ? '<button id="fmSave">' + SAVE_ICON + ' Lưu</button>' : ""}${dlBtn}<button id="fmVClose">${X_ICON}</button></span></div>`;
       if (d.editable) {
         card.innerHTML = head + `<textarea id="fmText" spellcheck="false">${esc(d.content)}</textarea>`;
         card.querySelector("#fmSave").onclick = async () => {
           const f = new FormData(); f.append("brain", fbrain()); f.append("path", rel); f.append("content", card.querySelector("#fmText").value);
           const r = await (await fetch("/files/write", { method: "POST", body: f })).json();
-          const b = card.querySelector("#fmSave"); b.textContent = r.ok ? "✓ Đã lưu" : "⚠ Lỗi"; setTimeout(() => b.textContent = "💾 Lưu", 1500);
+          const b = card.querySelector("#fmSave"); b.innerHTML = r.ok ? CHECK_ICON + " Đã lưu" : WARN_ICON + " Lỗi"; setTimeout(() => b.innerHTML = SAVE_ICON + " Lưu", 1500);
         };
       } else {
         card.innerHTML = head + `<div class="fm-readbox"><pre style="white-space:pre-wrap;margin:0;color:var(--text)">${esc(d.content || "")}</pre></div>`;
@@ -952,6 +1012,12 @@
     el.querySelector("#fmUp").onclick = () => { if (upTarget !== null && upTarget !== undefined) load(upTarget); };
     el.querySelector("#fmHome").onclick = () => load(undefined);   // undefined = về brain (điểm vào mặc định)
     el.querySelector("#fmRefresh").onclick = () => load(cur);
+    el.querySelector("#fmZipCur").onclick = async (e) => {
+      const b = e.currentTarget, old = b.textContent;
+      b.textContent = "Đang nén..."; b.disabled = true;
+      try { await _dlFolder(cur, cur.split("/").pop() || "brain"); }
+      finally { b.textContent = old; b.disabled = false; }
+    };
     el.querySelector("#fmNewDir").onclick = async () => {
       const n = prompt("Tên thư mục mới:"); if (!n) return;
       const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", cur); fd.append("name", n);
@@ -1012,23 +1078,25 @@
       const [t, c] = SRC[s] || [s, "var(--text3)"];
       return `<span style="font-size:11px;padding:2px 7px;border-radius:99px;border:1px solid ${c}55;color:${c}">${esc(t)}</span>`;
     };
-    const chip = (t) => `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:var(--surface-2);color:var(--text2);margin:0 4px 4px 0;display:inline-block">${esc(t)}</span>`;
+    // Tham số thứ hai là TÊN icon, không phải HTML: giữ esc() bắt buộc cho phần
+    // chữ nên không thể vô tình nhét HTML thô vào qua đường này.
+    const chip = (t, iconName) => `<span style="font-size:11px;padding:2px 7px;border-radius:6px;background:var(--surface-2);color:var(--text2);margin:0 4px 4px 0;display:inline-block">${iconName ? ic(iconName) + " " : ""}${esc(t)}</span>`;
     const MM = { readonly: "chỉ đọc", safe: "ghi (safe)", full: "toàn quyền" };
 
     function card(p) {
-      const status = p.error ? `<span style="color:var(--red)">⚠ lỗi</span>`
-        : p.gated ? `<span style="color:var(--warn-ink)">⚠ chờ bật env</span>`
+      const status = p.error ? `<span style="color:var(--red)">${WARN_ICON} lỗi</span>`
+        : p.gated ? `<span style="color:var(--warn-ink)">${WARN_ICON} chờ bật env</span>`
         : p.loaded ? `<span style="color:var(--green)">● đang chạy</span>`
         : p.enabled ? `<span style="color:var(--warn-ink)">● bật (chưa nạp)</span>`
         : `<span style="color:var(--text3)">○ tắt</span>`;
       const meta = [MM[p.min_mode] ? `quyền tối thiểu: ${MM[p.min_mode]}` : "",
                     p.version ? `v${esc(p.version)}` : "", p.author ? esc(p.author) : ""].filter(Boolean).join(" · ");
-      const chips = (p.tools || []).map(t => chip("🔧 " + t)).join("") + (p.hooks || []).map(h => chip("🪝 " + h)).join("");
+      const chips = (p.tools || []).map(t => chip(t, "wrench")).join("") + (p.hooks || []).map(h => chip(h, "webhook")).join("");
       const div = document.createElement("div");
       div.className = "wf-card" + (p.loaded ? "" : " off");
       div.innerHTML = `
         <div class="wf-top">
-          <div class="wf-name">🧩 ${esc(p.name)} <span class="dim" style="font-size:12px">${esc(p.slug)}</span> ${srcBadge(p.source)}</div>
+          <div class="wf-name">${ic("puzzle")} ${esc(p.name)} <span class="dim" style="font-size:12px">${esc(p.slug)}</span> ${srcBadge(p.source)}</div>
           <div>${status}</div>
         </div>
         <div class="wf-desc">${esc(p.description || "")}</div>
@@ -1038,7 +1106,7 @@
         const fd = new FormData();
         fd.append("slug", p.slug); fd.append("enabled", p.enabled ? "0" : "1"); fd.append("brain", fbrain());
         let r = {}; try { r = await (await fetch("/plugins/toggle", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
-        if (r && r.error) alert("⚠ " + r.error);
+        if (r && r.error) alert(r.error);
         else if (r && r.note) alert(r.note);
         load();
       };
@@ -1051,7 +1119,7 @@
       try { d = await (await fetch(`/plugins?brain=${encodeURIComponent(fbrain())}`)).json(); } catch (e) {}
       if (myGen !== _renderGen) return;
       const intro = `<p style="color:var(--text3);font-size:15px;max-width:720px;margin:0 0 12px">Plugin thêm <b>tool</b> (công cụ engine gọi được) và <b>hook</b> native cho Javis mà không sửa lõi - dùng được ở MỌI engine (Claude Code, Codex, API) qua hub, tôn trọng 3 mức quyền như tool khác.</p>`;
-      const gateBanner = (!d.user_gate) ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid rgba(224,160,74,.5);border-radius:10px;background:rgba(224,160,74,.08);color:var(--warn-ink);font-size:13px;line-height:1.55"><b>⚠ Plugin do bạn cài đang bị chặn.</b> Plugin toàn cục/brain chạy code Python thật trong server nên mặc định TẮT. Để bật: đặt biến môi trường <code>JAVIS_ENABLE_USER_PLUGINS=true</code> rồi khởi động lại Javis. Plugin có sẵn (bundled) vẫn chạy bình thường.</div>` : "";
+      const gateBanner = (!d.user_gate) ? `<div style="margin-bottom:14px;padding:11px 13px;border:1px solid rgba(224,160,74,.5);border-radius:10px;background:rgba(224,160,74,.08);color:var(--warn-ink);font-size:13px;line-height:1.55"><b>${WARN_ICON} Plugin do bạn cài đang bị chặn.</b> Plugin toàn cục/brain chạy code Python thật trong server nên mặc định TẮT. Để bật: đặt biến môi trường <code>JAVIS_ENABLE_USER_PLUGINS=true</code> rồi khởi động lại Javis. Plugin có sẵn (bundled) vẫn chạy bình thường.</div>` : "";
       const dirHint = `<p style="color:var(--text3);font-size:12.5px;margin:0 0 14px">Thả plugin TOÀN CỤC (dùng cho MỌI brain) vào <code>${esc(d.global_dir || "")}</code> · mỗi plugin gồm <code>plugin.yaml</code> + <code>plugin.py</code>. Hoặc bảo Javis trong khung chat: "tạo plugin ...".</p>`;
       const plugins = (d.plugins || []).slice();
       const order = { bundled: 0, user: 1, vault: 2 };
@@ -1086,8 +1154,8 @@
         <input type="hidden" id="lpSlug">
         <div class="si-grid">
           <div class="si-field"><label>Loại việc</label><div class="si-row" id="lpKind">
-            <button class="si-chip sel" data-kind="loop">🔁 Việc lặp</button>
-            <button class="si-chip" data-kind="reminder">⏰ Nhắc hẹn</button></div></div>
+            <button class="si-chip sel" data-kind="loop">${ic("repeat")} Việc lặp</button>
+            <button class="si-chip" data-kind="reminder">${ic("alarm-clock")} Nhắc hẹn</button></div></div>
           <div class="si-field"><label>Tên</label><input id="lpName" placeholder="VD: Đọc email mỗi 2 tiếng"></div>
           <div class="si-field"><label id="lpBodyLabel">Mô tả nhiệm vụ (mỗi vòng Javis làm đúng việc này)</label>
             <textarea id="lpBody" placeholder="VD: Mỗi vòng đọc 1 source chưa xử lý trong 06 - Sources rồi đề xuất Wiki page nên tạo. Hoặc: đọc số đơn hôm nay qua MCP POS, nếu thấp thì soạn nháp 1 caption đẩy hàng vào 05 - Projects."></textarea></div>
@@ -1096,7 +1164,7 @@
               <div class="si-field"><label>Chế độ</label><div class="si-row" id="lpModes">
                 <button class="si-chip" data-mode="suggest">Đề xuất (chỉ đọc)</button>
                 <button class="si-chip" data-mode="auto">Tự làm (an toàn)</button>
-                <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">⚠ Toàn quyền</button></div></div>
+                <button class="si-chip" data-mode="full" style="border-color:rgba(224,102,74,.5)">${WARN_ICON} Toàn quyền</button></div></div>
               <div class="si-field"><label>Chu kỳ (phút, tối thiểu 5)</label><input type="number" id="lpInterval" min="5" value="120" style="max-width:120px"></div>
             </div>
           </div>
@@ -1104,21 +1172,21 @@
             <div class="si-row" style="gap:14px;flex-wrap:wrap">
               <div class="si-field"><label>Khi nào</label><input id="lpRemWhen" placeholder="30 phút nữa · 8h30 · 0 7 * * * · 2026-07-20 09:00" style="min-width:260px"></div>
               <div class="si-field"><label>Kiểu</label><div class="si-row" id="lpRemModes">
-                <button class="si-chip sel" data-rmode="notify">⏰ Chỉ nhắc</button>
-                <button class="si-chip" data-rmode="task">🤖 Tự làm rồi báo</button></div></div>
+                <button class="si-chip sel" data-rmode="notify">${ic("alarm-clock")} Chỉ nhắc</button>
+                <button class="si-chip" data-rmode="task">${ic("bot")} Tự làm rồi báo</button></div></div>
             </div>
             <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
           </div>
           <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
-            <b>⚠ CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
+            <b>${WARN_ICON} CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
           </div>
           <div class="dim" id="lpLoopNote" style="font-size:12px;color:var(--text3);margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
-          <div class="si-actions"><button class="s-btn" id="lpSave">💾 Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:var(--warn-ink)"></span></div>
+          <div class="si-actions"><button class="s-btn" id="lpSave">${SAVE_ICON} Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:var(--warn-ink)"></span></div>
         </div>
       </div>
       <div class="lp-search-row" style="margin:6px 0 10px">
-        <input id="lpSearch" type="search" autocomplete="off" placeholder="🔍 Tìm việc theo tên..."
+        <input id="lpSearch" type="search" autocomplete="off" placeholder="Tìm việc theo tên..."
           style="width:100%;max-width:340px;padding:8px 12px;border-radius:8px;border:1px solid var(--hairline);background:var(--surface-2);color:var(--text);font-size:14px;outline:none">
         <span class="dim" id="lpSearchNote" style="display:none;font-size:12px;color:var(--text3);margin-left:8px"></span>
       </div>
@@ -1253,8 +1321,8 @@
         let r = {};
         try { r = await (await fetch("/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })).json(); }
         catch (e) { r = { error: e.message }; }
-        b.textContent = "💾 Lưu";
-        if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+        b.innerHTML = SAVE_ICON + " Lưu";
+        if (!r.ok) { msg.innerHTML = Icons.warn(r.error || "Lưu lỗi"); return; }
         el.querySelector("#lpForm").style.display = "none";
         loadAll();
         return;
@@ -1273,8 +1341,8 @@
       // hoặc mặc định an toàn (tạo mới: goal=custom, vault + MCP đọc).
       b.textContent = "Đang lưu...";
       let r = {}; try { r = await (await fetch("/loops", { method: "POST", body: fd })).json(); } catch (e) { r = { error: e.message }; }
-      b.textContent = "💾 Lưu";
-      if (!r.ok) { msg.textContent = "⚠ " + (r.error || "Lưu lỗi"); return; }
+      b.innerHTML = SAVE_ICON + " Lưu";
+      if (!r.ok) { msg.innerHTML = Icons.warn(r.error || "Lưu lỗi"); return; }
       el.querySelector("#lpForm").style.display = "none";
       loadAll(); loadLog();
     };
@@ -1316,30 +1384,30 @@
 
     function loopCard(lp) {
       const paused = !!lp.auto_paused_reason;
-      const dot = lp.running ? `<span style="color:var(--green)">⏳ đang chạy</span>`
-        : paused ? `<span style="color:var(--warn-ink)">⚠ tự tạm dừng</span>`
+      const dot = lp.running ? `<span style="color:var(--green)">${ic("loader", { cls: "ic-spin" })} đang chạy</span>`
+        : paused ? `<span style="color:var(--warn-ink)">${WARN_ICON} tự tạm dừng</span>`
         : lp.enabled ? `<span style="color:var(--green)">● bật</span>` : `<span style="color:var(--text3)">○ tắt</span>`;
       const verify = lp.last_status && lp.last_status !== "ok"
         ? ` · ${esc(lp.last_status.slice(0, 90))}` : (lp.last_status === "ok" ? " · ok" : "");
       const last = lp.last_run ? `lần cuối ${fmtT(lp.last_run)}` : "chưa chạy";
       const next = (lp.enabled && !paused && lp.next_run) ? ` · kế tiếp ~${fmtT(lp.next_run)}` : "";
-      const modeLbl = lp.mode === "full" ? `<span style="color:var(--red);font-weight:600">⚠ toàn quyền</span>`
+      const modeLbl = lp.mode === "full" ? `<span style="color:var(--red);font-weight:600">${WARN_ICON} toàn quyền</span>`
         : lp.mode === "auto" ? "tự làm (an toàn)" : "đề xuất";
       const extra = [
         `${modeLbl} · mỗi ${lp.interval_min} phút`,
         (lp.goal && lp.goal !== "custom") ? (GNAME[lp.goal] || lp.goal) : "",
         lp.quiet_hours ? `im lặng ${lp.quiet_hours}` : "",
         lp.max_runs_per_day ? `tối đa ${lp.max_runs_per_day}/ngày (đã ${lp.runs_today})` : "",
-        lp.tools_profile === "code" ? `⚙ code · ${esc(lp.workspace)}` : "",
+        lp.tools_profile === "code" ? `${ic("settings")} code · ${esc(lp.workspace)}` : "",
       ].filter(Boolean).join(" · ");
       const div = document.createElement("div");
       div.className = "wf-card" + (lp.enabled ? "" : " off");
       div.dataset.kind = "loop";
       div.dataset.search = _lpNorm(`${lp.name} ${lp.slug} ${lp.goal || ""} ${GNAME[lp.goal] || ""}`);
       div.innerHTML = `
-        <div class="wf-top"><div class="wf-name">🔁 ${esc(lp.name)} <span class="dim" style="font-size:12px">${esc(lp.slug)}</span></div><div>${dot}</div></div>
+        <div class="wf-top"><div class="wf-name">${ic("repeat")} ${esc(lp.name)} <span class="dim" style="font-size:12px">${esc(lp.slug)}</span></div><div>${dot}</div></div>
         <div class="wf-desc">${extra}</div>
-        <div class="wf-steps">${last}${verify}${next}${paused ? `<br>⚠ ${esc(lp.auto_paused_reason)}` : ""}</div>
+        <div class="wf-steps">${last}${verify}${next}${paused ? `<br>${WARN_ICON} ${esc(lp.auto_paused_reason)}` : ""}</div>
         <div class="wf-actions">
           <button class="s-btn-ghost tgl">${lp.enabled ? "Tắt" : "Bật"}</button>
           <button class="s-btn-ghost run">▶ Chạy ngay</button>
@@ -1461,7 +1529,7 @@
         group.className = "lp-group";
         const head = document.createElement("div");
         head.style.cssText = "display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:15px;color:var(--text);font-weight:600;border-bottom:1px solid var(--hairline);padding-bottom:6px";
-        head.innerHTML = `<span>🧠 ${esc(g.name)}</span>`
+        head.innerHTML = `<span>${ic("brain")} ${esc(g.name)}</span>`
           + (cur ? `<span style="font-size:11px;color:var(--green);font-weight:500">đang xem</span>` : "")
           + (g.is_default ? `<span style="font-size:11px;color:var(--text3);font-weight:400">mặc định</span>` : "");
         group.appendChild(head);
@@ -1576,9 +1644,9 @@
           <button class="si-chip ${(cfg.curator||{}).enabled ? "sel" : ""}" id="lnCurator">${(cfg.curator||{}).enabled ? "● Bật" : "○ Tắt"}</button>
           <div class="dim" style="font-size:13px;margin-top:6px;color:var(--text3)">Dọn index, LINT Wiki (chỉ đề xuất), nén MEMORY.md. Không xoá.</div></div>
         <div class="si-actions">
-          <button class="s-btn" id="lnSave">💾 Lưu cấu hình</button>
+          <button class="s-btn" id="lnSave">${SAVE_ICON} Lưu cấu hình</button>
           <button class="s-btn-ghost" id="lnRun">▶ Học ngay</button>
-          <button class="s-btn-ghost" id="lnCuratorRun">🧹 Curator ngay</button>
+          <button class="s-btn-ghost" id="lnCuratorRun">${ic("brush-cleaning")} Curator ngay</button>
           <button class="s-btn-ghost" id="lnStop">■ Dừng</button>
           <button class="s-btn-ghost" id="lnUndo" style="color:var(--warn-ink)">↶ Hoàn tác lần học gần nhất</button>
         </div>
@@ -1602,12 +1670,12 @@
             <div class="si-field"><label>Tự động</label><button class="si-chip" id="bkAuto">○ Tắt</button></div>
           </div>
           <div class="si-actions">
-            <button class="s-btn-ghost" id="bkTest">🔌 Kiểm tra kết nối</button>
+            <button class="s-btn-ghost" id="bkTest">${ic("plug")} Kiểm tra kết nối</button>
             <button class="s-btn" id="bkNow">⇅ Đồng bộ ngay</button>
-            <button class="s-btn-ghost" id="bkSave">💾 Lưu cấu hình</button>
+            <button class="s-btn-ghost" id="bkSave">${SAVE_ICON} Lưu cấu hình</button>
           </div>
           <div class="dim" id="bkStatus" style="font-size:13px;color:var(--text3)"></div>
-          <div class="dim" id="bkWarn" style="font-size:12px;color:var(--warn-ink);margin-top:2px">⚠ Brain có thể chứa số liệu/thông tin cá nhân - CHỈ dùng repo Private. Token lưu nội bộ (không đẩy lên repo).</div>
+          <div class="dim" id="bkWarn" style="font-size:12px;color:var(--warn-ink);margin-top:2px">${WARN_ICON} Brain có thể chứa số liệu/thông tin cá nhân - CHỈ dùng repo Private. Token lưu nội bộ (không đẩy lên repo).</div>
         </div>
       </div>
 
@@ -1656,7 +1724,7 @@
       f.append("brain", fbrain());
       return (await fetch("/learn/config", { method: "POST", body: f })).json();
     }
-    el.querySelector("#lnSave").onclick = async () => { const b = el.querySelector("#lnSave"); b.textContent = "Đang lưu..."; await save(); b.textContent = "✓ Đã lưu"; setTimeout(() => b.textContent = "💾 Lưu cấu hình", 1500); };
+    el.querySelector("#lnSave").onclick = async () => { const b = el.querySelector("#lnSave"); b.textContent = "Đang lưu..."; await save(); b.innerHTML = CHECK_ICON + " Đã lưu"; setTimeout(() => b.innerHTML = SAVE_ICON + " Lưu cấu hình", 1500); };
     const brainForm = () => { const f = new FormData(); f.append("brain", fbrain()); return f; };
     el.querySelector("#lnRun").onclick = async () => {
       const b = el.querySelector("#lnRun"); b.disabled = true; b.textContent = "Đang học...";
@@ -1666,7 +1734,7 @@
     el.querySelector("#lnCuratorRun").onclick = async () => {
       const b = el.querySelector("#lnCuratorRun"); b.disabled = true; b.textContent = "Đang dọn...";
       await fetch("/learn/curator-now", { method: "POST", body: brainForm() });
-      setTimeout(() => { b.disabled = false; b.textContent = "🧹 Curator ngay"; loadAll(); }, 2500);
+      setTimeout(() => { b.disabled = false; b.innerHTML = ic("brush-cleaning") + " Curator ngay"; loadAll(); }, 2500);
     };
     el.querySelector("#lnStop").onclick = async () => { await fetch("/learn/stop", { method: "POST" }); };
     el.querySelector("#lnUndo").onclick = async () => {
@@ -1712,12 +1780,12 @@
       f.append("enabled", bkAutoOn ? "1" : "0");
       return (await fetch("/backup/config", { method: "POST", body: f })).json();
     }
-    el.querySelector("#bkSave").onclick = async () => { const b = el.querySelector("#bkSave"); b.textContent = "Đang lưu..."; await bkSaveCfg(); b.textContent = "✓ Đã lưu"; setTimeout(() => b.textContent = "💾 Lưu cấu hình", 1500); loadBackup(); };
+    el.querySelector("#bkSave").onclick = async () => { const b = el.querySelector("#bkSave"); b.textContent = "Đang lưu..."; await bkSaveCfg(); b.innerHTML = CHECK_ICON + " Đã lưu"; setTimeout(() => b.innerHTML = SAVE_ICON + " Lưu cấu hình", 1500); loadBackup(); };
     el.querySelector("#bkTest").onclick = async () => {
       const b = el.querySelector("#bkTest"); b.disabled = true; b.textContent = "Đang kiểm tra..."; await bkSaveCfg();
       let r = {}; try { r = await (await fetch("/backup/test", { method: "POST" })).json(); } catch (e) { r = { error: e.message }; }
-      b.disabled = false; b.textContent = "🔌 Kiểm tra kết nối";
-      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:var(--green)">✓ Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:var(--red)">✗ ${esc(r.error || "không kết nối được")}</span>`;
+      b.disabled = false; b.innerHTML = ic("plug") + " Kiểm tra kết nối";
+      el.querySelector("#bkStatus").innerHTML = r.ok ? `<span style="color:var(--green)">${CHECK_ICON} Kết nối OK - token + repo hợp lệ.</span>` : `<span style="color:var(--red)">${ic("circle-x")} ${esc(r.error || "không kết nối được")}</span>`;
     };
     el.querySelector("#bkNow").onclick = async () => {
       const b = el.querySelector("#bkNow"); b.disabled = true; b.textContent = "Đang đồng bộ 2 chiều..."; await bkSaveCfg();
@@ -1730,10 +1798,10 @@
         if (r.pushed) bits.push("đã đẩy lên GitHub");
         if (r.restored) bits.push("khôi phục từ backup");
         const cf = (r.conflicts || []).length
-          ? ` · <span style="color:var(--warn-ink)">⚠ ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
-        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--green)">✓ Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
+          ? ` · <span style="color:var(--warn-ink)">${WARN_ICON} ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--green)">${CHECK_ICON} Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
       } else {
-        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--red)">✗ ${esc(r.error || "lỗi")}</span>`;
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--red)">${ic("circle-x")} ${esc(r.error || "lỗi")}</span>`;
       }
     };
     async function loadBackup() {
@@ -1744,7 +1812,7 @@
       if (s.token_set && !el.querySelector("#bkToken").value) el.querySelector("#bkToken").placeholder = "•••• (đã lưu, để trống nếu giữ nguyên)";
       bkAutoOn = !!s.enabled; bkAutoBtn.classList.toggle("sel", bkAutoOn); bkAutoBtn.textContent = bkAutoOn ? "● Bật" : "○ Tắt";
       const when = s.last_backup ? new Date(s.last_backup * 1000).toLocaleString() : "chưa đồng bộ";
-      const gitNote = s.has_git ? "" : " · ⚠ máy chưa cài git (cần git để đồng bộ)";
+      const gitNote = s.has_git ? "" : " · " + WARN_ICON + " máy chưa cài git (cần git để đồng bộ)";
       const brainsNote = s.brains_count != null ? ` · ${s.brains_count} brain trong thư mục brains` : "";
       el.querySelector("#bkStatus").innerHTML = `Lần cuối: ${esc(when)}${s.last_status ? " · " + esc(s.last_status) : ""}${brainsNote}${gitNote}`;
     }
@@ -1756,7 +1824,13 @@
   // ============================================
   // Trang Việc - operations console cho hàng đợi AI tự vận hành
   // ============================================
-  const _PRIO = { 1: "🔺", 2: "🔼", 3: "🔽" };
+  // Ưu tiên việc: tên icon + lớp màu. Cao thì mũi đôi màu đỏ để nhảy ra khỏi
+  // danh sách, thấp thì mờ đi cho khỏi tranh chú ý.
+  const _PRIO = { 1: ["chevrons-up", "ic-err"], 2: ["chevron-up", "ic-warn"], 3: ["chevron-down", "ic-dim"] };
+  function _prioIcon(p) {
+    const spec = _PRIO[p];
+    return spec ? ic(spec[0], { cls: spec[1] }) : "";
+  }
   const _KSTATUS = {
     triage: "AI đang đặc tả", todo: "Chờ phụ thuộc", ready: "Trong hàng đợi",
     running: "Đang chạy", review: "Cần duyệt ngoại lệ", blocked: "Cần xử lý",
@@ -1796,7 +1870,7 @@
         <div class="si-field"><label>Ngữ cảnh và đầu ra mong muốn</label><textarea id="knIntent" placeholder="Có thể viết tự nhiên. AI specifier sẽ chuẩn hoá, chọn worker và điều kiện hoàn thành."></textarea></div>
         <div class="si-row" style="gap:14px;flex-wrap:wrap">
           <div class="si-field" style="flex:1;min-width:220px"><label>Route</label><select id="knRoute" class="loop-sel">${routeOpts}</select></div>
-          <div class="si-field"><label>Ưu tiên</label><select id="knPrio" class="loop-sel"><option value="1">🔺 Cao</option><option value="2" selected>🔼 Vừa</option><option value="3">🔽 Thấp</option></select></div>
+          <div class="si-field"><label>Ưu tiên</label><select id="knPrio" class="loop-sel"><option value="1">Cao</option><option value="2" selected>Vừa</option><option value="3">Thấp</option></select></div>
           <div class="si-field"><label>Ngoại lệ</label><label class="auto-learn" style="margin-top:8px"><input type="checkbox" id="knApprove"><span>Yêu cầu duyệt kết quả</span></label></div>
         </div>
         <div class="si-actions"><button class="s-btn" id="knSave">Giao cho AI</button><button class="s-btn-ghost" id="knCancel">Huỷ</button></div>
@@ -1886,7 +1960,7 @@
 
     function taskActions(t) {
       const acts = [];
-      if (t.status === "review") acts.push(`<button data-act="done" data-id="${esc(t.id)}">✓ Duyệt ngoại lệ</button>`);
+      if (t.status === "review") acts.push(`<button data-act="done" data-id="${esc(t.id)}">${CHECK_ICON} Duyệt ngoại lệ</button>`);
       if (t.status === "blocked" || t.status === "review") acts.push(`<button data-act="retry" data-id="${esc(t.id)}">↻ Thử lại</button>`);
       if (t.status === "running") acts.push(`<button data-act="cancel" data-id="${esc(t.id)}">Dừng task</button>`);
       if (t.status !== "running") acts.push(`<button class="danger" data-act="archive" data-id="${esc(t.id)}">Xóa khỏi bảng</button>`);
@@ -1898,7 +1972,7 @@
       const reason = t.block_reason ? `<div class="kn-task-result" style="color:var(--red)">${esc(t.block_reason)}</div>` : "";
       const result = !reason && t.result ? `<div class="kn-task-result">${esc(t.result.slice(0, 240))}</div>` : "";
       return `<div class="kn-task" data-task="${esc(t.id)}">
-        <div class="kn-task-top"><div class="kn-task-title">${_PRIO[t.priority] || ""} ${esc(t.title)}</div><span class="kn-pill">${esc(_KSTATUS[t.status] || t.status)}</span></div>
+        <div class="kn-task-top"><div class="kn-task-title">${_prioIcon(t.priority)} ${esc(t.title)}</div><span class="kn-pill">${esc(_KSTATUS[t.status] || t.status)}</span></div>
         <div class="kn-task-meta"><span>${esc(t.capability || "auto")}</span><span>attempt ${Number(t.attempts || 0)}/${Number(t.max_attempts || 3)}</span><span>${ago(t.updated_at)}</span></div>
         ${reason}${result}
         ${acts.length ? `<div class="kn-actions">${acts.join("")}</div>` : ""}
@@ -2008,7 +2082,7 @@
 
   // ---- Trang Tổng quan ----
   async function renderOverview(el) {
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">◎</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     const s = await freshSettings();
     const m = s.model || {};
     const eng = m.engine === "openrouter" ? "OpenRouter (chat thuần)" : "Claude CLI (đầy đủ MCP)";
@@ -2016,7 +2090,6 @@
     const tg = s.telegram || {};
     const dash = s.dashboard || {};
     const gOn = dash.graph_enabled !== false;
-    const gMode = (((typeof localStorage !== "undefined" && localStorage.getItem("javis.graphMode")) || dash.graph_mode || "2d") === "3d") ? "3d" : "2d";
     el.innerHTML = `
       <div class="cview-section">
         <h3>Phiên bản</h3>
@@ -2026,7 +2099,7 @@
           <div id="ovVerChangelog" style="display:none;margin:8px 0;padding:8px 10px;border-left:3px solid var(--accent,var(--accent));background:rgba(120,140,160,.08);border-radius:6px;font-size:13px;line-height:1.6"></div>
           <div class="js-actions">
             <button class="gcard-btn ghost" id="ovVerCheck">Kiểm tra lại</button>
-            <button class="gcard-btn" id="ovVerUpdate" style="display:none">⬆ Cập nhật ngay</button>
+            <button class="gcard-btn" id="ovVerUpdate" style="display:none">${ic("upload-cloud")} Cập nhật ngay</button>
           </div>
           <div id="ovVerProgress" style="display:none;margin-top:10px"></div>
           <div class="gcard-meta" id="ovVerStatus"></div>
@@ -2046,12 +2119,10 @@
         <h3>Hiệu năng</h3>
         <div class="cgrid">
           <div class="gcard">
-            <div class="gcard-top"><span class="gcard-name">Đồ thị não</span><span class="gcard-tag">${gOn ? (gMode === "3d" ? "3D" : "2D") : "tắt"}</span></div>
-            <div class="gcard-meta">2D là canvas thuần, nhẹ và đỡ lag; 3D đẹp hơn nhưng nặng máy (render trên máy anh, không phải VPS). Tắt hẳn để nhẹ nhất. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
+            <div class="gcard-top"><span class="gcard-name">Đồ thị não</span><span class="gcard-tag">${gOn ? "bật" : "tắt"}</span></div>
+            <div class="gcard-meta">Đồ thị canvas nhẹ, chạy ngay trên thiết bị. Có thể tắt hẳn để giảm tải thêm. ${isNarrow() ? "Màn hình hẹp đang tự ép lite-mode." : ""}</div>
             <div class="js-actions">
-              <button class="gcard-btn ${gOn && gMode === "2d" ? "" : "ghost"}" id="ovGraph2d">2D</button>
-              <button class="gcard-btn ${gOn && gMode === "3d" ? "" : "ghost"}" id="ovGraph3d">3D</button>
-              <button class="gcard-btn ghost" id="ovGraphToggle">${gOn ? "Tắt hẳn" : "Bật lại"}</button>
+              <button class="gcard-btn ${gOn ? "ghost" : ""}" id="ovGraphToggle">${gOn ? "Tắt đồ thị" : "Bật đồ thị"}</button>
             </div>
           </div>
         </div>
@@ -2101,7 +2172,7 @@
       box.style.display = "";
       const at = updStepIndex(phase);
       const dots = UPD_STEPS.map((s, i) => {
-        const mark = i < at ? "✅" : (i === at ? "⏳" : "○");
+        const mark = i < at ? OK_ICON : (i === at ? ic("loader", { cls: "ic-spin" }) : ic("circle", { cls: "ic-dim" }));
         const w = i === at ? "font-weight:600" : "opacity:.7";
         return `<span style="${w}">${mark} ${esc(s.label)}</span>`;
       }).join('<span style="opacity:.4"> → </span>');
@@ -2118,7 +2189,7 @@
       meta.textContent = "Đang kiểm tra bản mới…";
       let j = {};
       try { j = await (await fetch("/version", { cache: "no-store" })).json(); }
-      catch (e) { meta.textContent = "⚠ Không kiểm tra được (mạng)."; return; }
+      catch (e) { meta.innerHTML = WARN_ICON + " Không kiểm tra được (mạng)."; return; }
       tag.textContent = "v" + (j.current || "?");
       window._ovVerCur = j.current || "";
       window._ovVerPrev = j.previous_version || "";
@@ -2137,7 +2208,7 @@
           ovLoadChangelogSnippet(j.current);
         }
       } else if (j.latest) {
-        meta.innerHTML = "✅ Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
+        meta.innerHTML = OK_ICON + " Đang dùng bản mới nhất (v" + esc(j.current) + ") · " + esc(ml);
         upd.style.display = "none";
       } else {
         meta.innerHTML = "v" + esc(j.current) + " · " + esc(ml) + (j.error ? " · chưa so được với GitHub" : "");
@@ -2178,10 +2249,10 @@
         verUpd.disabled = false;
         renderProgress("preparing", "");
         document.getElementById("ovVerProgress").style.display = "none";
-        st.innerHTML = "⚠ " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
+        st.innerHTML = WARN_ICON + " " + esc(resp.error || "Không cập nhật được.") + (resp.manual ? " Chạy: <code>" + esc(resp.manual) + "</code>" : "");
         return;
       }
-      st.textContent = "⏳ Đang cập nhật… đừng tắt trang.";
+      st.innerHTML = ic("loader", { cls: "ic-spin" }) + " Đang cập nhật… đừng tắt trang.";
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
@@ -2190,14 +2261,14 @@
         try { s = await (await fetch("/update/status", { cache: "no-store" })).json(); } catch (e) { s = null; }
         if (s && s.state && s.state.phase) {
           const ph = s.state.phase, res = s.state.result;
-          const stashNote = s.state.stashed ? "📦 Sửa đổi cục bộ đã được cất vào git stash (dùng 'git stash list' để xem lại)." : "";
+          const stashNote = s.state.stashed ? ic("package") + " Sửa đổi cục bộ đã được cất vào git stash (dùng 'git stash list' để xem lại)." : "";
           renderProgress(ph, stashNote);
-          if (res === "success") { clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
+          if (res === "success") { clearInterval(poll); st.innerHTML = OK_ICON + " Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return; }
           if (res === "rolled_back") { clearInterval(poll); renderProgress("done", stashNote); st.innerHTML = "↩ Bản mới lỗi, đã <b>tự quay về bản cũ</b>. Xem <code>update.log</code>."; verUpd.disabled = false; return; }
           if (res === "pull_failed" || res === "rollback_failed" || res === "error") {
             clearInterval(poll);
             const pb = document.getElementById("ovVerProgress"); if (pb) pb.style.display = "none";
-            st.innerHTML = "⚠ " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
+            st.innerHTML = WARN_ICON + " " + esc(s.state.error || "Cập nhật lỗi.") + " Xem <code>update.log</code>.";
             verUpd.disabled = false; return;
           }
         }
@@ -2206,13 +2277,13 @@
           const v = await (await fetch("/version", { cache: "no-store" })).json();
           const flipOk = (window._ovVerMode === "docker") || !(s && s.state && s.state.phase);
           if (flipOk && v && v.update_available === false && v.current && v.current !== oldCur) {
-            clearInterval(poll); st.textContent = "✅ Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
+            clearInterval(poll); st.innerHTML = OK_ICON + " Đã cập nhật xong. Đang tải lại trang…"; setTimeout(() => location.reload(), 1500); return;
           }
           // docker bản mới có thể lỗi: server vẫn còn bản cũ sau khá lâu → hiện cách lùi
           if ((window._ovVerMode === "docker") && tries >= 12 && v && v.current === oldCur) {
             clearInterval(poll);
             const prev = window._ovVerPrev || (v.previous_version || "");
-            st.innerHTML = "⚠ Bản mới chưa lên sau một lúc - có thể lỗi.";
+            st.innerHTML = WARN_ICON + " Bản mới chưa lên sau một lúc - có thể lỗi.";
             if (rb) {
               rb.style.display = "";
               rb.innerHTML = "<b>Cách lùi về bản cũ (Docker):</b><br>Pin tag phiên bản cũ rồi kéo lại:"
@@ -2242,7 +2313,7 @@
       meta.innerHTML = on
         ? "Javis tự chạy nền mỗi khi anh đăng nhập Windows - không cần bật tay. Chạy ẩn, mở <code>localhost:7777</code> để dùng."
         : "Bật để Javis tự khởi động mỗi khi mở máy. Chạy ẩn ở nền, không hiện cửa sổ.";
-      if (j.stale) meta.innerHTML += '<br><span class="dim">⚠ Đường dẫn cài đặt đã đổi - bấm bật lại để cập nhật.</span>';
+      if (j.stale) meta.innerHTML += '<br><span class="dim">' + WARN_ICON + ' Đường dẫn cài đặt đã đổi - bấm bật lại để cập nhật.</span>';
       const btn = document.getElementById("ovAutoToggle");
       btn.style.display = "";
       btn.disabled = false;
@@ -2256,7 +2327,7 @@
         try { r = await (await fetch("/autostart", { method: "POST", body: fd })).json(); }
         catch (e) { r = { ok: false, error: e.message }; }
         if (r.ok) { st.textContent = ""; ovLoadAutostart(); }
-        else { st.textContent = "⚠ " + esc(r.error || "Lỗi"); btn.disabled = false; }
+        else { st.innerHTML = Icons.warn(r.error || "Lỗi"); btn.disabled = false; }
       };
     }
     ovLoadAutostart();
@@ -2270,19 +2341,6 @@
       recomputeGraph();
       renderOverview(el);
     };
-    // Đổi 2D/3D: lưu localStorage (bền ngay, không cần restart server) + lưu server (bền lâu) + dựng lại đồ thị.
-    const setGraphMode = async (mode) => {
-      try { localStorage.setItem("javis.graphMode", mode); } catch (e) {}
-      graphEnabled = true;
-      try { await saveSetting("dashboard", { graph_mode: mode, graph_enabled: true }); } catch (e) {}
-      if (window.reinitGraph) { try { await window.reinitGraph(mode); } catch (e) {} }
-      recomputeGraph();
-      renderOverview(el);
-    };
-    const b2d = document.getElementById("ovGraph2d");
-    if (b2d) b2d.onclick = () => setGraphMode("2d");
-    const b3d = document.getElementById("ovGraph3d");
-    if (b3d) b3d.onclick = () => setGraphMode("3d");
     const mig = document.getElementById("ovMigrate");
     if (mig) mig.onclick = async () => {
       const brain = (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -2292,15 +2350,15 @@
       let r = {};
       try { r = await (await fetch("/brain/migrate", { method: "POST", body: fd })).json(); } catch (e) { r = { ok: false, error: e.message }; }
       const res = document.getElementById("ovMigrateResult");
-      if (r.ok) res.innerHTML = `✅ ${(r.moved || []).length ? "Đã di chuyển: " + r.moved.join(", ") : "Không có gì cần di chuyển (đã chuẩn)."}` + ((r.skipped || []).length ? `<br><span class="dim">Bỏ qua: ${r.skipped.join("; ")}</span>` : "");
-      else res.textContent = "⚠ Lỗi: " + (r.error || "không rõ");
+      if (r.ok) res.innerHTML = `${OK_ICON} ${(r.moved || []).length ? "Đã di chuyển: " + r.moved.join(", ") : "Không có gì cần di chuyển (đã chuẩn)."}` + ((r.skipped || []).length ? `<br><span class="dim">Bỏ qua: ${r.skipped.join("; ")}</span>` : "");
+      else res.innerHTML = WARN_ICON + " Lỗi: " + esc(r.error || "không rõ");
       mig.disabled = false; mig.textContent = "Chuẩn hóa brain đang chọn";
     };
   }
 
   // ---- Trang Models: (A) Main Model + (B) Providers ----
   async function renderModels(el) {
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">◈</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     const s = await freshSettings();
     const m = s.model || {};
     const providers = m.providers || [];
@@ -2388,7 +2446,7 @@
           <div class="aux-now">
             <div class="aux-now-txt">
               <div class="aux-now-model">${aux ? esc(aux) : "Mặc định của Claude Code"}</div>
-              <div class="aux-now-prov">${aux ? esc(auxProvDef.label || auxProv) : "không đổi model, dùng model mặc định"}${auxReady ? "" : ' <span class="aux-warn">⚠ nhà cung cấp này chưa kết nối - việc nền sẽ tự dùng lại Claude</span>'}</div>
+              <div class="aux-now-prov">${aux ? esc(auxProvDef.label || auxProv) : "không đổi model, dùng model mặc định"}${auxReady ? "" : ' <span class="aux-warn">${WARN_ICON} nhà cung cấp này chưa kết nối - việc nền sẽ tự dùng lại Claude</span>'}</div>
             </div>
             <div class="aux-now-act">
               ${aux ? '<button class="gcard-btn" id="auxReset">Về mặc định</button>' : ""}
@@ -2493,7 +2551,7 @@
     let r;
     try { r = await (await fetch("/claude/login-start", { method: "POST" })).json(); }
     catch (e) { if (msg) msg.textContent = "Lỗi mạng."; return; }
-    if (!r.ok) { if (msg) msg.textContent = "⚠ " + (r.error || "Không bắt đầu được đăng nhập."); return; }
+    if (!r.ok) { if (msg) msg.innerHTML = Icons.warn(r.error || "Không bắt đầu được đăng nhập."); return; }
     if (act) act.innerHTML = `
       <div class="prov-note" style="line-height:1.7">
         <b>1)</b> Mở link này để đăng nhập claude.ai:<br>
@@ -2525,7 +2583,7 @@
       try { rr = await (await fetch("/claude/login-code", { method: "POST", body: fd })).json(); }
       catch (e) { if (m2) m2.textContent = "Lỗi mạng."; return; }
       if (rr.ok) { stopped = true; refreshClaudeCard(el); }
-      else if (m2) m2.textContent = "⚠ " + (rr.error || "Code sai, thử lại.");
+      else if (m2) m2.innerHTML = Icons.warn(rr.error || "Code sai, thử lại.");
     };
   }
 
@@ -2546,7 +2604,7 @@
       let p;
       try { p = await (await fetch("/oauth/openai/poll", { method: "POST" })).json(); }
       catch (e) { setTimeout(poll, iv); return; }
-      if (p.status === "connected") { if (msg) msg.textContent = "✓ Đã kết nối!"; renderModels(el); return; }
+      if (p.status === "connected") { if (msg) msg.innerHTML = CHECK_ICON + " Đã kết nối!"; renderModels(el); return; }
       if (p.status === "error") { if (msg) msg.textContent = "Lỗi: " + (p.error || ""); return; }
       setTimeout(poll, iv);
     };
@@ -2584,8 +2642,8 @@
           body: JSON.stringify({ callback: cb }),
         })).json();
       } catch (e) { if (m2) m2.textContent = "Lỗi mạng."; btn.disabled = false; return; }
-      if (p.status === "connected") { if (msg) msg.textContent = "✓ Đã kết nối!"; renderModels(el); return; }
-      if (m2) m2.textContent = "⚠ " + (p.error || "Chưa được, thử lại.");
+      if (p.status === "connected") { if (msg) msg.innerHTML = CHECK_ICON + " Đã kết nối!"; renderModels(el); return; }
+      if (m2) m2.innerHTML = Icons.warn(p.error || "Chưa được, thử lại.");
       btn.disabled = false;
     };
   }
@@ -2636,14 +2694,14 @@
         <div class="mp-box">
           <div class="mp-head">
             <div><div class="mp-title">${esc(opts.title || "SET MAIN MODEL")}</div><div class="mp-sub">hiện tại: ${esc(main.model || "mặc định")} · ${esc(main.provider || "")}</div></div>
-            <button class="mp-x" data-act="close">✕</button>
+            <button class="mp-x" data-act="close">${X_ICON}</button>
           </div>
           <input class="mp-filter" placeholder="Lọc provider / model…" value="${esc(filterQ)}">
           <div class="mp-body">
             <div class="mp-provs">${providers.map(p => `
               <button class="mp-prov ${p.id === selProv ? "active" : ""}" data-prov="${p.id}">
                 <div class="mp-prov-l">${esc(p.label)}</div>
-                <div class="mp-prov-c">${esc(p.id)}${p.id === main.provider ? " · ĐANG DÙNG" : ""}${esc(tagFor(p.id))}${p.configured ? "" : " · ⚠ cần kết nối"}</div>
+                <div class="mp-prov-c">${esc(p.id)}${p.id === main.provider ? " · ĐANG DÙNG" : ""}${esc(tagFor(p.id))}${p.configured ? "" : " · " + WARN_ICON + " cần kết nối"}</div>
               </button>`).join("")}</div>
             <div class="mp-models">${models.length ? models.map(mod => `
               <button class="mp-model ${mod === selModel ? "sel" : ""}" data-mod="${esc(mod)}">${esc(mod)}${(selProv === main.provider && mod === main.model) ? ' <span class="mp-cur">ĐANG DÙNG</span>' : ""}</button>`).join("")
@@ -2732,21 +2790,29 @@
     return m;
   }
   function mHead(title) {
-    return '<div class="mp-head"><div class="mp-title">' + title + '</div><button class="mp-x" data-act="close">✕</button></div>';
+    return '<div class="mp-head"><div class="mp-title">' + title + '</div><button class="mp-x" data-act="close">' + X_ICON + '</button></div>';
   }
   function permChip(p) {
     const m = PERM_META[p] || PERM_META.full;
     return '<span class="perm-chip" style="color:' + m.color + ';border-color:' + m.color + '55">' + m.label + '</span>';
   }
   function iconInner(con) {
-    // icon là URL/đường dẫn ảnh (logo hãng) → render <img>; còn lại là emoji → in thẳng.
-    const ic = (con && con.icon) || "🔌";
-    return /^(https?:|\/)/.test(ic) ? '<img class="ico-img" src="' + esc(ic) + '" alt="" loading="lazy">' : ic;
+    // Trường icon của connector có 3 dạng, xử lý theo thứ tự:
+    //   URL/đường dẫn ảnh (logo hãng) → <img>
+    //   tên icon Lucide               → dựng SVG
+    //   thứ khác                      → in thẳng
+    // Nhánh cuối để giữ catalog TỰ THÊM của người dùng vẫn hiện được: nếu họ
+    // để emoji thì cứ hiện emoji, đừng biến thành dấu hỏi.
+    const src = (con && con.icon) || "plug";
+    if (/^(https?:|\/)/.test(src)) {
+      return '<img class="ico-img" src="' + esc(src) + '" alt="" loading="lazy">';
+    }
+    return Icons.has(src) ? ic(src) : esc(src);
   }
   function connChip(c) {
     return '<button class="conn-chip' + (c.enabled ? "" : " off") + '" data-conn="' + c.id + '">'
       + '<span class="cdot' + (c.enabled ? " on" : "") + '">●</span> ' + esc(c.label || c.name || "?")
-      + (c.is_default ? ' <span class="cstar">★</span>' : "") + " " + permChip(c.perm) + '</button>';
+      + (c.is_default ? ' <span class="cstar">' + ic("star", { cls: "ic-fill" }) + '</span>' : "") + " " + permChip(c.perm) + '</button>';
   }
 
   // ── Sức khoẻ kết nối (khối A): tô chấm màu chip theo /connect/health + nút Kết nối lại ──
@@ -2768,7 +2834,7 @@
         chip.title = "Hoạt động bình thường (" + (rec.tools || 0) + " công cụ)" + when;
       } else {
         dot.classList.add("herr");
-        chip.title = "⚠ " + (rec.message || "Lỗi") + when;
+        chip.title = (rec.message || "Lỗi") + when;
       }
     });
     // Connection chết vì HẾT PHIÊN ĐĂNG NHẬP → nút sửa ngay trên card, khỏi mò vào menu
@@ -2780,7 +2846,7 @@
       if (!chip) return;
       const fix = document.createElement("button");
       fix.className = "conn-chip conn-fix";
-      fix.innerHTML = "🔁 Kết nối lại " + esc(c.label || "");
+      fix.innerHTML = ic("repeat") + " Kết nối lại " + esc(c.label || "");
       fix.onclick = () => reconnectAccount(el, c, byId[c.connector_id]);
       chip.after(fix);
     });
@@ -2819,7 +2885,7 @@
       const r = await postJson("/connect/health/check", { id: c.id });
       if (r && r.ok) { closeConnModal(); renderConnect(el); return; }
       go.disabled = false; go.textContent = "Lưu và kiểm tra";
-      m.querySelector("#rkErr").textContent = "⚠ " + ((r && r.message) || "Vẫn chưa kết nối được.");
+      m.querySelector("#rkErr").innerHTML = Icons.warn((r && r.message) || "Vẫn chưa kết nối được.");
     };
   }
   function connectorCard(con, conns) {
@@ -2846,7 +2912,7 @@
     const byGroup = {};
     cat.forEach(c => { if (c.group) (byGroup[c.group] = byGroup[c.group] || []).push(c); });
     return Object.keys(byGroup).map(g => {
-      const meta = GROUP_META[g] || { name: g, icon: "🔌", category: "Khác", desc: "" };
+      const meta = GROUP_META[g] || { name: g, icon: ic("plug"), category: "Khác", desc: "" };
       const ids = byGroup[g].map(c => c.id);
       const nConn = (conns || []).filter(x => ids.includes(x.connector_id)).length;
       return '<div class="cat-card" data-cat="' + esc(meta.category) + '">'
@@ -2921,7 +2987,7 @@
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form">'
       // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
-      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
+      + (con.risk ? '<div class="conn-risk">' + WARN_ICON + ' ' + esc(con.risk) + '</div>' : "")
       // Có steps thì wizard từng bước THAY guide tường chữ (guide giữ làm fallback catalog cũ)
       + (hasSteps ? stepsHtml(con)
         : (con.guide ? '<div class="conn-guide">' + esc(con.guide) + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>' : ""))
@@ -2943,7 +3009,7 @@
       const r = await postJson("/connect/add", { connector_id: con.id, fields: fieldsVal,
         label: m.querySelector("#cLabel").value.trim(), reuse_from: m._reuseFrom || "" });
       if (!r.ok) { err.textContent = r.error || "Lỗi"; go.disabled = false; go.textContent = "Kết nối"; return; }
-      m.querySelector(".conn-form").innerHTML = '<div class="conn-ok">✓ Đã kết nối: <b>' + esc(r.label || con.name) + '</b> (' + (r.tools || 0) + ' công cụ)'
+      m.querySelector(".conn-form").innerHTML = '<div class="conn-ok">' + CHECK_ICON + ' Đã kết nối: <b>' + esc(r.label || con.name) + '</b> (' + (r.tools || 0) + ' công cụ)'
         + (isFirst ? '<div class="conn-hint">Sang trang Javis hỏi thử: "Hôm nay bán được bao nhiêu?"</div>' : "") + '</div>';
       go.style.display = "none";
       setTimeout(() => { closeConnModal(); renderConnect(el); }, 1600);
@@ -2951,7 +3017,7 @@
   }
 
   function openQrFlow(el, con, isFirst) {
-    const risk = con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "";
+    const risk = con.risk ? '<div class="conn-risk">' + WARN_ICON + ' ' + esc(con.risk) + '</div>' : "";
     const guide = con.guide
       ? '<div class="conn-guide">' + esc(con.guide)
         + (con.guide_url ? ' <a href="' + esc(safeHref(con.guide_url))
@@ -2979,7 +3045,7 @@
           zone.innerHTML = '<img class="qr-img" src="' + st.qr + '"><div class="mp-note">Mở Zalo trên điện thoại > biểu tượng QR góc trên > quét mã này</div>';
         } else if (st.state === "done") {
           clearInterval(_connPoll); _connPoll = null;
-          zone.innerHTML = '<div class="conn-ok">✓ Đã đăng nhập: <b>' + esc(st.label || "Zalo") + '</b>'
+          zone.innerHTML = '<div class="conn-ok">' + CHECK_ICON + ' Đã đăng nhập: <b>' + esc(st.label || "Zalo") + '</b>'
             + (isFirst ? '<div class="conn-hint">Sang trang Javis nhắn thử: "Đọc tin nhắn Zalo mới nhất"</div>' : "") + '</div>';
           setTimeout(() => { closeConnModal(); renderConnect(el); }, 1800);
         } else if (st.state === "error") {
@@ -3042,7 +3108,7 @@
       if (!inp) return;
       try { await navigator.clipboard.writeText(inp.value); }
       catch (e) { inp.select(); try { document.execCommand("copy"); } catch (_) {} }
-      btn.textContent = "Đã chép ✓";
+      btn.innerHTML = "Đã chép " + CHECK_ICON;
       setTimeout(() => { btn.textContent = "Sao chép"; }, 1400);
     });
   }
@@ -3054,7 +3120,7 @@
     // CHỈ nhóm Google: Facebook/Meta cũng đặt tên field client_id/client_secret (nhãn App ID)
     // nhưng không hề có file JSON để tải - từng mọc nhầm ô "tải từ Google" sang form Facebook.
     if (!hasClientFields(con) || con.group !== "google") return "";
-    return '<div class="json-drop" id="jsonDrop"><span id="jdMsg">📄 Kéo thả file JSON client tải từ Google vào đây (hoặc bấm chọn file) - tự điền Client ID + Secret</span>'
+    return '<div class="json-drop" id="jsonDrop"><span id="jdMsg">' + ic("file-code") + ' Kéo thả file JSON client tải từ Google vào đây (hoặc bấm chọn file) - tự điền Client ID + Secret</span>'
       + '<input type="file" accept=".json,application/json" style="display:none"></div>';
   }
   function wireJsonDrop(m) {
@@ -3067,14 +3133,14 @@
       try { const d = JSON.parse(txt); c = d.web || d.installed || d; } catch (e) {}
       if (!c || !c.client_id) {
         z.classList.remove("ok"); z.classList.add("bad");
-        msg.textContent = "⚠ File này không phải JSON client của Google - tải đúng file từ trang Credentials.";
+        msg.innerHTML = WARN_ICON + " File này không phải JSON client của Google - tải đúng file từ trang Credentials.";
         return;
       }
       const idI = m.querySelector('[data-f="client_id"]'), scI = m.querySelector('[data-f="client_secret"]');
       if (idI) idI.value = c.client_id || "";
       if (scI) scI.value = c.client_secret || "";
       z.classList.remove("bad"); z.classList.add("ok");
-      msg.textContent = "✓ Đã điền key từ file (" + (c.client_id || "").slice(0, 28) + "…)"
+      msg.innerHTML = CHECK_ICON + " Đã điền key từ file (" + (c.client_id || "").slice(0, 28) + "…)"
         + (c.client_secret ? "" : " - file thiếu client_secret, dán tay ô Secret");
     };
     z.onclick = () => file.click();
@@ -3110,7 +3176,7 @@
         const i = m.querySelector('[data-f="' + k + '"]');
         if (i) { i.value = ""; i.placeholder = "Dùng lại key của tài khoản đã chọn"; i.disabled = true; }
       });
-      btn.textContent = "✓ Sẽ dùng lại key"; btn.disabled = true;
+      btn.innerHTML = CHECK_ICON + " Sẽ dùng lại key"; btn.disabled = true;
     };
   }
   // Field client_id/secret coi như ĐÃ CÓ khi user chọn dùng lại key
@@ -3139,7 +3205,7 @@
     const m = connModal(mHead("KẾT NỐI " + esc((con.name || "").toUpperCase()))
       + '<div class="conn-form">'
       // Cảnh báo rủi ro phải hiện NGAY LÚC QUYẾT ĐỊNH, không đợi tới hộp thoại đổi quyền.
-      + (con.risk ? '<div class="conn-risk">⚠ ' + esc(con.risk) + '</div>' : "")
+      + (con.risk ? '<div class="conn-risk">' + WARN_ICON + ' ' + esc(con.risk) + '</div>' : "")
       + (hasSteps ? stepsHtml(con)
         : '<div class="conn-guide">' + esc(con.guide || "Đăng nhập bằng tài khoản của nhà cung cấp.")
           + (con.guide_url ? ' <a href="' + esc(con.guide_url) + '" target="_blank">Hướng dẫn ↗</a>' : "") + '</div>')
@@ -3182,7 +3248,7 @@
   function openFullAck(el, c, con) {
     const text = (con && con.risk) ? con.risk
       : "Mức này cho phép Javis thao tác THẬT ra ngoài qua kết nối này: tạo đơn, gửi tin, chạy quảng cáo, publish… Hành động có thể KHÔNG hoàn tác được.";
-    const m = connModal(mHead("⚠ BẬT TOÀN QUYỀN")
+    const m = connModal(mHead(WARN_ICON + " BẬT TOÀN QUYỀN")
       + '<div class="conn-form"><div class="conn-risk">' + esc(text) + '</div>'
       + '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px"><input type="checkbox" id="ackChk"> Tôi hiểu rủi ro và tự chịu trách nhiệm</label></div>'
       + '<div class="mp-foot"><button class="mp-btn" data-act="close">Huỷ</button><button class="mp-btn primary" id="ackGo" disabled>Bật Toàn quyền</button></div>');
@@ -3196,15 +3262,15 @@
   function openAccountMenu(el, c, con) {
     const m = connModal(mHead(esc(c.label || "Tài khoản"))
       + '<div class="conn-menu">'
-      + '<button class="conn-menu-btn" data-m="test">🔄 Test kết nối</button>'
-      + '<button class="conn-menu-btn" data-m="rekey">🔁 Kết nối lại (đăng nhập / đổi key)</button>'
-      + '<button class="conn-menu-btn" data-m="default"' + (c.is_default ? " disabled" : "") + '>★ Đặt làm mặc định</button>'
-      + '<button class="conn-menu-btn" data-m="rename">✏ Đổi tên</button>'
-      + '<button class="conn-menu-btn" data-m="perm">🛡 Đổi quyền (' + ((PERM_META[c.perm] || {}).label || c.perm) + ')</button>'
-      + '<button class="conn-menu-btn" data-m="deny">⛔ Chặn tool cụ thể' + ((c.deny_tools || []).length ? " (" + c.deny_tools.length + ")" : "") + '</button>'
-      + '<button class="conn-menu-btn" data-m="audit">📜 Nhật ký gọi tool</button>'
+      + '<button class="conn-menu-btn" data-m="test">' + ic("rotate-cw") + ' Test kết nối</button>'
+      + '<button class="conn-menu-btn" data-m="rekey">' + ic("repeat") + ' Kết nối lại (đăng nhập / đổi key)</button>'
+      + '<button class="conn-menu-btn" data-m="default"' + (c.is_default ? " disabled" : "") + '>' + ic("star") + ' Đặt làm mặc định</button>'
+      + '<button class="conn-menu-btn" data-m="rename">' + ic("pencil") + ' Đổi tên</button>'
+      + '<button class="conn-menu-btn" data-m="perm">' + ic("shield") + ' Đổi quyền (' + ((PERM_META[c.perm] || {}).label || c.perm) + ')</button>'
+      + '<button class="conn-menu-btn" data-m="deny">' + ic("ban") + ' Chặn tool cụ thể' + ((c.deny_tools || []).length ? " (" + c.deny_tools.length + ")" : "") + '</button>'
+      + '<button class="conn-menu-btn" data-m="audit">' + ic("scroll") + ' Nhật ký gọi tool</button>'
       + '<button class="conn-menu-btn" data-m="toggle">' + (c.enabled ? "○ Tắt tạm" : "● Bật lại") + '</button>'
-      + '<button class="conn-menu-btn danger" data-m="del">🗑 Xoá kết nối</button>'
+      + '<button class="conn-menu-btn danger" data-m="del">' + ic("trash-2") + ' Xoá kết nối</button>'
       + '</div><div class="mp-foot"><span class="mp-note" id="cmNote"></span><button class="mp-btn" data-act="close">Đóng</button></div>');
     const note = m.querySelector("#cmNote");
     m.querySelectorAll("[data-m]").forEach(b => b.onclick = async () => {
@@ -3212,7 +3278,7 @@
       if (act === "test") {
         note.textContent = "Đang test…";
         const r = await postJson("/connect/test", { id: c.id });
-        note.textContent = r.ok ? "✓ OK - " + (r.tools || 0) + " công cụ" + (r.label ? " (" + r.label + ")" : "") : "⚠ " + (r.error || "lỗi");
+        note.innerHTML = r.ok ? CHECK_ICON + " OK - " + (r.tools || 0) + " công cụ" + (r.label ? " (" + r.label + ")" : "") : WARN_ICON + " " + esc(r.error || "lỗi");
       } else if (act === "rekey") {
         closeConnModal(); reconnectAccount(el, c, con);
       } else if (act === "default") {
@@ -3257,20 +3323,20 @@
         <span class="prov-shield ${ok ? "on" : ""}">${_shield(ok)}</span>
         <div class="prov-info">
           <div class="prov-name">${esc(s.name)} <span class="prov-kind">${esc(kind || "claude code")}</span></div>
-          <div class="prov-status ${ok ? "on" : ""}">${ok ? "● " : "⚠ "}${esc(s.status)}${detail ? " · " + esc(detail) : ""}</div>
+          <div class="prov-status ${ok ? "on" : ""}">${ok ? ic("circle", { cls: "ic-fill ic-ok" }) + " " : WARN_ICON + " "}${esc(s.status)}${detail ? " · " + esc(detail) : ""}</div>
         </div>
       </div>
     </div>`;
   }
   async function renderConnect(el) {
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">🔌</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     let d;
     try { d = await (await fetch("/connect/catalog")).json(); } catch (e) { el.innerHTML = placeholder("mcp", "Không tải được."); return; }
     const cat = d.catalog || [];
     const conns = d.connections || [];
     const byId = {};
     cat.forEach(c => byId[c.id] = c);
-    byId.custom = { id: "custom", name: "Tự thêm (nâng cao)", icon: "⭐", category: "Khác",
+    byId.custom = { id: "custom", name: "Tự thêm (nâng cao)", icon: "star", category: "Khác",
                     description: "Server MCP tự khai URL/lệnh/header - dành cho người rành kỹ thuật.", auth_type: "apikey" };
     const st = await freshSettings();
     const main = (st.model && st.model.main) || {};
@@ -3279,16 +3345,16 @@
     const mainLabel = (provs.find(p => p.id === main.provider) || {}).label || main.provider || "-";
     let warn = "";
     if (main.provider === "openai-oauth") {
-      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy kho Kết nối sang Codex qua hub, nên vẫn dùng được đầy đủ.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">${CHECK_ICON} <b>ChatGPT (gói subscription)</b> chạy qua <b>Codex CLI</b> - Javis tự đẩy kho Kết nối sang Codex qua hub, nên vẫn dùng được đầy đủ.</div></div>`;
     } else if (!MCP_PROVIDERS.includes(main.provider)) {
-      warn = `<div class="gcard" style="border:1px solid var(--warn-ink);background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">⚠ Main Model đang là <b>${esc(mainLabel)}</b> - chưa hỗ trợ gọi công cụ. Đổi ở trang <b>Models</b>.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--warn-ink);background:rgba(185,130,31,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">${WARN_ICON} Main Model đang là <b>${esc(mainLabel)}</b> - chưa hỗ trợ gọi công cụ. Đổi ở trang <b>Models</b>.</div></div>`;
     } else if (main.provider !== "anthropic-cli") {
-      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">✓ <b>${esc(mainLabel)}</b> dùng được kho Kết nối (qua vòng gọi tool + hub), kèm cả tool file và skill.</div></div>`;
+      warn = `<div class="gcard" style="border:1px solid var(--green);background:rgba(44,122,75,.10);max-width:740px;margin-bottom:14px"><div class="gcard-meta" style="opacity:1">${CHECK_ICON} <b>${esc(mainLabel)}</b> dùng được kho Kết nối (qua vòng gọi tool + hub), kèm cả tool file và skill.</div></div>`;
     }
     const groups = {};
     conns.forEach(c => { const k = c.connector_id || "custom"; (groups[k] = groups[k] || []).push(c); });
     const connectedHtml = Object.keys(groups).map(cid =>
-      connectorCard(byId[cid] || { id: cid, name: cid, icon: "🔌" }, groups[cid])).join("");
+      connectorCard(byId[cid] || { id: cid, name: cid, icon: "plug" }, groups[cid])).join("");
     const cats = Array.from(new Set(cat.map(c => c.category || "Khác")));
     el.innerHTML = warn
       + '<div class="cview-section"><h3>◆ Đã kết nối <span style="opacity:.5">' + conns.length + ' tài khoản</span></h3>'
@@ -3368,7 +3434,7 @@
     modal.innerHTML = `
       <style>#mcpAddModal .mcp-lb{display:flex;flex-direction:column;gap:4px;font-size:14px;opacity:.85}#mcpAddModal .mcp-lb input,#mcpAddModal .mcp-lb select,#mcpAddModal .mcp-lb textarea{width:100%}</style>
       <div class="mp-box" style="max-width:560px">
-        <div class="mp-head"><div class="mp-title">${edit ? "SỬA MCP SERVER" : "THÊM MCP SERVER"}</div><button class="mp-x" data-act="close">✕</button></div>
+        <div class="mp-head"><div class="mp-title">${edit ? "SỬA MCP SERVER" : "THÊM MCP SERVER"}</div><button class="mp-x" data-act="close">${X_ICON}</button></div>
         <div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px">
           <label class="mcp-lb">Tên<input class="js-input" id="mName" placeholder="pancake-pos-shop-2" value="${edit ? esc(server.name) : ""}"></label>
           <label class="mcp-lb">Transport<select class="js-input" id="mTransport"><option value="http">HTTP</option><option value="sse">SSE</option><option value="stdio">stdio</option></select></label>
@@ -3414,7 +3480,7 @@
 
   // ---- Trang Kênh (Telegram) - form đầy đủ ----
   async function renderChannels(el) {
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">✉</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     const s = await freshSettings();
     const tg = s.telegram || {};
     el.innerHTML = `
@@ -3435,16 +3501,16 @@
     async function refreshTgStatus() {
       let d; try { d = await (await fetch("/telegram/status")).json(); } catch (e) { return; }
       let line;
-      if (!d.enabled) line = "⚪ Bot CHƯA bật - tích 'Bật bot Telegram' rồi Lưu (test gửi được KHÔNG có nghĩa bot đang nhận tin).";
-      else if (!d.token_set) line = "⚪ Chưa có bot token.";
+      if (!d.enabled) line = ic("circle", { cls: "ic-dim" }) + " Bot CHƯA bật - tích 'Bật bot Telegram' rồi Lưu (test gửi được KHÔNG có nghĩa bot đang nhận tin).";
+      else if (!d.token_set) line = ic("circle", { cls: "ic-dim" }) + " Chưa có bot token.";
       else if (d.status === "polling") {
         const n = (d.chat_ids || []).length;
-        line = `🟢 Bot đang nhận tin - ${n ? n + " chat ID được phép" : "MỌI NGƯỜI nhắn được (chưa giới hạn ID)"} - nhắn cho bot là Javis trả lời.`;
+        line = `${ic("circle", { cls: "ic-fill ic-ok" })} Bot đang nhận tin - ${n ? n + " chat ID được phép" : "MỌI NGƯỜI nhắn được (chưa giới hạn ID)"} - nhắn cho bot là Javis trả lời.`;
       }
-      else if (d.status === "conflict") line = "🔴 409: " + (d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
-      else if (d.status === "error") line = "⚠ Lỗi bot: " + (d.last_error || "");
-      else if (d.status === "starting") line = "⏳ Đang khởi động bot…";
-      else line = "⚪ Bot đã tắt.";
+      else if (d.status === "conflict") line = ic("circle", { cls: "ic-fill ic-err" }) + " 409: " + (d.last_error || "token bị poll nơi khác hoặc còn webhook") + " - bot tự xoá webhook khi khởi động; nếu vẫn lỗi thì có nơi khác đang poll cùng token.";
+      else if (d.status === "error") line = WARN_ICON + " Lỗi bot: " + esc(d.last_error || "");
+      else if (d.status === "starting") line = ic("loader", { cls: "ic-spin" }) + " Đang khởi động bot…";
+      else line = ic("circle", { cls: "ic-dim" }) + " Bot đã tắt.";
       st.textContent = line;
     }
     refreshTgStatus();
@@ -3454,7 +3520,7 @@
       if (tok) data.token = tok;
       st.textContent = "Đang lưu...";
       const r = await saveSetting("telegram", data);
-      st.textContent = r.ok ? "✅ Đã lưu, đang khởi động bot…" : "⚠ Lỗi lưu.";
+      st.innerHTML = r.ok ? OK_ICON + " Đã lưu, đang khởi động bot…" : WARN_ICON + " Lỗi lưu.";
       if (r.ok) setTimeout(refreshTgStatus, 1800);
     };
     document.getElementById("tgTest").onclick = async () => {
@@ -3462,16 +3528,16 @@
       try {
         const r = await (await fetch("/telegram/test", { method: "POST" })).json();
         st.textContent = r.ok
-          ? (r.total > 1 ? `✅ Đã gửi tin test tới ${r.sent}/${r.total} ID.` + (r.error ? " Lỗi: " + r.error : "") : "✅ Đã gửi tin test.")
-          : "⚠ " + (r.error || "Chưa cấu hình bot.");
+          ? (r.total > 1 ? `${OK_ICON} Đã gửi tin test tới ${r.sent}/${r.total} ID.` + (r.error ? " Lỗi: " + r.error : "") : OK_ICON + " Đã gửi tin test.")
+          : Icons.warn(r.error || "Chưa cấu hình bot.");
       }
-      catch (e) { st.textContent = "⚠ Lỗi mạng."; }
+      catch (e) { st.innerHTML = WARN_ICON + " Lỗi mạng."; }
     };
   }
 
   // ---- Trang Tài khoản: workspace + đăng nhập ----
   async function renderAccount(el) {
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">⚙</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     const s = await freshSettings();
     const auth = s.auth || {};
     el.innerHTML = `
@@ -3487,7 +3553,7 @@
       <div class="cview-section">
         <h3>Tài khoản đăng nhập</h3>
         <div class="gcard" style="max-width:560px">
-          <div class="gcard-meta">${auth.has_password ? "🔒 Đã đặt mật khẩu · tài khoản: <b>" + esc(auth.username || "admin") + "</b>" : "Chưa đặt mật khẩu - ai mở dashboard cũng dùng được. Đặt mật khẩu nếu đưa lên VPS."}</div>
+          <div class="gcard-meta">${auth.has_password ? ic("lock") + " Đã đặt mật khẩu · tài khoản: <b>" + esc(auth.username || "admin") + "</b>" : "Chưa đặt mật khẩu - ai mở dashboard cũng dùng được. Đặt mật khẩu nếu đưa lên VPS."}</div>
           <label class="js-lbl">Tài khoản</label><input class="js-input" id="acUser" value="${esc(auth.username || "")}" placeholder="admin">
           <label class="js-lbl">Mật khẩu</label><input class="js-input" id="acPass" type="password" placeholder="${auth.has_password ? "đổi mật khẩu" : "đặt mật khẩu"}">
           <div class="js-actions">
@@ -3501,19 +3567,19 @@
     document.getElementById("acWsSave").onclick = async () => {
       wsStatus.textContent = "Đang lưu...";
       const r = await saveSetting("general", { workspace_name: document.getElementById("acWs").value.trim() });
-      wsStatus.textContent = r.ok ? "✅ Đã lưu." : "⚠ Lỗi.";
+      wsStatus.innerHTML = r.ok ? OK_ICON + " Đã lưu." : WARN_ICON + " Lỗi.";
       const wn = document.getElementById("workspaceName"); if (wn) wn.textContent = document.getElementById("acWs").value.trim() || "Javis OS";
     };
     const acStatus = document.getElementById("acStatus");
     document.getElementById("acSave").onclick = async () => {
       const user = document.getElementById("acUser").value.trim() || "admin";
       const pass = document.getElementById("acPass").value;
-      if (!pass || pass.length < 4) { acStatus.textContent = "⚠ Mật khẩu tối thiểu 4 ký tự."; return; }
+      if (!pass || pass.length < 4) { acStatus.innerHTML = WARN_ICON + " Mật khẩu tối thiểu 4 ký tự."; return; }
       acStatus.textContent = "Đang lưu...";
       // /auth/setup cấp cookie ngay → tránh tự khoá khi bật auth lần đầu
       const fd = new FormData(); fd.append("username", user); fd.append("password", pass);
-      try { const r = await (await fetch("/auth/setup", { method: "POST", body: fd })).json(); acStatus.textContent = r.ok ? "✅ Đã lưu tài khoản." : "⚠ " + (r.error || "Lỗi."); renderAccount(el); }
-      catch (e) { acStatus.textContent = "⚠ Lỗi mạng."; }
+      try { const r = await (await fetch("/auth/setup", { method: "POST", body: fd })).json(); acStatus.innerHTML = r.ok ? OK_ICON + " Đã lưu tài khoản." : Icons.warn(r.error || "Lỗi."); renderAccount(el); }
+      catch (e) { acStatus.innerHTML = WARN_ICON + " Lỗi mạng."; }
     };
     const lo = document.getElementById("acLogout");
     if (lo) lo.onclick = async () => { await fetch("/auth/logout", { method: "POST" }); location.reload(); };
@@ -3542,7 +3608,7 @@
   async function renderSettings(el) {
     const gen = _renderGen;               // chốt token: nếu user đổi trang trong lúc await → bỏ render này
     parkQuickSet();                       // giữ #quickSet an toàn TRƯỚC khi ghi đè cviewBody
-    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">⚙</div><div>Đang tải...</div></div>`;
+    el.innerHTML = `<div class="cview-placeholder"><div class="ph-ico">${ic("loader", { cls: "ic-xl ic-spin" })}</div><div>Đang tải...</div></div>`;
     const s = await freshSettings();
     if (gen !== _renderGen) return;       // đã sang trang khác → KHÔNG ghi đè trang mới bằng nội dung cũ
     const v = s.voice || {};
@@ -3554,7 +3620,6 @@
     const dashboard = s.dashboard || {};
     const graphOn = dashboard.graph_enabled !== false;
     const stripC2pa = !!((s.image || {}).strip_c2pa);
-    const graphMode = (((typeof localStorage !== "undefined" && localStorage.getItem("javis.graphMode")) || dashboard.graph_mode || "2d") === "3d") ? "3d" : "2d";
     const mainProviderId = model.main?.provider || (model.engine === "openrouter" ? "openrouter" : "anthropic-cli");
     const mainProvider = (model.providers || []).find(p => p.id === mainProviderId);
     const engine = mainProvider?.label || ({ "openrouter": "OpenRouter", "openai": "OpenAI API", "openai-oauth": "ChatGPT OAuth", "anthropic-cli": "Claude CLI" }[mainProviderId] || mainProviderId);
@@ -3587,7 +3652,7 @@
       </div>`;
     el.innerHTML = `<div class="settings-page">
       <details class="settings-group" open>
-        <summary><span><b>Hệ thống</b><small>Trạng thái hiện tại và lối tắt tới các nhóm chuyên sâu</small></span><span class="settings-caret">⌄</span></summary>
+        <summary><span><b>Hệ thống</b><small>Trạng thái hiện tại và lối tắt tới các nhóm chuyên sâu</small></span><span class="settings-caret">${ic("chevron-down")}</span></summary>
         <div class="settings-group-body">
           <div class="settings-status-grid">
             <div><span>Engine</span><b>${esc(engine)}</b></div>
@@ -3597,23 +3662,21 @@
           </div>
           <div class="settings-links">
             <button data-settings-go="models"><span>◈</span><b>Models</b><small>Model và nhà cung cấp</small></button>
-            <button data-settings-go="channels"><span>✉</span><b>Kênh</b><small>Telegram và kết nối chat</small></button>
-            <button data-settings-go="account"><span>♙</span><b>Tài khoản</b><small>Đăng nhập và workspace</small></button>
-            <button data-settings-go="logs"><span>🗒</span><b>Cập nhật</b><small>Phiên bản và nhật ký mới</small></button>
+            <button data-settings-go="channels"><span>${ic("mail")}</span><b>Kênh</b><small>Telegram và kết nối chat</small></button>
+            <button data-settings-go="account"><span>${ic("circle-user")}</span><b>Tài khoản</b><small>Đăng nhập và workspace</small></button>
+            <button data-settings-go="logs"><span>${ic("scroll-text")}</span><b>Cập nhật</b><small>Phiên bản và nhật ký mới</small></button>
           </div>
         </div>
       </details>
 
       <details class="settings-group" open>
-        <summary><span><b>Giao diện &amp; Brain</b><small>Hiệu năng đồ thị và cấu trúc dữ liệu</small></span><span class="settings-caret">⌄</span></summary>
+        <summary><span><b>Giao diện &amp; Brain</b><small>Hiệu năng đồ thị và cấu trúc dữ liệu</small></span><span class="settings-caret">${ic("chevron-down")}</span></summary>
         <div class="settings-group-body settings-two-col">
           <div class="settings-card">
-            <div class="settings-card-head"><b>Đồ thị não</b><span class="gcard-tag">${graphOn ? graphMode.toUpperCase() : "Tắt"}</span></div>
-            <p>2D nhẹ hơn; 3D đẹp hơn nhưng dùng thêm GPU trên thiết bị. Mobile luôn ưu tiên chế độ nhẹ.</p>
+            <div class="settings-card-head"><b>Đồ thị não</b><span class="gcard-tag">${graphOn ? "Bật" : "Tắt"}</span></div>
+            <p>Đồ thị canvas nhẹ, không dùng WebGL. Mobile luôn ưu tiên chế độ nhẹ.</p>
             <div class="js-actions">
-              <button class="gcard-btn ${graphOn && graphMode === "2d" ? "" : "ghost"}" id="setGraph2d">2D</button>
-              <button class="gcard-btn ${graphOn && graphMode === "3d" ? "" : "ghost"}" id="setGraph3d">3D</button>
-              <button class="gcard-btn ghost" id="setGraphToggle">${graphOn ? "Tắt đồ thị" : "Bật đồ thị"}</button>
+              <button class="gcard-btn ${graphOn ? "ghost" : ""}" id="setGraphToggle">${graphOn ? "Tắt đồ thị" : "Bật đồ thị"}</button>
             </div>
           </div>
           <div class="settings-card">
@@ -3637,12 +3700,12 @@
       </details>
 
       <details class="settings-group" open>
-        <summary><span><b>Giọng nói, thương hiệu &amp; truy cập</b><small>TTS, avatar và tên miền riêng</small></span><span class="settings-caret">⌄</span></summary>
+        <summary><span><b>Giọng nói, thương hiệu &amp; truy cập</b><small>TTS, avatar và tên miền riêng</small></span><span class="settings-caret">${ic("chevron-down")}</span></summary>
         <div class="settings-group-body cs-host"></div>
       </details>
 
       <details class="settings-group" id="setAutostartSec" style="display:none">
-        <summary><span><b>Khởi động cùng Windows</b><small>Tự chạy Javis ở nền khi đăng nhập</small></span><span class="settings-caret">⌄</span></summary>
+        <summary><span><b>Khởi động cùng Windows</b><small>Tự chạy Javis ở nền khi đăng nhập</small></span><span class="settings-caret">${ic("chevron-down")}</span></summary>
         <div class="settings-group-body">
           <div class="settings-card compact">
             <div class="settings-card-head"><b>Tự bật Javis</b><span class="gcard-tag" id="setAutoTag">…</span></div>
@@ -3689,8 +3752,8 @@
         if (oaKey) await saveSetting("model", { openai_api_key: oaKey });   // key OpenAI dùng chung với chat
         _settings = null;
         st.innerHTML = r.ok
-          ? "✅ Đã lưu. Đang dùng: <b>" + esc(provSel.value) + "</b>. Bấm ▶ Nghe thử."
-          : "⚠ Lỗi lưu.";
+          ? OK_ICON + " Đã lưu. Đang dùng: <b>" + esc(provSel.value) + "</b>. Bấm ▶ Nghe thử."
+          : WARN_ICON + " Lỗi lưu.";
       };
     }
 
@@ -3705,18 +3768,6 @@
       await saveSetting("dashboard", { graph_enabled: next });
       graphEnabled = next; recomputeGraph(); refreshSettings();
     };
-    const setGraphMode = async (mode) => {
-      try { localStorage.setItem("javis.graphMode", mode); } catch (e) {}
-      graphEnabled = true;
-      await saveSetting("dashboard", { graph_mode: mode, graph_enabled: true });
-      if (window.reinitGraph) { try { await window.reinitGraph(mode); } catch (e) {} }
-      recomputeGraph(); refreshSettings();
-    };
-    const graph2d = document.getElementById("setGraph2d");
-    const graph3d = document.getElementById("setGraph3d");
-    if (graph2d) graph2d.onclick = () => setGraphMode("2d");
-    if (graph3d) graph3d.onclick = () => setGraphMode("3d");
-
     // Gỡ dấu nguồn gốc AI: hỏi lại một lần khi BẬT (tắt thì cho về thẳng, vì về mặc định
     // an toàn thì không cần cản). Chỉ đổi ảnh tạo MỚI, ảnh cũ giữ nguyên.
     const setC2pa = async (strip) => {
@@ -3741,8 +3792,8 @@
       catch (e) { r = { ok: false, error: e.message }; }
       const result = document.getElementById("setBrainMigrateResult");
       if (result) result.innerHTML = r.ok
-        ? `✅ ${(r.moved || []).length ? "Đã di chuyển: " + (r.moved || []).map(esc).join(", ") : "Brain đã đúng cấu trúc."}${(r.skipped || []).length ? `<br><span class="dim">Bỏ qua: ${(r.skipped || []).map(esc).join("; ")}</span>` : ""}`
-        : "⚠ " + esc(r.error || "Không chuẩn hóa được.");
+        ? `${OK_ICON} ${(r.moved || []).length ? "Đã di chuyển: " + (r.moved || []).map(esc).join(", ") : "Brain đã đúng cấu trúc."}${(r.skipped || []).length ? `<br><span class="dim">Bỏ qua: ${(r.skipped || []).map(esc).join("; ")}</span>` : ""}`
+        : WARN_ICON + " " + esc(r.error || "Không chuẩn hóa được.");
       migrate.disabled = false; migrate.textContent = "Chuẩn hóa brain đang chọn";
     };
 
@@ -3763,7 +3814,7 @@
         const fd = new FormData(); fd.append("enabled", on ? "0" : "1");
         let r = {}; try { r = await (await fetch("/autostart", { method: "POST", body: fd })).json(); } catch (e) { r = { ok: false, error: e.message }; }
         if (r.ok) { document.getElementById("setAutoStatus").textContent = ""; loadAutostart(); }
-        else { document.getElementById("setAutoStatus").textContent = "⚠ " + esc(r.error || "Lỗi"); button.disabled = false; }
+        else { document.getElementById("setAutoStatus").innerHTML = WARN_ICON + " " + esc(r.error || "Lỗi"); button.disabled = false; }
       };
     };
     loadAutostart();
@@ -3773,7 +3824,7 @@
   // Trang TRÒ CHUYỆN - khung chat toàn khung (mượn node chat của cockpit + sidebar lịch sử)
   // Không nhân đôi bộ máy chat: relocate chính #chatArea/#attachBar/#modelBar/#hudVoice
   // (giữ nguyên mọi handler + WebSocket + streaming đã gắn trong app.js) rồi TRẢ về HUD khi
-  // rời trang. Cùng một cuộc trò chuyện hiển thị ở cả màn 3D lẫn tab này.
+  // rời trang. Cùng một cuộc trò chuyện hiển thị ở cả màn Javis lẫn tab này.
   // ============================================
   const CHAT_NODE_IDS = ["chatArea", "attachBar", "modelBar", "hudVoice"];
   let _chatSlots = [];        // vị trí gốc từng node để trả về đúng chỗ trong HUD
@@ -3784,7 +3835,7 @@
     const css = `
     body.on-chat .cview-head{ display:none; }
     body.on-chat .cview-body{ padding:0; overflow:hidden; }
-    /* Ẩn hẳn THÂN HUD (metrics/orb 3D/panels) khi ở tab chat. cview fade-in 200ms của Alpine
+    /* Ẩn hẳn THÂN HUD (metrics/graph/panels) khi ở tab chat. cview fade-in 200ms của Alpine
        + canvas WebGL bị đẩy lớp compositing có thể để lộ HUD phía sau (loé orb) lúc mở tab. Giữ
        .hud-top (thanh trên toàn cục) hiển thị. Rời tab (bỏ .on-chat) HUD tự hiện lại + graph thức. */
     body.on-chat .hud-body{ visibility:hidden; }
@@ -3848,7 +3899,7 @@
         '<aside class="chatpage-side" id="chatPageSide"></aside>' +
         '<div class="chatpage-main">' +
           '<div class="chatpage-bar">' +
-            '<button class="cp-ico-btn cp-side-toggle" type="button" title="Ẩn/hiện lịch sử">🕘</button>' +
+            '<button class="cp-ico-btn cp-side-toggle" type="button" title="Ẩn/hiện lịch sử">' + ic("history") + '</button>' +
             '<span class="cp-title">Trò chuyện với Javis</span>' +
             '<span class="cp-engine" id="cpEngine"></span>' +
           '</div>' +
@@ -3870,7 +3921,7 @@
       try { _chatEngObs = new MutationObserver(sync); _chatEngObs.observe(eb, { childList: true, characterData: true, subtree: true }); } catch (e) {}
     }
 
-    // Mobile: nút 🕘 mở/đóng drawer lịch sử; bấm vào vùng chat thì đóng drawer
+    // Mobile: nút lịch sử mở/đóng drawer lịch sử; bấm vào vùng chat thì đóng drawer
     const isNar = () => window.matchMedia("(max-width: 860px)").matches;
     el.querySelector(".cp-side-toggle").onclick = () => page.classList.toggle("side-open");
     slot.addEventListener("click", () => { if (isNar() && page.classList.contains("side-open")) page.classList.remove("side-open"); });
@@ -4015,14 +4066,17 @@
     node.className = "vt-node"; node.dataset.rel = rel; node.dataset.name = it.name;
     node.style.paddingLeft = (6 + depth * 13) + "px";
     node.innerHTML = `<span class="vt-chev ${isDir ? "" : "leaf"}">▸</span>`
-      + `<span class="vt-ico">${isDir ? "📁" : _fileIcon(it.ext)}</span>`
+      + `<span class="vt-ico">${isDir ? ic("folder") : _fileIcon(it.ext)}</span>`
       + `<span class="vt-name">${esc(it.name)}</span>`
-      + `<span class="vt-act"><button data-a="add" title="Thêm file ${isDir ? "trong thư mục này" : "cùng thư mục"}">＋</button><button data-a="ren" title="Đổi tên">✎</button><button data-a="del" title="Xoá">🗑</button></span>`;
+      + `<span class="vt-act"><button data-a="add" title="Thêm file ${isDir ? "trong thư mục này" : "cùng thư mục"}">＋</button>`
+      + `<button data-a="dl" title="${isDir ? "Tải cả thư mục về máy (nén .zip)" : "Tải file về máy"}">⤓</button>`
+      + `<button data-a="ren" title="Đổi tên">${ic("pencil")}</button><button data-a="del" title="Xoá">${ic("trash-2")}</button></span>`;
     if (!isDir && rel === _vtActivePath) node.classList.add("active");
     node.querySelectorAll(".vt-act button").forEach(b => b.onclick = (e) => {
       e.stopPropagation();
       const a = b.dataset.a;
       if (a === "add") _vtAddFile(rel, isDir);
+      else if (a === "dl") { if (isDir) _dlFolder(rel, it.name); else _dlFile(rel); }
       else if (a === "ren") _vtRename(rel, it.name);
       else _vtDelete(rel, it.name, isDir);
     });
@@ -4222,12 +4276,12 @@
   function _neCommonBtns(actions, rel, it) {
     const mk = (label, title, fn) => { const b = document.createElement("button"); b.textContent = label; if (title) b.title = title; b.onclick = fn; return b; };
     const ed = document.getElementById("noteEditor");
-    actions.appendChild(mk("✎", "Đổi tên file", () => _neRenameCur(rel, it)));
-    actions.appendChild(mk("🗑", "Xoá file", () => _neDeleteCur(rel, it)));
+    actions.appendChild(mk(ic("pencil"), "Đổi tên file", () => _neRenameCur(rel, it)));
+    actions.appendChild(mk(ic("trash-2"), "Xoá file", () => _neDeleteCur(rel, it)));
     actions.appendChild(mk("↗", "Mở tab mới", () => window.open(_vtRaw(rel), "_blank")));
-    actions.appendChild(mk("⤓", "Tải về", () => window.open(_vtRaw(rel, 1), "_blank")));
-    actions.appendChild(mk("⛶", "Phóng to / thu nhỏ", () => ed.classList.toggle("ne-full")));
-    actions.appendChild(mk("✕", "Đóng (Esc)", closeNote));
+    actions.appendChild(mk("⤓ Tải", "Tải file về máy", () => _dlFile(rel)));
+    actions.appendChild(mk(ic("maximize"), "Phóng to / thu nhỏ", () => ed.classList.toggle("ne-full")));
+    actions.appendChild(mk(X_ICON, "Đóng (Esc)", closeNote));
   }
   function _neRenderDownload(body, actions, rel, it) {
     body.className = "ne-body";
@@ -4317,9 +4371,9 @@
       ["H3", "Tiêu đề 3", () => isWys() ? exec("formatBlock", "H3") : lineTa("### ")],
       ["•", "Gạch đầu dòng", () => isWys() ? exec("insertUnorderedList") : lineTa("- ")],
       ["1.", "Danh sách số", () => isWys() ? exec("insertOrderedList") : lineTa("{n}. ")],
-      ["❝", "Trích dẫn", () => isWys() ? exec("formatBlock", "BLOCKQUOTE") : lineTa("> ")],
+      [ic("quote"), "Trích dẫn", () => isWys() ? exec("formatBlock", "BLOCKQUOTE") : lineTa("> ")],
       ["</>", "Code", () => isWys() ? exec("insertHTML", "<code>code</code>") : wrapTa("`", "`", "code")],
-      ["🔗", "Link", () => { const u = prompt("URL:", "https://"); if (!u) return; isWys() ? exec("createLink", u) : wrapTa("[", "](" + u + ")", "chữ"); }],
+      [ic("link"), "Link", () => { const u = prompt("URL:", "https://"); if (!u) return; isWys() ? exec("createLink", u) : wrapTa("[", "](" + u + ")", "chữ"); }],
       ["―", "Kẻ ngang", () => isWys() ? exec("insertHorizontalRule") : insTa("\n---\n")],
     ];
     host.innerHTML = "";
@@ -4376,7 +4430,7 @@
         const wys = document.getElementById("neWys");
         wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value);
         let curMode = wysOk ? "wys" : "source";
-        // Tick checkbox task trong bản render -> tự lưu ngay (như Obsidian), khỏi bấm 💾
+        // Tick checkbox task trong bản render -> tự lưu ngay (như Obsidian), khỏi bấm nút Lưu
         wys.addEventListener("jv-task-toggle", () => { if (_neSaveFn) _neSaveFn(); });
         const wysToSrc = () => { const md = _mdFromHtml(wys.innerHTML); if (md != null) ta.value = md; };
         const srcToWys = () => { wys.innerHTML = window.mdToHtml ? window.mdToHtml(ta.value) : esc(ta.value); };
@@ -4397,15 +4451,15 @@
         });
         actions.appendChild(seg);
       }
-      const saveBtn = document.createElement("button"); saveBtn.textContent = "💾 Lưu"; saveBtn.title = "Lưu (Ctrl+S)";
+      const saveBtn = document.createElement("button"); saveBtn.innerHTML = SAVE_ICON + " Lưu"; saveBtn.title = "Lưu (Ctrl+S)";
       _neSaveFn = async () => {
         const content = mdGetter ? mdGetter() : ta.value;
         const fd = new FormData(); fd.append("brain", fbrain()); fd.append("path", rel); fd.append("content", content);
         try {
           const r = await (await fetch("/files/write", { method: "POST", body: fd })).json();
-          if (r.ok) { saveBtn.textContent = "✓ Đã lưu"; saveBtn.classList.add("ne-saved"); setTimeout(() => { saveBtn.textContent = "💾 Lưu"; saveBtn.classList.remove("ne-saved"); }, 1400); }
-          else saveBtn.textContent = "⚠ Lỗi";
-        } catch (e) { saveBtn.textContent = "⚠ Lỗi"; }
+          if (r.ok) { saveBtn.innerHTML = CHECK_ICON + " Đã lưu"; saveBtn.classList.add("ne-saved"); setTimeout(() => { saveBtn.innerHTML = SAVE_ICON + " Lưu"; saveBtn.classList.remove("ne-saved"); }, 1400); }
+          else saveBtn.innerHTML = WARN_ICON + " Lỗi";
+        } catch (e) { saveBtn.innerHTML = WARN_ICON + " Lỗi"; }
       };
       saveBtn.onclick = _neSaveFn;
       actions.appendChild(saveBtn);
@@ -4465,7 +4519,7 @@
     const dead = Object.entries(d.engines || {}).filter(([, rec]) => rec && rec.ok === false);
     if (!dead.length) { b.hidden = true; return; }
     const [name, rec] = dead[0];
-    b.textContent = "⚠ Bộ não " + name + " mất đăng nhập: " + (rec.message || "")
+    b.innerHTML = WARN_ICON + " Bộ não " + esc(name) + " mất đăng nhập: " + esc(rec.message || "")
       + " " + (ENGINE_FIX_UI[name] || "");
     b.hidden = false;
   }

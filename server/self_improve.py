@@ -830,7 +830,7 @@ class LoopFeature:
                 try:
                     asyncio.create_task(self.deps.notify(
                         f"⚠ Loop '{loop['name']}' ({slug}) đã tự tạm dừng sau 3 lần lỗi liên tiếp. "
-                        "Mở trang Tự cải thiện để xem log."))
+                        "Mở trang Việc định kỳ để xem log."))
                 except Exception:
                     pass
             return {"ok": not failed, "summary": summary, "verify": verify_line,

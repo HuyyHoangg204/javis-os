@@ -40,7 +40,9 @@ BRAIN = _TMP / "brains" / "My Vault"
 _ANCHOR = Path(BRAIN.anchor)
 
 _orig_brain_root = main._brain_root
+_orig_brains_dir = main.BRAINS_DIR
 main._brain_root = lambda brain: str(BRAIN)
+main.BRAINS_DIR = str(_TMP / "brains")
 
 
 def _set_env(host=None, files_root=None):
@@ -127,8 +129,76 @@ try:
     check("UI gửi mode thật xuống /files/search",
           "/files/search?brain=${encodeURIComponent(fbrain())}" in console_js
           and "&mode=${searchMode}" in console_js)
+    check("UI Tệp tin có nút Tải về ở danh sách thường và kết quả tìm kiếm",
+          console_js.count('data-act="dl"') >= 2 and "Tải file về máy" in console_js)
+    check("UI cây file Javis có nút tải cạnh file và trong editor",
+          'data-a="dl"' in console_js and 'mk("⤓ Tải", "Tải file về máy"' in console_js)
+    check("UI có nút tải CẢ thư mục (nén .zip): danh sách, thanh công cụ, cây file",
+          'data-act="zip"' in console_js and 'id="fmZipCur"' in console_js
+          and console_js.count("_dlFolder(rel, it.name)") >= 2)
+    check("UI tải bằng thẻ <a download> (không dính chặn popup)",
+          "function _dlGo(" in console_js and "window.open(rawUrl(rel, 1)" not in console_js)
 
-    # ---- 6. Xoá: chặn xoá brain root lẫn trần ----
+    # ---- 6. Tải CẢ thư mục về dạng .zip (/files/zip) ----
+    import zipfile as _zipfile
+
+    (BRAIN / "01 - Daily" / "2026-07-30.md").write_text("nhật ký hôm nay", encoding="utf-8")
+    (BRAIN / "attachments").mkdir(exist_ok=True)
+    (BRAIN / "attachments" / "anh.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 64)
+    brain_rel = main._files_rel(_ANCHOR, BRAIN)
+
+    probe = asyncio.run(main.files_zip(brain="brain", path=brain_rel, probe=1))
+    check("zip probe: đếm đủ file (kể cả trong thư mục con)",
+          isinstance(probe, dict) and probe.get("files") == 4 and probe.get("bytes", 0) > 0
+          and probe.get("name") == "My Vault.zip")
+
+    zip_resp = asyncio.run(main.files_zip(brain="brain", path=brain_rel, probe=0))
+    check("zip: trả file .zip đặt theo tên thư mục", getattr(zip_resp, "filename", "") == "My Vault.zip")
+    with _zipfile.ZipFile(zip_resp.path) as _z:
+        names = _z.namelist()
+        bad = _z.testzip()
+    check("zip: gói MỌI loại file, không riêng .md",
+          bad is None and "My Vault/note.md" in names
+          and "My Vault/attachments/anh.png" in names
+          and "My Vault/01 - Daily/2026-07-30.md" in names)
+    check("zip: giữ nguyên cây thư mục", "My Vault/attachments/" in names)
+
+    dl_dir = asyncio.run(main.files_download(brain="brain", path=brain_rel))
+    check("download trỏ vào thư mục → tự nén .zip (không 404 nữa)",
+          getattr(dl_dir, "filename", "") == "My Vault.zip")
+
+    _old_max = main._ZIP_MAX_FILES
+    main._ZIP_MAX_FILES = 1          # ép vượt trần để kiểm chứng đường dừng sớm
+    try:
+        too_big = asyncio.run(main.files_zip(brain="brain", path=brain_rel, probe=1))
+        check("zip: vượt trần an toàn → 413 chứ không nén nửa vời",
+              hasattr(too_big, "status_code") and too_big.status_code == 413)
+    finally:
+        main._ZIP_MAX_FILES = _old_max
+
+    not_dir = asyncio.run(main.files_zip(brain="brain", path=brain_rel + "/note.md", probe=0))
+    check("zip: trỏ vào file lẻ → 404 'Không phải thư mục'",
+          hasattr(not_dir, "status_code") and not_dir.status_code == 404)
+
+    # ---- 7. Link export cũ /brains/<tên>/<path> vẫn mở được ----
+    (BRAIN / "exports").mkdir(exist_ok=True)
+    (BRAIN / "exports" / "bao-cao.html").write_text("<h1>OK</h1>", encoding="utf-8")
+    compat = asyncio.run(main.brain_file_compat(
+        brain_name="My Vault", path="exports/bao-cao.html", dl=0))
+    check("link export cũ /brains/<brain>/... ánh xạ đúng file",
+          Path(getattr(compat, "path", "")).resolve() == BRAIN / "exports" / "bao-cao.html")
+    missing_brain = asyncio.run(main.brain_file_compat(
+        brain_name="Brain Không Có", path="exports/bao-cao.html", dl=0))
+    check("link /brains không được rơi nhầm sang brain mặc định",
+          hasattr(missing_brain, "status_code") and missing_brain.status_code == 404)
+
+    for _tmp_resp in (zip_resp, dl_dir):
+        try:
+            os.unlink(_tmp_resp.path)
+        except OSError:
+            pass
+
+    # ---- 8. Xoá: chặn xoá brain root lẫn trần ----
     async def _del(path_arg):
         return await main.files_delete(brain="brain", path=path_arg)
 
@@ -136,6 +206,7 @@ try:
     check("không xoá được brain root", hasattr(r, "status_code") and r.status_code == 400)
 finally:
     main._brain_root = _orig_brain_root
+    main.BRAINS_DIR = _orig_brains_dir
     _set_env()
 
 if _fails:

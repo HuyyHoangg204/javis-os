@@ -20,7 +20,7 @@
 #      Host(`javis.srv1782015.hstgr.cloud`)   (thay bằng hostname VPS của bạn).
 #
 # GHI CHÚ:
-#   - Mấu chốt (rút từ compose thật của Hermes): KHÔNG khai báo networks - Traefik tự thấy container qua nhãn.
+#   - Mấu chốt: KHÔNG khai báo networks - Traefik của Hostinger tự thấy container qua nhãn.
 #   - Cập nhật bản mới: Redeploy trong Docker Manager (image :latest + pull_policy: always).
 #   - VPS KHÔNG phải Hostinger: bỏ file này, dùng docker-compose.yml + docker-compose.https.yml (Caddy).
 #   - Image GHCR phải để PUBLIC (GitHub > Packages > javis-os > Package settings > Public).

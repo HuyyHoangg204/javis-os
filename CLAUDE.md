@@ -61,11 +61,11 @@ Khi nhận một nhiệm vụ qua chat, Javis KHÔNG chỉ trả lời. Quy trì
 
 ## Tạo Plugin (tool/hook native cho mọi engine)
 
-Plugin là THƯ MỤC Python thả vào để thêm **tool** (công cụ engine gọi được) và/hoặc **hook** (chạy tự động quanh mỗi tool call) mà KHÔNG sửa lõi. Tool plugin đi qua hub nên Claude Code, Codex lẫn engine API đều gọi được, và TÔN TRỌNG 3 mức quyền như tool khác. Đây là port ý tưởng "plugin" của hermes-agent.
+Plugin là THƯ MỤC Python thả vào để thêm **tool** (công cụ engine gọi được) và/hoặc **hook** (chạy tự động quanh mỗi tool call) mà KHÔNG sửa lõi. Tool plugin đi qua hub nên Claude Code, Codex lẫn engine API đều gọi được, và TÔN TRỌNG 3 mức quyền như tool khác.
 
 **Khi nào tạo plugin** (không lạm dụng): khi cần một TOOL cụ thể, tái dùng, làm được bằng Python thuần (tính toán, biến đổi dữ liệu, đọc/ghi file theo luật riêng, gọi 1 API đơn giản) mà chưa có MCP nào phủ. Nếu chỉ cần HƯỚNG DẪN cách làm bằng tool sẵn có → viết Skill. Nếu là nguồn dữ liệu ngoài có sẵn MCP → đấu MCP.
 
-**Nơi ghi:** plugin do user tạo → mặc định TOÀN CỤC `<JAVIS_STATE_DIR>/plugins/<slug>/` để MỌI brain dùng chung (giống `~/.hermes/plugins`; nạp được ở cả Claude Code/Codex vì không phụ thuộc vault). Chỉ khi user muốn RIÊNG cho một brain thì ghi vào `<vault>/plugins/<slug>/`. Cả hai đều cần env gate `JAVIS_ENABLE_USER_PLUGINS=true`. Mỗi plugin 2 file (`plugin.yaml` + `plugin.py`) - **mẫu đầy đủ nằm trong skill `javis-builder`**, nạp skill đó khi đi tạo thật.
+**Nơi ghi:** plugin do user tạo → mặc định TOÀN CỤC `<JAVIS_STATE_DIR>/plugins/<slug>/` để MỌI brain dùng chung (nạp được ở cả Claude Code/Codex vì không phụ thuộc vault). Chỉ khi user muốn RIÊNG cho một brain thì ghi vào `<vault>/plugins/<slug>/`. Cả hai đều cần env gate `JAVIS_ENABLE_USER_PLUGINS=true`. Mỗi plugin 2 file (`plugin.yaml` + `plugin.py`) - **mẫu đầy đủ nằm trong skill `javis-builder`**, nạp skill đó khi đi tạo thật.
 
 **AN TOÀN (BẮT BUỘC):**
 - Plugin do chat tạo LUÔN `enabled: false`. Không tự bật.

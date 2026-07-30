@@ -14,7 +14,7 @@ Javis tự lưu lại từng lượt hỏi và trả lời vào một cơ sở d
 - Đổi tên cho dễ nhớ.
 - Xoá cuộc không cần nữa.
 
-Một điểm quan trọng: các cuộc trò chuyện được gắn theo "bộ não" (vault) đang chọn. Khi bạn đổi bộ não ở thanh chọn vault, danh sách lịch sử cũng đổi theo để chỉ hiện các cuộc thuộc bộ não đó. Xem thêm cách chọn bộ não ở [Bắt đầu & thiết lập lần đầu](01-bat-dau-thiet-lap.md).
+Một điểm quan trọng: các cuộc trò chuyện được gắn theo "bộ não" (vault) đang chọn. Khi bạn đổi bộ não ở thanh chọn vault, danh sách lịch sử đổi theo để chỉ hiện các cuộc thuộc bộ não đó, **và khung chat cũng đổi theo**. Xem mục "Đổi bộ não giữa chừng" bên dưới, và cách chọn bộ não ở [Bắt đầu & thiết lập lần đầu](01-bat-dau-thiet-lap.md).
 
 ## Nơi lưu dữ liệu
 
@@ -35,36 +35,47 @@ Mỗi cuộc trò chuyện lưu kèm: tên (title), bộ não, engine đang dùn
 
 Danh sách này không chỉ có các cuộc bạn mở trên web. Những gì bạn nhắn với Javis qua **Telegram** cũng được lưu vào đây và mang nhãn **TG** trong danh sách, nên ngồi máy tính bạn vẫn đọc lại và tìm kiếm được cuộc đã nói lúc đang đi đường.
 
-Vì trên Telegram gần như không ai bấm bắt đầu cuộc mới, Javis tự cắt sang cuộc mới khi bạn nghỉ quá 12 tiếng hoặc khi cuộc hiện tại đã dài khoảng 100 lượt. Việc cắt này chỉ để bản lưu dễ đọc, không làm Javis quên mạch trong lúc bạn đang trò chuyện trên Telegram. Các cuộc Telegram cũ hơn 30 ngày được tự cất vào kho lưu nên không hiện ở danh sách mặc định, nhưng vẫn tìm được bằng ô tìm kiếm. Chi tiết ở [Telegram](11-telegram.md).
+Vì trên Telegram gần như không ai bấm bắt đầu cuộc mới, Javis tự cắt sang cuộc mới khi bạn nghỉ quá 12 tiếng hoặc khi cuộc hiện tại đã dài khoảng 100 lượt. Việc cắt này chỉ để bản lưu dễ đọc, không làm Javis quên mạch trong lúc bạn đang trò chuyện trên Telegram. Các cuộc Telegram cũ hơn 30 ngày được tự cất vào kho lưu nên không hiện ở danh sách mặc định, nhưng vẫn tìm được bằng ô tìm kiếm. Chi tiết ở [Kênh Telegram](11-telegram.md).
 
 ## Mở ở đâu trong Javis
 
-Lịch sử giờ nằm ở **cột trái của chat phóng to** (chat workspace), giống bố cục Claude/Cowork:
+Có hai chỗ mở được cùng một sidebar lịch sử. Nội dung y hệt nhau, chọn chỗ nào tiện hơn thì dùng.
 
-1. Bấm nút **🕘 Lịch sử** ở góc trên bên phải màn hình (hoặc bấm nút **⛶** trên khung Hội thoại để phóng to chat, rồi bấm **🕘 Lịch sử** ở góc trái thanh tiêu đề).
+**Cách 1 - trang Trò chuyện (nhóm Trợ lý).** Mở nhóm **Trợ lý** trên rail điều hướng bên trái rồi bấm **Trò chuyện**. Trang này có sẵn hai cột: cột trái là sidebar lịch sử, cột phải là khung chat với tiêu đề "Trò chuyện với Javis". Bấm nút **🕘** trên thanh tiêu đề (chú thích khi rê chuột: "Ẩn/hiện lịch sử") để thu hoặc mở cột trái. Đây là chỗ chính thức trên rail, không cần phóng to gì cả.
+
+**Cách 2 - chat phóng to (chat workspace).** Từ màn hình chính **Javis**:
+
+1. Bấm nút **🕘 Lịch sử** ở hàng nút góc trên bên phải màn hình. Hoặc bấm nút **⛶** trên khung **HỘI THOẠI** để phóng to chat, rồi bấm **🕘 Lịch sử** ở góc trái thanh tiêu đề.
 2. Khung chat mở rộng gần hết màn hình; cột bên trái là **sidebar Lịch sử** gồm: nút **＋ Hội thoại mới** trên cùng, ô tìm kiếm, và danh sách các cuộc trò chuyện nhóm theo thời gian (**Hôm nay / Hôm qua / 7 ngày qua / Cũ hơn**).
 3. Cuộc đang mở được tô sáng trong danh sách để bạn biết mình đang ở đâu.
 
-Ẩn/hiện sidebar: bấm nút **🕘 Lịch sử** trên thanh tiêu đề của khung chat (trạng thái được nhớ cho lần sau). Trên màn hình hẹp (dưới ~900px), sidebar tự ẩn và mở dạng ngăn kéo nổi; nhấn **Esc** đóng ngăn kéo trước, nhấn lần nữa mới thu nhỏ chat.
+Ẩn/hiện sidebar ở chế độ phóng to: bấm nút **🕘 Lịch sử** trên thanh tiêu đề (trạng thái được nhớ cho lần sau). Trên màn hình hẹp (dưới ~900px), sidebar tự ẩn và mở dạng ngăn kéo nổi; nhấn **Esc** đóng ngăn kéo trước, nhấn lần nữa mới thu nhỏ chat. Nút thu nhỏ ghi **✕ Thu nhỏ (Esc)**.
 
 ## Cách dùng (từng bước)
 
 ### Xem lại danh sách cuộc trò chuyện
 
-1. Mở chat phóng to (nút **⛶** hoặc **🕘 Lịch sử**).
-2. Danh sách bên trái hiện các cuộc thuộc bộ não đang chọn, nhóm theo thời gian, cuộc cập nhật gần nhất nằm trên cùng (tối đa 100 cuộc).
-3. Mỗi dòng cho biết: tên cuộc trò chuyện, giờ (hoặc ngày), engine đã dùng và số tin nhắn (ví dụ `12 tin`).
-4. Nếu chưa có cuộc nào, sidebar hiện dòng "Chưa có hội thoại nào."
+1. Mở sidebar lịch sử theo một trong hai cách ở trên.
+2. Danh sách hiện các cuộc thuộc bộ não đang chọn, nhóm theo thời gian, cuộc cập nhật gần nhất nằm trên cùng.
+3. Mỗi dòng cho biết: tên cuộc trò chuyện, giờ (hoặc ngày), nhãn kênh nếu không phải web (ví dụ **TG**), engine đã dùng và số tin nhắn (ví dụ `12 tin`).
+4. Danh sách hiện **20 cuộc** đầu tiên. Còn nữa thì cuối danh sách có nút **Xem thêm 20**, bấm một lần mở thêm 20 mục. Không có trần trên, bấm tiếp là ra tiếp.
+5. Nếu chưa có cuộc nào, sidebar hiện dòng "Chưa có hội thoại nào." kèm dòng "Bấm ＋ để bắt đầu."
 
 Cuộc chưa được đặt tên sẽ hiện tạm câu hỏi đầu tiên của bạn làm tên. Javis cũng tự đặt tên rút gọn từ câu hỏi đầu (khoảng 48 ký tự) ngay sau lượt trả lời đầu tiên.
 
+### Nhận biết cuộc đang trả lời dở
+
+Cuộc nào còn một lượt đang chạy nền sẽ có biểu tượng **⏳** đứng trước tên (chú thích khi rê chuột: "Đang trả lời") và cả dòng được làm nổi. Bạn cứ đi làm việc khác, câu trả lời vẫn chạy tiếp trên máy chủ và tự lưu vào cuộc đó.
+
+Trong lúc đó nếu bạn gửi thêm một câu nữa vào chính cuộc đang chạy, Javis từ chối và báo: "Phiên này đang trả lời - đợi lượt hiện tại xong đã." Muốn hỏi việc khác ngay thì bấm **＋ Hội thoại mới** rồi hỏi ở cuộc mới.
+
 ### Tìm kiếm toàn văn
 
-1. Mở sidebar Lịch sử (trong chat phóng to).
+1. Mở sidebar Lịch sử.
 2. Bấm vào ô có chữ mờ **Tìm trong mọi hội thoại…** ở phía trên.
 3. Gõ từ khoá. Javis tự tìm sau khi bạn ngừng gõ một chút, không cần bấm Enter.
-4. Kết quả hiện các dòng khớp, kèm đoạn trích ngắn quanh từ khoá; phần trùng từ khoá được tô đậm màu vàng để dễ nhận ra.
-5. Mỗi kết quả cho biết vai trò của tin nhắn (bạn hỏi hay Javis trả lời) và thời điểm.
+4. Trong lúc tìm, danh sách hiện "Đang tìm…".
+5. Kết quả hiện các dòng khớp: tên cuộc trò chuyện, đoạn trích ngắn quanh từ khoá (phần trùng từ khoá được in đậm) và thời điểm của tin nhắn đó.
 6. Bấm vào một kết quả để mở thẳng cuộc trò chuyện chứa đoạn đó.
 7. Xoá hết chữ trong ô tìm kiếm để quay lại danh sách đầy đủ.
 
@@ -76,7 +87,7 @@ Nếu không có dòng nào khớp, sidebar hiện "Không tìm thấy." Tìm ki
 2. Khung chat bên phải nạp lại NGAY toàn bộ lượt hỏi và đáp cũ, dòng đó được tô sáng trong danh sách.
 3. Gõ câu mới như bình thường. Javis nối tiếp đúng mạch cuộc cũ, không bắt đầu lại từ đầu.
 
-Với engine Claude Code CLI, Javis nhớ cả phiên gốc của CLI để tiếp tục đúng ngữ cảnh công cụ đã dùng. Với các engine gọi qua API (ví dụ OpenRouter, OpenAI, Anthropic API), Javis nạp lại các lượt cũ từ cơ sở dữ liệu để giữ mạch. Xem thêm về engine ở [Models & engine](10-models-va-engine.md).
+Cách Javis giữ mạch khác nhau theo engine, xem mục "Javis nhớ mạch cũ bằng cách nào" bên dưới và [Models & engine](10-models-va-engine.md).
 
 ### Bắt đầu một cuộc trò chuyện mới
 
@@ -97,31 +108,60 @@ Tên tối đa khoảng 120 ký tự, phần thừa sẽ bị cắt bớt. Nếu
 
 1. Trong danh sách, đưa chuột vào dòng cuộc cần xoá.
 2. Bấm biểu tượng thùng rác **🗑** (chú thích khi rê chuột: "Xoá").
-3. Một hộp xác nhận hiện ra: "Xoá hội thoại này?". Bấm OK để xoá, bấm Huỷ để giữ lại.
+3. Một hộp xác nhận hiện ra kèm tên cuộc: `Xoá hội thoại "<tên cuộc>"?`. Bấm OK để xoá, bấm Huỷ để giữ lại.
 4. Cuộc và toàn bộ tin nhắn của nó bị xoá khỏi cơ sở dữ liệu, danh sách tự cập nhật.
+5. Nếu cuộc vừa xoá đúng là cuộc bạn đang mở, khung chat tự chuyển sang một hội thoại mới trống.
 
-Lưu ý: xoá là vĩnh viễn, không có thùng rác khôi phục. Cân nhắc kỹ trước khi xoá cuộc quan trọng.
+Lưu ý: xoá là vĩnh viễn, không có thùng rác khôi phục. Cân nhắc kỹ trước khi xoá cuộc quan trọng. (Khác với xoá cả một bộ não - cái đó có thùng rác giữ 30 ngày, xem [Quản lý tệp tin](05-quan-ly-tep-tin.md).)
+
+## Javis nhớ mạch cũ bằng cách nào
+
+Ba engine giữ ngữ cảnh theo ba cách khác nhau, nên hành vi khi mở lại cuộc cũ cũng khác nhau.
+
+**Engine Claude (Agent SDK).** Mỗi cuộc trò chuyện trên dashboard lưu kèm mã phiên gốc của Claude. Mở lại cuộc cũ là Javis nối đúng phiên đó, nên cả ngữ cảnh lẫn công cụ đã dùng đều còn nguyên.
+
+**Engine Codex (gói ChatGPT).** Mỗi cuộc lưu kèm mã thread native riêng của Codex để lượt sau nối tiếp đúng thread. Nếu thread đó mất (máy được nâng cấp, rollout cũ bị dọn), Javis không bỏ mạch: nó dựng lại ngữ cảnh từ chính lịch sử đã lưu trong `conversations.db` rồi mở thread mới, và báo trong khung chat một dòng "Phiên Codex cũ không còn trên máy - Javis đang khôi phục ngữ cảnh từ lịch sử đã lưu." Phần lịch sử đưa vào có ngân sách khoảng 60.000 ký tự, ưu tiên giữ đoạn gần nhất.
+
+Nếu bạn đổi sang engine khác rồi hỏi tiếp trong cùng một cuộc, liên kết thread Codex cũ được bỏ (vì thread đó không chứa lượt vừa rồi). Quay lại Codex, Javis dựng thread mới từ lịch sử đã lưu.
+
+**Engine gọi qua API (OpenRouter, OpenAI, Anthropic API, Google Gemini).** Mỗi lượt Javis dựng lại lịch sử từ cơ sở dữ liệu rồi gửi kèm. Cuộc dài thì phần cũ **được nén chứ không bị cắt câm**: Javis tự tóm tắt gộp phần đầu hội thoại, lưu bản tóm tắt lại, rồi ở các lượt sau chèn nó vào đầu payload dưới dạng ghi chú "[Tóm tắt phần đầu hội thoại - đã nén để tiết kiệm context...]". Model vẫn nhớ chủ đề, quyết định đã chốt, con số và việc đang dang dở, trong khi payload không phình vô hạn.
+
+Việc nén thường chạy nền sau mỗi lượt nên bạn không thấy chậm. Chỉ khi phần chưa nén dồn quá dài (hay gặp ở lượt API đầu tiên ngay sau một mạch chat bằng engine Claude) Javis mới nén ngay trong lượt, chậm thêm một nhịp. Nếu nhà cung cấp lỗi khiến bước tóm tắt hỏng, Javis mới rơi về cách cũ là cắt bớt phần rất cũ.
+
+## Đổi bộ não giữa chừng
+
+Đổi bộ não ở ô chọn trên thanh trên cùng không chỉ đổi danh sách lịch sử, mà đổi cả khung chat:
+
+- Nội dung của bộ não cũ bị dọn khỏi khung chat ngay lập tức, để bạn không nhầm là đang nói chuyện trong bộ não mới.
+- Bộ não nào bạn đã xem trong lần tải trang này thì Javis mở lại đúng cuộc bạn đang dở ở đó.
+- Bộ não bạn chưa mở lần nào trong phiên trang này thì khung chat để trắng, coi như bắt đầu mới.
+- Việc ghi nhớ này chỉ sống trong một lần tải trang. Tải lại trang (F5) là quay về luật chung: mỗi lần mở trang là một hội thoại mới. Cuộc cũ vẫn nằm nguyên trong danh sách lịch sử, bấm vào là mở lại được.
 
 ## Bảng thao tác nhanh
 
 | Thao tác | Nút / phím | Vị trí |
 |---|---|---|
-| Mở chat phóng to + lịch sử | `🕘 Lịch sử` (góc phải màn hình) hoặc `⛶` | Khung Hội thoại |
-| Ẩn/hiện sidebar lịch sử | `🕘 Lịch sử` | Thanh tiêu đề khung chat phóng to |
-| Thu nhỏ chat | `✕ Thu nhỏ` hoặc phím `Esc` | Thanh tiêu đề |
+| Mở sidebar lịch sử (chính thức) | Mục `Trò chuyện` | Rail điều hướng, nhóm Trợ lý |
+| Ẩn/hiện sidebar ở trang Trò chuyện | `🕘` | Thanh tiêu đề "Trò chuyện với Javis" |
+| Mở chat phóng to + lịch sử | `🕘 Lịch sử` (góc phải màn hình) hoặc `⛶` | Màn hình Javis, khung HỘI THOẠI |
+| Ẩn/hiện sidebar khi phóng to | `🕘 Lịch sử` | Thanh tiêu đề khung chat phóng to |
+| Thu nhỏ chat | `✕ Thu nhỏ (Esc)` hoặc phím `Esc` | Thanh tiêu đề |
 | Tìm toàn văn | Ô "Tìm trong mọi hội thoại…" | Đầu sidebar |
 | Cuộc mới | `＋ Hội thoại mới` | Đầu sidebar |
 | Mở lại cuộc | Bấm vào dòng | Danh sách (cuộc đang mở được tô sáng) |
+| Nạp thêm cuộc cũ | `Xem thêm 20` | Cuối danh sách |
 | Đổi tên | `✎` | Hiện khi rê chuột vào dòng |
 | Xoá | `🗑` | Hiện khi rê chuột vào dòng |
+| Cuộc đang trả lời dở | `⏳` trước tên | Dấu hiệu, không bấm được |
 
 ## Mẹo
 
 - Đặt tên rõ ràng cho các cuộc quan trọng ngay sau khi làm xong, để sau này tìm nhanh mà không phải đọc lại từng cuộc.
-- Muốn giữ mạch cho một chủ đề dài, hãy mở lại đúng cuộc cũ thay vì bấm **+ Mới**. Như vậy Javis vẫn nhớ ngữ cảnh trước đó.
-- Khi làm một việc mới hoàn toàn không liên quan, bấm **+ Mới** để Javis không lẫn ngữ cảnh cũ vào câu trả lời.
+- Muốn giữ mạch cho một chủ đề dài, hãy mở lại đúng cuộc cũ thay vì bấm **＋ Hội thoại mới**. Như vậy Javis vẫn nhớ ngữ cảnh trước đó.
+- Khi làm một việc mới hoàn toàn không liên quan, bấm **＋ Hội thoại mới** để Javis không lẫn ngữ cảnh cũ vào câu trả lời.
 - Tìm kiếm quét cả nội dung tin nhắn, nên bạn có thể tìm theo một con số, một tên khách hàng hay một cụm từ đã trao đổi, không chỉ theo tên cuộc.
 - Danh sách và tìm kiếm luôn theo bộ não đang chọn. Nếu không thấy cuộc cần tìm, kiểm tra xem bạn có đang ở đúng bộ não hay không.
+- Cuộc rất dài vẫn dùng được, nhưng nếu bạn chuyển sang một chủ đề khác hẳn thì mở cuộc mới vẫn cho câu trả lời sắc hơn: phần cũ khi bị nén chỉ còn ở dạng tóm tắt, không còn nguyên chữ.
 
 ## Đồng bộ khi đổi máy
 
@@ -140,14 +180,31 @@ Nhiều khả năng bạn đang ở một bộ não khác. Danh sách chỉ hi�
 **Bấm mở bảng nhưng hiện "Lỗi tải danh sách."**
 Máy chủ Javis có thể chưa chạy hoặc vừa khởi động lại. Kiểm tra máy chủ đang chạy ở cổng mặc định (7777) rồi thử lại. Xem thêm [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md).
 
+**Không thấy cuộc trò chuyện từ tuần trước ở cuối danh sách.**
+Danh sách chỉ nạp 20 cuộc một lần. Cuộn xuống cuối và bấm **Xem thêm 20** vài lần, hoặc nhanh hơn là gõ một từ khoá vào ô tìm kiếm.
+
 **Tìm kiếm báo "Không tìm thấy" dù chắc chắn đã nói câu đó.**
 Kiểm tra bạn có đang ở đúng bộ não chứa cuộc đó không. Nếu vẫn không ra, thử từ khoá ngắn hơn hoặc một từ đơn giản hơn thay vì cả câu dài.
 
+**Gửi câu mới thì báo "Phiên này đang trả lời - đợi lượt hiện tại xong đã."**
+Cuộc đó còn một lượt đang chạy (dòng tương ứng có ⏳). Đợi lượt đó xong, hoặc bấm **＋ Hội thoại mới** để hỏi việc khác song song.
+
 **Mở lại cuộc cũ nhưng Javis không nhớ ngữ cảnh trước.**
-Với engine Claude Code CLI, khả năng nhớ đầy đủ phụ thuộc vào phiên gốc còn được lưu hay không. Với engine API, Javis nạp lại các lượt cũ từ cơ sở dữ liệu; nếu cuộc quá dài, phần rất cũ có thể bị lược bớt để vừa dung lượng. Trong trường hợp đó, nhắc lại ngắn gọn thông tin quan trọng trong câu hỏi mới.
+Với engine Claude, khả năng nhớ đầy đủ phụ thuộc vào phiên gốc còn được lưu hay không. Với engine Codex, thread native có thể đã bị dọn khỏi máy - Javis sẽ tự khôi phục từ lịch sử đã lưu và báo một dòng trong khung chat. Với engine API, phần rất cũ có thể đã ở dạng tóm tắt nén thay vì nguyên văn, nên chi tiết vụn có thể mờ đi; khi đó nhắc lại ngắn gọn thông tin quan trọng trong câu hỏi mới là đủ.
+
+**Đổi bộ não xong thì khung chat trắng trơn.**
+Đúng như thiết kế: bộ não bạn chưa mở lần nào trong lần tải trang này thì khung chat bắt đầu trống. Cuộc cũ của bộ não đó vẫn nằm trong sidebar lịch sử, bấm vào là mở lại.
 
 **Lỡ xoá nhầm một cuộc.**
 Xoá là vĩnh viễn, không khôi phục được từ giao diện. Cách phòng ngừa duy nhất là sao lưu tệp `conversations.db` định kỳ (xem mục "Đồng bộ khi đổi máy").
 
 **Đổi tên xong nhưng tên bị cắt ngắn.**
 Tên cuộc trò chuyện giới hạn khoảng 120 ký tự. Nếu bạn nhập dài hơn, phần thừa bị bỏ. Hãy đặt tên ngắn gọn, súc tích.
+
+## Liên quan
+
+- [Trò chuyện & giọng nói](02-tro-chuyen-va-giong-noi.md) - cách gửi câu hỏi, đính kèm file, bật giọng nói.
+- [Models & engine](10-models-va-engine.md) - chọn engine Claude, Codex hay một provider API.
+- [Kênh Telegram](11-telegram.md) - cuộc trò chuyện sinh ra từ Telegram và nhãn TG.
+- [Quản lý tệp tin](05-quan-ly-tep-tin.md) - chọn và quản lý bộ não.
+- [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md)

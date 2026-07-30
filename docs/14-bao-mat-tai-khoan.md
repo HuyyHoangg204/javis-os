@@ -1,16 +1,18 @@
 # Bảo mật & tài khoản
 
-Trang này giải thích cách Javis OS tự bảo vệ khi bạn đưa nó lên mạng, và cách dùng trang **Tài khoản** trong dashboard để đặt mật khẩu, đổi mật khẩu, đăng xuất và đổi tên workspace.
+Trang này giải thích cách Javis OS tự bảo vệ khi bạn đưa nó lên mạng, và cách dùng trang **Tài khoản** trong dashboard để đặt mật khẩu, đăng xuất, tắt đăng nhập và đổi tên workspace.
 
 ## Tính năng này là gì
 
-Javis chạy Claude với **toàn quyền trên máy/VPS** của bạn: nó đọc được tệp, chạy lệnh, gọi công cụ. Vì thế nếu để dashboard hở ra Internet mà không có mật khẩu thì bất kỳ ai biết địa chỉ cũng điều khiển được máy của bạn.
+Javis chạy bộ não AI với **toàn quyền trên máy/VPS** của bạn: nó đọc được tệp, chạy lệnh, gọi công cụ. Vì thế nếu để dashboard hở ra Internet mà không có mật khẩu thì bất kỳ ai biết địa chỉ cũng điều khiển được máy của bạn.
 
-Javis xử lý việc này theo 3 lớp:
+Javis xử lý việc này theo 5 lớp:
 
 1. **Tự bắt buộc đăng nhập khi chạy public.** Khi server nghe ra ngoài (không phải chỉ máy này), Javis chặn mọi chức năng cho tới khi bạn đăng nhập. Chạy trên máy cá nhân (localhost) thì không ép, dùng thẳng như cũ.
 2. **Chống chiếm tài khoản lần đầu.** Người đầu tiên muốn tạo admin phải có **MÃ THIẾT LẬP** (in trong log server) hoặc admin đã được đặt sẵn qua biến môi trường. Kẻ chỉ biết URL không tạo được tài khoản.
 3. **Chống dò mật khẩu.** Sai nhiều lần bị khoá tạm theo địa chỉ IP; mỗi lần sai bị làm chậm.
+4. **Chặn trang web lạ sai khiến Javis (CSRF) và chặn tên miền lạ trỏ về máy bạn (DNS-rebinding).** Xem mục riêng bên dưới.
+5. **Mã hoá khoá bí mật lưu trong `settings.json`.** API key, token Telegram, token GitHub... không nằm dạng chữ thô trên đĩa.
 
 ## Mở ở đâu trong Javis
 
@@ -19,7 +21,7 @@ Mọi thao tác tài khoản nằm ở mục **Tài khoản** trong nhóm **Hệ
 Trang **Tài khoản** có 2 khối:
 
 - **Workspace**: đổi tên workspace hiển thị.
-- **Tài khoản đăng nhập**: đặt/đổi mật khẩu, đăng xuất, tắt đăng nhập.
+- **Tài khoản đăng nhập**: đặt mật khẩu, đăng xuất, tắt đăng nhập.
 
 ## Khi nào Javis bắt buộc đăng nhập
 
@@ -62,6 +64,8 @@ Khi mở dashboard lần đầu trên server công khai, Javis hiện màn **t�
 
 Nếu nhập sai/thiếu mã, Javis báo: "Sai hoặc thiếu MÃ THIẾT LẬP - xem mã trong log/terminal của server."
 
+Mã thiết lập chỉ được sinh **lúc server khởi động**. Nếu bạn đã dùng nó rồi (mã bị xoá) và sau đó lại cần tạo tài khoản mới, phải khởi động lại server để Javis sinh mã mới.
+
 ### B. Đặt mật khẩu (khi đang chạy máy cá nhân, chưa có mật khẩu)
 
 Nếu bạn chạy Javis ở nhà mà muốn khoá lại trước khi đưa lên VPS:
@@ -72,18 +76,32 @@ Nếu bạn chạy Javis ở nhà mà muốn khoá lại trước khi đưa lên
 4. Bấm **Đặt mật khẩu**.
 5. Javis lưu tài khoản và cấp phiên đăng nhập ngay cho bạn (không tự khoá bạn ra ngoài).
 
-Lưu ý về độ dài mật khẩu: khi lưu, server yêu cầu **tối thiểu 8 ký tự**. Bạn nên đặt mật khẩu từ 8 ký tự trở lên trong mọi trường hợp cho an toàn.
+Lưu ý về độ dài mật khẩu, vì hai bên kiểm khác nhau và dễ gây bối rối:
 
-### C. Đổi mật khẩu
+| Nơi kiểm | Ngưỡng | Thông báo khi trượt |
+|---|---|---|
+| Giao diện (trước khi gửi) | dưới 4 ký tự là chặn ngay | ⚠ Mật khẩu tối thiểu 4 ký tự. |
+| Server (khi lưu thật) | dưới 8 ký tự là từ chối | Mật khẩu tối thiểu 8 ký tự |
 
-Khi đã có mật khẩu, khối **Tài khoản đăng nhập** hiện dòng "🔒 Đã đặt mật khẩu · tài khoản: <tên của bạn>" và nút chuyển thành **Đổi mật khẩu**.
+Nghĩa là nhập 4-7 ký tự thì giao diện cho qua nhưng server vẫn không lưu, và bạn nhận hai con số khác nhau trong hai lần bấm. Cứ đặt từ 8 ký tự trở lên là hết chuyện.
 
-1. Vào **Tài khoản**.
-2. (Tuỳ chọn) Sửa ô **Tài khoản** nếu muốn đổi tên đăng nhập.
-3. Nhập mật khẩu mới vào ô **Mật khẩu** (tối thiểu 8 ký tự).
-4. Bấm **Đổi mật khẩu**.
+### C. Đổi mật khẩu (phải đi vòng)
 
-Lưu ý: nếu server báo lỗi "Đã có tài khoản - hãy đăng nhập." khi đổi mật khẩu, hãy **Tắt đăng nhập** trước (khi đang chạy máy cá nhân) rồi đặt lại mật khẩu mới; hoặc trên VPS thì đặt lại qua `JAVIS_ADMIN_PASSWORD` sau khi xoá phần `auth` cũ trong `settings.json`.
+Khi đã có mật khẩu, khối **Tài khoản đăng nhập** hiện dòng "🔒 Đã đặt mật khẩu · tài khoản: <tên của bạn>" và nút chuyển nhãn thành **Đổi mật khẩu**.
+
+Nói thẳng để bạn khỏi mất thời gian: **nút Đổi mật khẩu hiện không đổi được gì.** Nó gửi tới đúng cái cửa dùng lúc tạo tài khoản lần đầu (`/auth/setup`), mà cửa đó luôn từ chối khi máy đã có tài khoản. Bấm vào bạn sẽ nhận đúng một dòng: **⚠ Đã có tài khoản - hãy đăng nhập.**
+
+Đường đi được, khi bạn đang chạy trên **máy cá nhân**:
+
+1. Vào **Tài khoản**, bấm **Tắt đăng nhập**.
+2. Xác nhận ở hộp thoại "Tắt đăng nhập? Ai mở dashboard cũng dùng được." Javis xoá mật khẩu cũ và đăng xuất mọi phiên.
+3. Khối quay lại trạng thái chưa có mật khẩu. Nhập **Tài khoản** + **Mật khẩu** mới rồi bấm **Đặt mật khẩu**.
+
+Trên **VPS/public** thì cách trên không chạy trọn: vừa tắt xong là Javis ép ngay màn tạo tài khoản kèm MÃ THIẾT LẬP, mà mã cũ đã bị huỷ sau lần tạo đầu. Trên VPS hãy đổi mật khẩu bằng đường deploy:
+
+1. Dừng container.
+2. Xoá (hoặc làm rỗng) khối `"auth"` trong `settings.json` ở thư mục state (Docker: `/data/state/settings.json`).
+3. Đặt `JAVIS_ADMIN_PASSWORD` (và `JAVIS_ADMIN_USER` nếu muốn) rồi khởi động lại. Javis tạo lại admin từ biến môi trường lúc boot.
 
 ### D. Đăng xuất
 
@@ -110,6 +128,52 @@ Lưu ý: nếu server vẫn đang chạy public (hoặc bạn đặt `JAVIS_REQU
 2. Ở khối **Workspace**, sửa **Tên workspace**.
 3. Bấm **Lưu**. Tên mới hiển thị ngay trên đầu dashboard.
 
+## Chặn CSRF và DNS-rebinding
+
+Đây là lớp bảo vệ chạy ngầm, bạn không phải bật gì, nhưng nên biết nó tồn tại vì đôi khi nó là thủ phạm của lỗi 403 khó hiểu.
+
+Vấn đề nó giải: dashboard nghe ở `localhost:7777`. Khi bạn **chưa** đặt mật khẩu, một trang web bất kỳ đang mở trong trình duyệt của bạn vẫn có thể bắn request POST tới `http://localhost:7777/...`. Trình duyệt chặn trang đó ĐỌC kết quả, nhưng không chặn request chạy, nên hành động vẫn xảy ra. Kẻ tấn công cũng có thể trỏ một tên miền của chúng về `127.0.0.1` để lách kiểm tra nguồn gốc.
+
+Javis chặn hai đường đó bằng một cổng gác đứng trước cả cổng đăng nhập:
+
+| Trường hợp | Xử lý |
+|---|---|
+| Request GHI (POST/PUT/DELETE/PATCH) kèm `Origin` khác Host và không nằm trong allowlist | Chặn, trả 403 kèm `"cross-origin request bị chặn"` |
+| Request đến với tên miền (Host) lạ, trong khi **chưa** bật cổng đăng nhập | Chặn, trả 403 kèm `"host không được phép"` |
+| Cùng nguồn gốc (Origin trùng Host) | Cho qua |
+| Client không phải trình duyệt (không gửi `Origin`, ví dụ CLI, curl, MCP) | Cho qua |
+| Host là một địa chỉ IP | Bỏ qua bước kiểm Host |
+
+Allowlist gồm: `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`, cộng tên miền riêng bạn đã đặt trong **Cài đặt → Tên miền & SSL**, cộng mọi tên trong biến môi trường `JAVIS_ALLOWED_HOSTS` (nhiều tên cách nhau dấu phẩy).
+
+Khi nào bạn cần đụng tới: chạy Javis sau một reverse proxy với tên miền chưa khai trong app, mà lại **chưa** đặt mật khẩu. Lúc đó Javis coi tên miền đó là lạ và trả 403. Cách sửa: đặt mật khẩu (bật cổng đăng nhập là bước kiểm Host tự bỏ qua), hoặc thêm tên miền vào `JAVIS_ALLOWED_HOSTS`.
+
+## Khoá bí mật trong settings.json được mã hoá
+
+Các trường nhạy cảm trong `settings.json` không lưu dạng chữ thô. Javis mã hoá chúng bằng Fernet (AES-128-CBC + HMAC) trước khi ghi ra đĩa, và tự giải mã khi đọc lên. Giá trị đã mã hoá có tiền tố `enc:`.
+
+Những trường được mã hoá:
+
+| Trường | Là gì |
+|---|---|
+| `model.openrouter_key` | API key OpenRouter |
+| `model.anthropic_api_key` | API key Anthropic |
+| `model.openai_api_key` | API key OpenAI |
+| `model.gemini_api_key` | API key Google Gemini |
+| `model.openai_oauth.access_token` / `refresh_token` / `id_token` | Token đăng nhập ChatGPT |
+| `telegram.token` | Bot token Telegram |
+| `backup.token` | GitHub PAT dùng sao lưu brain |
+| `voice.elevenlabs_key` | API key ElevenLabs |
+
+Khoá dùng để mã hoá nằm ở tệp **`.secret_key`** trong thư mục state (`JAVIS_STATE_DIR`, Docker: `/data/state/.secret_key`). Tệp này sinh một lần, không lên git.
+
+Hệ quả vận hành phải nhớ:
+
+- **Chép `settings.json` sang máy khác mà quên `.secret_key` thì mất trắng mọi khoá.** Javis đọc thấy `enc:` nhưng không giải mã được nên trả về chuỗi rỗng, bạn phải nhập lại từng key. Đây là đánh đổi có chủ ý: thà bắt nhập lại còn hơn để key nằm phơi.
+- **Sao lưu thì sao lưu cả cặp** `settings.json` + `.secret_key`, và giữ chúng ở nơi kín như nhau.
+- Nếu máy thiếu thư viện `cryptography`, Javis không mã hoá được: secret rơi về tiền tố `plain:` và server in cảnh báo ra log. Cài bằng `pip install cryptography` rồi khởi động lại là mã hoá bật lại.
+- Giá trị cũ chưa có tiền tố (lưu từ bản trước khi có mã hoá) vẫn đọc được bình thường, và tự được bọc `enc:` ở lần ghi kế tiếp.
+
 ## Cách bảo mật hoạt động (dành cho người muốn hiểu sâu)
 
 | Cơ chế | Chi tiết thực tế |
@@ -120,8 +184,26 @@ Lưu ý: nếu server vẫn đang chạy public (hoặc bạn đặt `JAVIS_REQU
 | Phiên qua khởi động lại | Phiên lưu ra tệp, nên **khởi động lại server không làm bạn bị đăng xuất**. |
 | Chống dò mật khẩu | Đếm số lần sai theo IP. Sai đủ số lần liên tiếp (8 lần) bị khoá tạm khoảng 5 phút; mỗi lần sai bị làm chậm nửa giây. Khi bị khoá, Javis báo "Quá nhiều lần sai - thử lại sau ít phút." |
 | Cookie an toàn khi HTTPS | Khi bạn truy cập qua **tên miền riêng** đã bật HTTPS (Caddy On-Demand TLS), cookie được đánh dấu `secure` (chỉ gửi qua HTTPS). |
+| CORS | Chỉ mở cho `localhost` / `127.0.0.1` / `::1` (tiện lúc dev). Trang web khác không đọc được API qua trình duyệt. |
+| Cổng gác CSRF | Chặn request ghi từ nguồn gốc chéo, và chặn Host lạ khi chưa bật đăng nhập (xem mục riêng ở trên). |
+| Secret trên đĩa | API key và token trong `settings.json` mã hoá Fernet bằng `.secret_key` trong thư mục state. |
 
 Về cookie `secure`: mặc định Javis **không** ép cookie `secure` để chạy được cả HTTP lẫn HTTPS (tránh kẹt vòng đăng nhập sau proxy HTTP như đường dẫn dạng `http://host/PORT/`). Nếu bạn chắc chắn chạy HTTPS đầu-cuối, bật `JAVIS_SECURE_COOKIE=1` trong biến môi trường (xem [Cấu hình .env](16-cau-hinh-env.md)). Truy cập qua đúng tên miền riêng thì Javis tự bật `secure` mà không cần đặt biến này (dựa vào Host khớp tên miền, không suy từ `X-Forwarded-Proto`).
+
+## Bảng tra nhanh nút và trạng thái
+
+| Nút / dòng chữ | Ở đâu | Xảy ra chuyện gì |
+|---|---|---|
+| **Đặt mật khẩu** | Tài khoản → Tài khoản đăng nhập (khi chưa có mật khẩu) | Tạo tài khoản admin và cấp phiên ngay cho bạn |
+| **Đổi mật khẩu** | Cùng chỗ, khi đã có mật khẩu | Luôn báo "Đã có tài khoản - hãy đăng nhập." Xem mục C để biết đường vòng |
+| **Đăng xuất** | Tài khoản → Tài khoản đăng nhập | Xoá phiên trình duyệt này, tải lại trang |
+| **Tắt đăng nhập** | Tài khoản → Tài khoản đăng nhập | Xoá mật khẩu + đăng xuất mọi phiên (hỏi xác nhận trước) |
+| **Lưu** | Tài khoản → Workspace | Đổi tên workspace hiển thị |
+| 🔒 Đã đặt mật khẩu · tài khoản: ... | Tài khoản đăng nhập | Đang có admin, tên đăng nhập hiện ngay sau dấu hai chấm |
+| Chưa đặt mật khẩu - ai mở dashboard cũng dùng được. Đặt mật khẩu nếu đưa lên VPS. | Tài khoản đăng nhập | Chưa có admin |
+| ✅ Đã lưu tài khoản. | Tài khoản đăng nhập | Đặt mật khẩu thành công |
+| ⚠ Mật khẩu tối thiểu 4 ký tự. | Tài khoản đăng nhập | Giao diện chặn trước khi gửi lên server |
+| **Quên mật khẩu?** | Màn đăng nhập | Bấm vào hiện hướng dẫn xoá khối `"auth"` trong `server/settings.json` rồi khởi động lại |
 
 ## Mẹo
 
@@ -129,12 +211,16 @@ Về cookie `secure`: mặc định Javis **không** ép cookie `secure` để c
 - **Đặt mật khẩu đủ dài.** Tối thiểu 8 ký tự; dùng cụm dài, khó đoán.
 - **Chạy qua HTTPS khi truy cập từ xa.** Dùng tên miền riêng (ví dụ Hostinger `*.hstgr.cloud`) hoặc Cloudflare Tunnel thay vì phơi cổng 7777 thô ra Internet. Cách trỏ tên miền và bật HTTPS xem [Thương hiệu & tên miền riêng](15-thuong-hieu-ten-mien.md).
 - **Localhost + tunnel thì bật `JAVIS_REQUIRE_LOGIN=1`.** Khi máy chỉ nghe localhost nhưng bạn mở ra ngoài bằng tunnel, Javis không tự biết là đang public, nên hãy ép login thủ công.
-- **MÃ THIẾT LẬP chỉ dùng 1 lần.** Sau khi tạo admin xong, mã tự huỷ. Muốn tạo lại admin (đã có admin cũ) thì phải đăng nhập bằng admin cũ hoặc xoá state.
+- **MÃ THIẾT LẬP chỉ dùng 1 lần.** Sau khi tạo admin xong, mã tự huỷ. Cần mã mới thì phải khởi động lại server.
+- **Sao lưu `.secret_key` cùng `settings.json`.** Thiếu một trong hai là phải nhập lại toàn bộ API key.
 
 ## Sự cố thường gặp
 
 **Mở app báo cần MÃ THIẾT LẬP.**
 Bạn đang chạy public và chưa có admin. Lấy mã trong state: App terminal (trong container) chạy `cat /data/state/.setup_token`; trên host chạy `docker compose logs javis` rồi tìm dòng có `SETUP TOKEN`. Hoặc đặt `JAVIS_ADMIN_PASSWORD` để khỏi cần mã.
+
+**Bấm Đổi mật khẩu thì báo "Đã có tài khoản - hãy đăng nhập."**
+Đúng như thiết kế hiện tại, không phải lỗi máy bạn. Nút đó không đổi được mật khẩu. Làm theo mục C ở trên: máy cá nhân thì Tắt đăng nhập rồi Đặt mật khẩu lại; VPS thì xoá khối `"auth"` trong `settings.json` rồi đặt lại qua `JAVIS_ADMIN_PASSWORD`.
 
 **Nhập đúng user/password nhưng vẫn quay lại màn đăng nhập (kẹt vòng đăng nhập).**
 Thường do cookie `secure` bị bật trong khi bạn đang truy cập qua HTTP (nhiều proxy phục vụ HTTP dạng `http://host/PORT/`). Đừng bật `JAVIS_SECURE_COOKIE` trừ khi bạn chắc chắn HTTPS đầu-cuối. Nếu đã lỡ bật, gỡ biến này rồi khởi động lại server.
@@ -142,15 +228,25 @@ Thường do cookie `secure` bị bật trong khi bạn đang truy cập qua HTT
 **Bị báo "Quá nhiều lần sai - thử lại sau ít phút."**
 Bạn (hoặc ai đó cùng IP) đã sai mật khẩu quá số lần cho phép. Đợi khoảng 5 phút rồi thử lại. Khởi động lại server cũng xoá bộ đếm này.
 
+**Mọi thao tác đều trả 403 "host không được phép".**
+Bạn đang vào Javis bằng một tên miền mà Javis chưa biết, trong lúc chưa đặt mật khẩu. Thêm tên miền đó vào `JAVIS_ALLOWED_HOSTS`, hoặc nhập nó ở **Cài đặt → Tên miền & SSL**, hoặc đơn giản là đặt mật khẩu.
+
+**Thao tác nào cũng báo 403 "cross-origin request bị chặn".**
+Bạn đang gọi API Javis từ một trang khác (script, tiện ích, iframe của bên thứ ba). Đây là lớp chống CSRF chặn đúng việc của nó. Nếu đó là công cụ của chính bạn, thêm hostname của nó vào `JAVIS_ALLOWED_HOSTS`.
+
 **Quên mật khẩu.**
-Cách chắc chắn nhất là sửa/xoá phần `auth` của tài khoản trong tệp `settings.json` ở thư mục state (Docker: `/data/state`) rồi khởi động lại; hoặc đặt lại admin bằng `JAVIS_ADMIN_PASSWORD` sau khi đã xoá phần `auth` cũ.
+Trên Windows, repo có sẵn script **`reset-auth.bat`** ở thư mục gốc dự án: chạy nó là xoá tài khoản/mật khẩu trong `server/settings.json` và đưa app về bộ cài đặt (nó in "OK - da xoa mat khau." rồi hướng dẫn khởi động lại). Nếu không dùng được script: sửa/xoá phần `auth` trong `settings.json` ở thư mục state (Docker: `/data/state`) rồi khởi động lại; hoặc đặt lại admin bằng `JAVIS_ADMIN_PASSWORD` sau khi đã xoá phần `auth` cũ.
+
+**Đổi máy/khôi phục backup xong thì mọi API key trống trơn.**
+Bạn chép `settings.json` mà không chép `.secret_key` đi cùng. Không có cách khôi phục: nhập lại key ở trang Models, Kênh và Cài đặt. Lần sau nhớ mang cả hai tệp.
 
 **Tắt đăng nhập rồi mà vẫn bị hỏi tài khoản.**
 Vì server vẫn đang public (hoặc `JAVIS_REQUIRE_LOGIN=1`). Ở chế độ này Javis không cho tắt đăng nhập hoàn toàn, mà bắt tạo lại tài khoản. Muốn dùng không mật khẩu thì phải chạy server nghe thuần localhost.
 
-## Xem thêm
+## Liên quan
 
 - [Bắt đầu & thiết lập lần đầu](01-bat-dau-thiet-lap.md) - dựng Javis và tạo admin lần đầu.
 - [Thương hiệu & tên miền riêng](15-thuong-hieu-ten-mien.md) - trỏ tên miền và bật HTTPS tự động.
-- [Cấu hình .env](16-cau-hinh-env.md) - danh sách biến môi trường bảo mật (`JAVIS_HOST`, `JAVIS_REQUIRE_LOGIN`, `JAVIS_ADMIN_USER/PASSWORD`, `JAVIS_SECURE_COOKIE`, `JAVIS_STATE_DIR`).
+- [Cấu hình .env](16-cau-hinh-env.md) - danh sách biến môi trường bảo mật (`JAVIS_HOST`, `JAVIS_REQUIRE_LOGIN`, `JAVIS_ADMIN_USER/PASSWORD`, `JAVIS_SECURE_COOKIE`, `JAVIS_ALLOWED_HOSTS`, `JAVIS_STATE_DIR`).
+- [Plugins](20-plugins.md) - vì sao plugin do bạn cài phải bật riêng bằng biến môi trường.
 - [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md) - các lỗi thường gặp khác.

@@ -30,7 +30,11 @@ router_block = CONSOLE.split("function renderPage(id)", 1)[1].split("// Trang St
 check("rail không còn tab Tổng quan", 'id: "overview"' not in rail_block and 'label: "Tổng quan"' not in rail_block)
 check("metadata không còn trang Tổng quan", "overview:" not in meta_block)
 check("router không còn render Tổng quan", 'id === "overview"' not in router_block)
-check("lite mode vào thẳng Trò chuyện", 'navigateTo("chat")' in CONSOLE and 'navigateTo("overview")' not in CONSOLE[-2500:])
+boot_block = CONSOLE.split("function boot()", 1)[1]
+check("reload luôn ở Javis, lite/mobile không tự nhảy sang Trò chuyện",
+      'active: "home"' in CONSOLE and 'navigateTo("chat")' not in boot_block)
+check("deep-link file vẫn được ưu tiên sau khi vào Javis",
+      'const m = /^#open=(.+)$/' in boot_block and "openFilesAt(decodeURIComponent(m[1]))" in boot_block)
 check("Cập nhật sở hữu khung kiểm tra phiên bản", 'id="updVerUpdate"' in CONSOLE and "wireUpdateManager(el)" in CONSOLE)
 check("Nhật ký không còn chỉ người dùng sang Tổng quan", "Cập nhật ở mục <b>Tổng quan</b>" not in CONSOLE)
 check("Cài đặt có khung đọc giới hạn chiều rộng", ".settings-page { width: min(100%, 960px)" in CONSOLE_CSS)

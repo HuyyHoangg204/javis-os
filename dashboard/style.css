@@ -236,7 +236,11 @@ body {
      margin/padding của từng tầng. */
   grid-template-rows: 52px 1fr auto auto auto;
   height: 100vh;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
+.hud > * { min-width: 0; }
 
 /* TOP */
 .hud-top {
@@ -407,7 +411,10 @@ body {
 /* BODY 3 cols */
 .hud-body {
   display: grid;
-  grid-template-columns: 260px 1fr 320px;
+  /* minmax(0, 1fr) rất quan trọng: canvas và chuỗi tool dài không được dùng min-content
+     để nới cột giữa rồi đẩy khung hội thoại ra ngoài viewport. */
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  min-width: 0;
   overflow: hidden;
 }
 .hud-left, .hud-right {
@@ -416,7 +423,9 @@ body {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
+.hud-center { min-width: 0; }
 .hud-left { border-right: 1px solid var(--border); }
 .hud-right { border-left: 1px solid var(--border); }
 .hud-left::-webkit-scrollbar, .hud-right::-webkit-scrollbar, .transcript::-webkit-scrollbar { width: 4px; }
@@ -433,17 +442,16 @@ body {
 }
 .mini-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* CENTER orb */
+/* CENTER graph */
 .hud-center {
   position: relative; overflow: hidden;
   background: var(--brain-bg);
 }
 #starfield { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; display: block; }
-#graph3dContainer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; }
 #graph2d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; cursor: grab; display: none; }
 .concept-label.cl-active .cl-name { color: var(--accent-ink); text-shadow: var(--brain-halo); }
 /* (Widget MỨC DÙNG nổi đã gỡ - chuyển thành trang riêng "Mức dùng" trong rail, có đồ thị 14 ngày) */
-#graph3dContainer canvas { display: block; background: transparent !important; }
+#graph2d canvas { display: block; background: transparent !important; }
 /* Vignette - chiều sâu kiểu HUD. Tông tối: sẫm dần ra rìa. Tông sáng: KHÔNG dùng
    màu đen (thành bẩn) mà đậm dần bằng chính màu giấy, nên vẫn co tiêu điểm vào giữa. */
 .hud-center::after {
@@ -801,18 +809,6 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
   border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
 }
 .fm-use:hover { opacity: 0.88; }
-.graph-tooltip {
-  position: fixed; display: none; background: var(--bg2);
-  border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px;
-  font-size: 14px; color: var(--text); pointer-events: none; z-index: 300;
-  box-shadow: var(--shadow-2); max-width: 280px;
-}
-.graph-tooltip strong { color: var(--accent); }
-.graph-tooltip .tt-path { color: var(--text3); font-family: var(--font); font-size: 12px; }
-.graph-tooltip .tt-links { color: var(--text2); font-size: 13px; }
-/* Chốt chặn cuối: rời cockpit là tooltip tắt, kể cả khi canvas chưa kịp phát sự kiện rời hover. */
-body.in-console .graph-tooltip { display: none !important; }
-
 /* RIGHT transcript */
 .transcript {
   flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
@@ -1181,7 +1177,12 @@ body.in-console .graph-tooltip { display: none !important; }
 .wf-pstep.done { border-color: var(--green); background: var(--ok-wash); }
 .wps-num { font-size: 11px; color: var(--text3); font-family: var(--font); margin-bottom: 3px; letter-spacing: 0.05em; }
 .wf-pstep.done .wps-num { color: var(--green); }
-.wf-pstep.done .wps-num::before { content: "✓ "; }
+.wf-pstep.done .wps-num::before {
+  content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .2em;
+  vertical-align: -0.14em; background-color: currentColor;
+  -webkit-mask: var(--ic-check) center/contain no-repeat;
+  mask: var(--ic-check) center/contain no-repeat;
+}
 .wf-pstep.active .wps-num { color: var(--accent); }
 /* Việc làm là chữ chính, tên agent hạ xuống chữ phụ: nhiều workflow gọi CÙNG một
    agent ở mọi bước (vd viral-video-production), lấy agent làm chính thì các ô hiện
@@ -1402,16 +1403,33 @@ body.chat-zoomed #jv-sess-btn { display: none; }
 }
 
 /* ===== Thanh chọn model + effort ngay trên khung chat ===== */
-.model-bar { position: relative; display: flex; align-items: center; gap: 8px 16px; padding: 8px 18px 6px; }
-/* Dải HỆ THỐNG + MCP dời xuống đây, nằm NGANG bên phải ô chọn model. Một hàng, tràn thì cuộn ngang. */
-.sysbar { display: flex; align-items: center; gap: 6px 12px; flex: 1 1 auto; min-width: 0;
-  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
-.sysbar::-webkit-scrollbar { height: 3px; }
-.sysbar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.model-bar {
+  position: relative; display: flex; align-items: center; gap: 8px 16px;
+  width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;
+  padding: 8px 18px 6px; overflow: hidden;
+}
+/* Dải HỆ THỐNG + MCP nằm ngang nhưng chỉ dùng phần rộng còn lại. Nội dung dài bị cắt
+   trong chính dải này, tuyệt đối không làm nở grid/canvas hay đẩy cột chat ra ngoài. */
+.sysbar {
+  display: flex; align-items: center; gap: 6px 12px;
+  flex: 1 1 0; width: 0; min-width: 0; max-width: 100%;
+  flex-wrap: nowrap; overflow: hidden;
+}
 .sysbar-label { font-family: var(--font); font-size: 11px; letter-spacing: 1px; color: var(--text3); flex: none; white-space: nowrap; }
 .sysbar-sep { width: 1px; height: 13px; background: var(--border); flex: none; }
-.sysbar .sys-status, .sysbar .mcp-list { flex-direction: row; flex-wrap: nowrap; gap: 4px 12px; }
-.sysbar .mcp-item { font-size: 12.5px; white-space: nowrap; }
+.sysbar .sys-status {
+  flex: 0 0 auto; min-width: 0; flex-direction: row; flex-wrap: nowrap; gap: 4px 12px;
+}
+.sysbar .mcp-list {
+  flex: 1 1 0; width: 0; min-width: 0; max-width: 100%;
+  flex-direction: row; flex-wrap: nowrap; gap: 4px 12px; overflow: hidden;
+}
+.sysbar .mcp-item {
+  min-width: 0; max-width: min(420px, 42vw); overflow: hidden; text-overflow: ellipsis;
+  font-size: 12.5px; white-space: nowrap;
+}
+.sysbar .mcp-list .mcp-item { flex: 0 1 auto; }
+.sysbar .mcp-kind { color: var(--text3); font-size: 10px; }
 .mb-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2);
   background: var(--bg3); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px;
   cursor: pointer; font-family: var(--font); transition: border-color .15s, color .15s; }
@@ -1585,7 +1603,9 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 .vt-ico { flex: none; font-size: 13px; }
 .vt-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .vt-act { display: none; gap: 1px; flex: none; padding-left: 4px; }
-.vt-node:hover .vt-act { display: flex; }
+.vt-node:hover .vt-act, .vt-node:focus-within .vt-act { display: flex; }
+/* Máy cảm ứng không có hover: nút hiện SẴN, nếu không thì không đời nào bấm được Tải/Xoá. */
+@media (hover: none) { .vt-act { display: flex; opacity: .75; } }
 .vt-act button { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 12px; padding: 0 3px; line-height: 1; }
 .vt-act button:hover { color: var(--accent); }
 .vt-hidden { display: none !important; }
@@ -1684,7 +1704,12 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 .jv-ask-done .jv-ask-chip.jv-ask-picked {
   opacity: 1; border-color: var(--accent); color: var(--accent); background: var(--accent-wash-2);
 }
-.jv-ask-done .jv-ask-chip.jv-ask-picked::before { content: "✓ "; }
+.jv-ask-done .jv-ask-chip.jv-ask-picked::before {
+  content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .2em;
+  vertical-align: -0.14em; background-color: currentColor;
+  -webkit-mask: var(--ic-check) center/contain no-repeat;
+  mask: var(--ic-check) center/contain no-repeat;
+}
 
 /* Menu lệnh / (chat-slash.js) */
 .slash-menu {
@@ -1712,3 +1737,62 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 /* name + desc: mỗi cái CẮT 1 DÒNG, tràn thì "..." (min-width:0 để ellipsis chạy trong grid) */
 .slash-name { grid-area: name; font-size: 13px; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slash-desc { grid-area: desc; font-size: 11px; color: var(--text3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ==========================================================================
+   ICON (Lucide) - dashboard/icons.js dựng thẻ <svg class="ic">
+   --------------------------------------------------------------------------
+   Icon vẽ bằng nét, màu là currentColor nên TỰ ĂN THEO màu chữ của chỗ nó
+   đứng và tự đổi khi chuyển tông SÁNG/TỐI. Đây là lý do chính bỏ emoji: emoji
+   cứng màu, ở tông sáng nó chọc vào mắt và mỗi máy vẽ một kiểu.
+
+   Cỡ mặc định là 1em - icon lớn nhỏ theo cỡ chữ của khối chứa nó, không phải
+   con số cứng. Nhờ vậy icon trong nút 11px và icon trong tiêu đề 18px đều cân.
+   ========================================================================== */
+.ic {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  /* Nhấc lên khỏi đường chân chữ: SVG mặc định ngồi trên baseline nên trông
+     như bị tụt so với chữ bên cạnh. -0.14em đưa tâm icon về ngang tâm chữ. */
+  vertical-align: -0.14em;
+  flex: none;              /* trong flex container thì không cho co méo */
+  stroke-width: 2;
+  overflow: visible;       /* nét ở sát rìa viewBox không bị cắt cụt */
+}
+
+/* Nét mảnh dần khi icon to lên: nét 2 ở cỡ 16px là vừa, ở cỡ 32px thì thô. */
+.ic-lg { width: 1.35em; height: 1.35em; stroke-width: 1.75; }
+.ic-xl { width: 2em; height: 2em; stroke-width: 1.5; }
+.ic-sm { width: .85em; height: .85em; stroke-width: 2.25; }
+
+/* Tô đặc: dùng cho đèn trạng thái (thay ● đặc so với ○ rỗng). */
+.ic-fill { fill: currentColor; }
+
+/* Màu theo trạng thái. Dùng biến "mực" nên tông sáng tự có bản đậm hơn. */
+.ic-ok   { color: var(--green); }
+.ic-warn { color: var(--warn-ink); }
+.ic-err  { color: var(--red); }
+.ic-dim  { color: var(--text3); }
+.ic-accent { color: var(--accent-ink); }
+
+/* Icon đang chờ thì quay. prefers-reduced-motion thì đứng im. */
+.ic-spin { animation: ic-spin 1.1s linear infinite; }
+@keyframes ic-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ic-spin { animation: none; } }
+
+/* Nút chỉ có icon, không có chữ: canh giữa tuyệt đối. */
+.ic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --------------------------------------------------------------------------
+   Icon trong ngữ cảnh CHỈ CSS với tới được (content của ::before/::after).
+   Thẻ SVG không nhét vào content: được, nên vẽ bằng MẶT NẠ: một ô vuông tô
+   currentColor rồi khoét theo hình icon. Nhờ vậy vẫn ăn màu chữ và vẫn tự đổi
+   theo tông SÁNG/TỐI - đúng như icon thường, việc emoji không làm được.
+
+   Biến --ic-<tên> do vendor/lucide-icons.css sinh ra; muốn thêm icon dùng được
+   ở đây thì thêm tên vào "css_vars" trong dashboard/icons.manifest.json.
+   -------------------------------------------------------------------------- */

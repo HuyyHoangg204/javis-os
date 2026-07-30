@@ -1,7 +1,7 @@
 /* Test autolink URL tran trong mdToHtml. Chay tay / CI:
        node dashboard/test_chat_render.js
    KHONG can trinh duyet: chi test ham thuan mdToHtml(). */
-const { mdToHtml } = require("../../dashboard/chat-render.js");
+const { mdToHtml, appFilePath } = require("../../dashboard/chat-render.js");
 
 let fails = [];
 function check(name, cond) {
@@ -135,6 +135,50 @@ check("anh: co onerror goi jvImgGone", has(h, 'onerror="jvImgGone(this)"'));
 check("anh: van giu class chat-img", has(h, 'class="chat-img"'));
 h = mdToHtml("![ngoai](https://example.com/x.png)");
 check("anh ngoai: cung co onerror", has(h, 'onerror="jvImgGone(this)"'));
+
+// ---- 24. Link /files/raw toi .md van la file brain -> mo editor noi bo, khong tab moi ----
+h = mdToHtml("[ghi chu](/files/raw?brain=brain&path=06%20-%20Sources%2Fghi-chu.md)");
+check("raw .md: thanh link vault", has(h, 'class="jv-floc"'));
+check("raw .md: giai ma dung path", has(h, 'data-vault-path="06 - Sources/ghi-chu.md"'));
+check("raw .md: khong target blank", !has(h, 'target="_blank"'));
+
+// ---- 25. Link export sai kieu /brains/<brain>/... duoc tu sua ve endpoint file that ----
+global.currentBrainPath = function () { return "D:\\Vaults\\My Bullet Journal"; };
+global.window = {
+  location: {
+    origin: "https://javis.example.com",
+    href: "https://javis.example.com/chat",
+  },
+};
+const brokenExport = "/brains/My%20Bullet%20Journal/exports/javis-tiec-tra-ai-warrior-plus.html";
+check("export /brains: giai ma dung path trong brain",
+  appFilePath(brokenExport) === "exports/javis-tiec-tra-ai-warrior-plus.html");
+h = mdToHtml("[Tải export](" + brokenExport + ")");
+check("export /brains: render thanh link tai qua /files/raw",
+  has(h, 'class="jv-fdownload"') && has(h, "/files/raw?brain=") && has(h, "dl=1"));
+h = mdToHtml("[Tải export](https://javis.example.com" + brokenExport + ")");
+check("export URL day du cung domain: cung duoc sua",
+  has(h, 'class="jv-fdownload"') && has(h, "/files/raw?brain=") && has(h, "dl=1"));
+
+// ---- 26. Editor nhan ca path goc brain va path da kem home cua Quan ly file ----
+const { ceilPath } = require("../../dashboard/file-editor.js");
+check("editor: path goc brain duoc ghep home",
+  ceilPath("brains/My Brain", "06 - Sources/ghi-chu.md") === "brains/My Brain/06 - Sources/ghi-chu.md");
+check("editor: path Quan ly file khong bi ghep home hai lan",
+  ceilPath("brains/My Brain", "brains/My Brain/06 - Sources/ghi-chu.md") === "brains/My Brain/06 - Sources/ghi-chu.md");
+
+// ---- 27. File thanh pham/media trong brain -> tai ve; URL ngoai van mo tab moi ----
+h = mdToHtml("[trang web](attachments/landing.html)");
+check("html noi bo: thanh link tai ve", has(h, 'class="jv-fdownload"') && has(h, "download"));
+check("html noi bo: dung endpoint dl=1", has(h, "dl=1") && !has(h, 'target="_blank"'));
+h = mdToHtml("![anh ket qua](attachments/post.png)");
+check("anh noi bo: bam la tai file goc", has(h, 'class="jv-fdownload"') && has(h, "dl=1"));
+h = mdToHtml("[video](attachments/demo.mp4)");
+check("video noi bo: bam la tai ve", has(h, 'class="jv-fdownload"') && has(h, "download"));
+h = mdToHtml("[note](notes/ke-hoach.md)");
+check("note md: van mo editor noi bo", has(h, 'class="jv-floc"') && !has(h, "jv-fdownload"));
+h = mdToHtml("[website](https://example.com/demo.html)");
+check("URL ngoai duoi html: van mo tab moi", has(h, 'target="_blank"') && !has(h, "jv-fdownload"));
 
 if (fails.length) {
   console.log("\nFAIL - " + fails.length + " test: " + fails.join(", "));

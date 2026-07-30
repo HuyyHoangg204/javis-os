@@ -55,16 +55,17 @@ vault/
 # Bộ nhớ cá nhân của project brain (thay đổi mỗi phiên, không cần version)
 brain/Memory/
 
-# Dev artifact - clone Hermes để học (rất nặng, có .git riêng)
+# Dev artifact - repo ngoài clone về để tham khảo (rất nặng, có .git riêng)
 .learn/
 
-# Cache/artifact của công cụ dev. Ba thư mục này TRƯỚC 0.9.241 chỉ được bỏ qua nhờ
+# Cache/artifact của công cụ dev. Các thư mục này phải được bỏ qua trong mọi clone.
 # .git/info/exclude trên máy một người - mà file đó KHÔNG được commit. Nghĩa là bất kỳ ai
 # clone mới hay fork dự án đều thấy chúng hiện ra untracked, và 106MB index của GitNexus
 # commit được. test_ignore_files.py bắt được đúng chỗ này khi chạy trên CI.
 .gitnexus/
 .superpowers/
 .claude/worktrees/
+.codex-tmp/
 
 # Cấu hình chạy dev preview cục bộ (đường dẫn theo máy, không thuộc sản phẩm)
 .claude/launch.json

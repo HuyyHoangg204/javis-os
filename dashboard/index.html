@@ -10,8 +10,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="/static/style.css?v=51">
-  <link rel="stylesheet" href="/static/console.css?v=30">
+  <!-- Biến --ic-* cho icon dùng trong content: của CSS. Phải đứng TRƯỚC style.css
+       vì style.css tham chiếu các biến này. -->
+  <link rel="stylesheet" href="/static/vendor/lucide-icons.css?v=1">
+  <link rel="stylesheet" href="/static/style.css?v=52">
+  <link rel="stylesheet" href="/static/console.css?v=31">
   <!-- Áp tông đã lưu TRƯỚC khi vẽ để không nháy tối rồi mới đổi sang sáng.
        Giá trị cũ "dim" (tông tối-nhạt, gỡ ở 0.9.250) quy về tối; theme.js sẽ ghi đè lại. -->
   <script>(function(){try{if(localStorage.getItem('javis.theme')==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}})();</script>
@@ -35,9 +38,9 @@
           <select id="graphSource" class="graph-select">
             <option value="brain">Brain Default</option>
           </select>
-          <button class="graph-folder-btn" id="newBrainBtn" title="Tạo brain mới trong thư mục brains">➕</button>
-          <button class="graph-folder-btn" id="delBrainBtn" title="Xoá brain đang chọn (xác nhận gõ đúng tên)">🗑</button>
-          <button class="graph-folder-btn" id="pickFolderBtn" title="Chọn brain từ folder ngoài bất kỳ">📁</button>
+          <button class="graph-folder-btn" id="newBrainBtn" title="Tạo brain mới trong thư mục brains"><i data-ic="plus"></i></button>
+          <button class="graph-folder-btn" id="delBrainBtn" title="Xoá brain đang chọn (xác nhận gõ đúng tên)"><i data-ic="trash-2"></i></button>
+          <button class="graph-folder-btn" id="pickFolderBtn" title="Chọn brain từ folder ngoài bất kỳ"><i data-ic="folder-open"></i></button>
           <span class="graph-stats" id="graphStats">-</span>
         </div>
       </div>
@@ -137,14 +140,14 @@
           <span class="vault-title">VAULT</span>
           <span class="vault-tools">
             <button class="mini-btn" id="vtNewFile" title="Tạo file mới ở gốc brain">＋</button>
-            <button class="mini-btn" id="vtNewDir" title="Tạo thư mục mới ở gốc brain">📁</button>
+            <button class="mini-btn" id="vtNewDir" title="Tạo thư mục mới ở gốc brain"><i data-ic="folder-plus"></i></button>
             <button class="mini-btn" id="vtRefresh" title="Làm mới cây">⟳</button>
           </span>
         </div>
         <div class="vault-search">
-          <span class="vs-ico">🔍</span>
+          <i class="vs-ico" data-ic="search"></i>
           <input id="vaultSearch" type="text" placeholder="Tìm note..." spellcheck="false" autocomplete="off">
-          <button class="vs-clear" id="vaultSearchClear" title="Xoá tìm kiếm" hidden>✕</button>
+          <button class="vs-clear" id="vaultSearchClear" title="Xoá tìm kiếm" hidden><i data-ic="x"></i></button>
         </div>
         <div class="vault-modes">
           <button class="vs-chip active" id="vsModeName" data-mode="name" title="Lọc nhanh theo tên trong cây">Tên</button>
@@ -154,17 +157,15 @@
         <div class="vault-results" id="vaultResults" hidden></div>
       </aside>
 
-      <!-- CENTER: 3D orb -->
+      <!-- CENTER: knowledge graph -->
       <div class="hud-center">
         <canvas id="starfield"></canvas>
-        <div id="graph3dContainer"></div>
         <div id="graph2d"></div>
         <div class="concept-labels" id="conceptLabels"></div>
         <div class="orb-overlay">
           <div class="orb-state" id="orbState">SẴN SÀNG</div>
           <div class="orb-interim" id="voiceInterim"></div>
         </div>
-        <div class="graph-tooltip" id="graphTooltip"></div>
         <button class="brain-overlay-toggle" id="brainOverlayToggle" type="button"
                 aria-pressed="false" aria-label="Ẩn nhãn và số liệu brain"
                 title="Ẩn nhãn thư mục và số liệu Agents / Skills / Workflows">
@@ -228,7 +229,7 @@
           <span>HỘI THOẠI</span>
           <span style="display:flex;align-items:center;gap:6px">
             <span class="engine-badge" id="engineBadge" title="Engine + model THẬT đang chạy (lấy từ server - không phải tên model tự nhận)">-</span>
-            <button class="mini-btn" id="chatZoomBtn" title="Phóng to khung chat (Esc để thu nhỏ)">⛶</button>
+            <button class="mini-btn" id="chatZoomBtn" title="Phóng to khung chat (Esc để thu nhỏ)"><i data-ic="maximize"></i></button>
           </span>
         </div>
         <!-- MỨC DÙNG token đã DỜI xuống góc dưới-phải khung giữa (giải phóng chỗ cho khung chat). -->
@@ -247,12 +248,12 @@
         <!-- ===== CÀI ĐẶT: avatar + tên miền + giọng nói + tốc độ (console.js nhúng vào trang Cài đặt) ===== -->
         <details class="quick-set" id="quickSet" open>
           <summary class="panel-label" style="cursor:pointer;list-style:none;user-select:none">
-            ⚙ CÀI ĐẶT NHANH <span class="qs-caret">▸</span>
+            <i data-ic="settings"></i> CÀI ĐẶT NHANH <i class="qs-caret" data-ic="chevron-right"></i>
           </summary>
           <div class="quick-set-body">
 
             <label class="qs-row">
-              <span>🔊 Đọc trả lời bằng giọng</span>
+              <span><i data-ic="volume-2"></i> Đọc trả lời bằng giọng</span>
               <span class="toggle"><input type="checkbox" id="qsTts" checked><span></span></span>
             </label>
 
@@ -359,8 +360,8 @@
       <div class="sysbar" id="sysBar">
         <span class="sysbar-label">HỆ THỐNG</span>
         <div class="sys-status">
-          <div class="mcp-item" id="claudeStatus">⬤ Claude Code CLI</div>
-          <div class="mcp-item" id="ttsStatus">⬤ Voice (Edge TTS)</div>
+          <div class="mcp-item" id="claudeStatus"><i data-ic="circle" class="ic-fill ic-sm"></i> Claude Code CLI</div>
+          <div class="mcp-item" id="ttsStatus"><i data-ic="circle" class="ic-fill ic-sm"></i> Voice (Edge TTS)</div>
         </div>
         <span class="sysbar-sep"></span>
         <span class="sysbar-label">MCP</span>
@@ -456,7 +457,7 @@
   <div class="run-drawer" id="runDrawer">
     <div class="run-head">
       <span id="runTitle">Chạy workflow</span>
-      <button class="run-close" id="runClose">✕</button>
+      <button class="run-close" id="runClose"><i data-ic="x"></i></button>
     </div>
     <div class="run-steps" id="runSteps"></div>
   </div>
@@ -467,23 +468,23 @@
 
   <!-- Vault structure banner -->
   <div class="vault-banner" id="vaultBanner">
-    <span class="vb-icon">⚠</span>
+    <i class="vb-icon" data-ic="triangle-alert"></i>
     <span class="vb-text" id="vbText">Cấu trúc vault chưa chuẩn cho Javis.</span>
     <button class="vb-init" id="vbInit">Khởi tạo cấu trúc</button>
-    <button class="vb-close" id="vbClose">✕</button>
+    <button class="vb-close" id="vbClose"><i data-ic="x"></i></button>
   </div>
 
   <!-- Drag-drop overlay -->
   <div class="drop-overlay" id="dropOverlay">
-    <div class="drop-msg">📎 Thả file vào đây → lưu vào Sources</div>
+    <div class="drop-msg"><i data-ic="paperclip"></i> Thả file vào đây → lưu vào Sources</div>
   </div>
 
   <!-- Folder picker modal -->
   <div class="modal-overlay" id="folderModal">
     <div class="folder-modal">
       <div class="fm-head">
-        <span>📁 Chọn brain (folder chứa ghi chú .md)</span>
-        <button class="fm-close" id="fmClose">✕</button>
+        <span><i data-ic="folder-open"></i> Chọn brain (folder chứa ghi chú .md)</span>
+        <button class="fm-close" id="fmClose"><i data-ic="x"></i></button>
       </div>
       <div class="fm-path" id="fmPath">-</div>
       <div class="fm-list" id="fmList"></div>
@@ -511,7 +512,7 @@
         .wz-tokhelp code,#wzProvHint code{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:4px;font-size:13px}
         #wzProvHint{margin-top:8px;font-size:15px;color:#8aa}
         </style>
-        <div class="set-note">Vài bước nhanh để bắt đầu. Mọi thứ đổi lại được sau trong ⚙ Cài đặt.</div>
+        <div class="set-note">Vài bước nhanh để bắt đầu. Mọi thứ đổi lại được sau trong <i data-ic="settings"></i> Cài đặt.</div>
         <div class="set-sec">
           <h4>1. Workspace</h4>
           <label>Tên hiển thị</label><input id="wzWsName" placeholder="Javis OS">
@@ -525,7 +526,7 @@
             <label>Mã thiết lập <span class="dim">(bảo mật)</span></label>
             <input id="wzToken" placeholder="dán MÃ THIẾT LẬP từ log server">
             <div class="wz-tokhelp">
-              <b>❓ Mã thiết lập là gì?</b> Javis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
+              <b><i data-ic="circle-help"></i> Mã thiết lập là gì?</b> Javis đang chạy trên server công khai. Để chắc <b>chính bạn</b> (không phải người lạ vô tình mở link) là người tạo tài khoản admin, bạn dán một mã chỉ in ra <b>log server</b> - nơi duy nhất chủ máy xem được.
               <br><b>Cách lấy mã (Hostinger → App terminal):</b>
               <ol>
                 <li>Mở app → bấm <b>App terminal</b> (bạn sẽ vào BÊN TRONG container <code>javis</code>).</li>
@@ -533,27 +534,27 @@
                 <li>Copy chuỗi hiện ra → dán vào ô trên.</li>
               </ol>
               <span class="dim">Nếu SSH vào HOST (không phải App terminal): <code>docker compose logs javis | grep "SETUP TOKEN"</code></span><br>
-              💡 <b>Khỏi cần mã:</b> nếu lúc deploy bạn đặt sẵn env <code>JAVIS_ADMIN_PASSWORD</code> (+ <code>JAVIS_ADMIN_USER</code>), mở app ra là <b>đăng nhập luôn</b>, không hỏi mã.
+              <i data-ic="lightbulb"></i> <b>Khỏi cần mã:</b> nếu lúc deploy bạn đặt sẵn env <code>JAVIS_ADMIN_PASSWORD</code> (+ <code>JAVIS_ADMIN_USER</code>), mở app ra là <b>đăng nhập luôn</b>, không hỏi mã.
             </div>
           </div>
         </div>
         <div class="set-sec">
           <h4>3. Nhà cung cấp AI (bộ não)</h4>
-          <div class="set-note">Chọn 1 nhà cung cấp chính. Đổi lại được trong ⚙ <b>Models</b>.</div>
+          <div class="set-note">Chọn 1 nhà cung cấp chính. Đổi lại được trong <i data-ic="cpu"></i> <b>Models</b>.</div>
           <div class="wz-prov" id="wzProv">
             <label class="wz-card" data-prov="anthropic-cli">
               <input type="radio" name="wzprov" value="anthropic-cli" checked>
-              <div><b>🧠 Claude Code <span class="wz-rec">khuyên dùng</span></b>
+              <div><b><i data-ic="brain"></i> Claude Code <span class="wz-rec">khuyên dùng</span></b>
                 <div class="wz-pdesc">Đăng nhập subscription Claude → đủ MCP, skill, đọc/ghi file, vòng lặp tự cải thiện. Mạnh & đầy đủ nhất.</div></div>
             </label>
             <label class="wz-card" data-prov="openai-oauth">
               <input type="radio" name="wzprov" value="openai-oauth">
-              <div><b>💬 ChatGPT (gói subscription)</b>
+              <div><b><i data-ic="message-circle"></i> ChatGPT (gói subscription)</b>
                 <div class="wz-pdesc">Đăng nhập ChatGPT Plus/Pro (qua Codex) → vẫn dùng được MCP của Javis. Hợp nếu bạn đã có gói ChatGPT.</div></div>
             </label>
             <label class="wz-card" data-prov="openrouter">
               <input type="radio" name="wzprov" value="openrouter">
-              <div><b>🌐 OpenRouter</b>
+              <div><b><i data-ic="globe"></i> OpenRouter</b>
                 <div class="wz-pdesc">Nhiều model giá rẻ (chat thuần, không MCP). Chỉ cần API key - không cần đăng nhập.</div></div>
             </label>
           </div>
@@ -590,7 +591,7 @@
   <!-- Cài đặt -->
   <div class="modal-overlay" id="settingsOverlay">
     <div class="settings-modal">
-      <div class="fm-head"><span>⚙ Cài đặt Javis</span><button class="fm-close" id="settingsClose">✕</button></div>
+      <div class="fm-head"><span><i data-ic="settings"></i> Cài đặt Javis</span><button class="fm-close" id="settingsClose"><i data-ic="x"></i></button></div>
       <div class="settings-body">
         <div class="set-sec">
           <h4>Chung</h4>
@@ -612,7 +613,7 @@
           <label>OpenRouter API key <span class="dim" id="setKeyHint"></span></label>
           <input id="setOrKey" type="password" placeholder="sk-or-... (để trống nếu không đổi)">
           <label>OpenRouter model <button type="button" class="set-mini" id="loadModelsBtn">↻ Tải danh sách</button></label>
-          <select id="setOrModelSel"><option value="__custom__">✏️ Nhập tên model khác (custom)…</option></select>
+          <select id="setOrModelSel"><option value="__custom__">Nhập tên model khác (custom)…</option></select>
           <input id="setOrModel" placeholder="vd openai/gpt-4o-mini" style="display:none">
           <div class="set-note">Danh sách model tải động từ OpenRouter. Không thấy model cần? Chọn "Nhập tên khác" rồi gõ chính xác id. OpenRouter sẽ kích hoạt ở bản kế (P2).</div>
           <button class="s-btn" id="saveModel">Lưu</button>
@@ -652,22 +653,26 @@
   <!-- Holder ẩn giữ #quickSet khi KHÔNG ở trang Cài đặt (node vẫn trong DOM → handler còn sống) -->
   <div id="quickSetHolder" hidden></div>
 
-  <!-- theme.js phải nạp TRƯỚC mọi file khác: graph.js / graph3d.js / app.js đăng ký
+  <!-- Bộ icon nạp ĐẦU TIÊN: mọi file dưới đây gọi ic() lúc render, thiếu nó thì
+       icon ra rỗng. lucide-icons.js chỉ định nghĩa dữ liệu nên phải đứng trước
+       icons.js (file dựng hàm ic / Icons). Cả hai đều không phụ thuộc DOM. -->
+  <script src="/static/vendor/lucide-icons.js?v=1"></script>
+  <script src="/static/icons.js?v=1"></script>
+
+  <!-- theme.js phải nạp TRƯỚC mọi file khác: graph.js / app.js đăng ký
        hàm vẽ lại theo tông ngay lúc parse, nếu window.javisTheme chưa có thì chúng
        đăng ký hụt và các lớp canvas kẹt ở bảng màu tối. -->
   <script src="/static/theme.js?v=1"></script>
   <script src="/static/voice.js?v=14"></script>
-  <!-- three.js + 3d-force-graph KHÔNG nạp tĩnh nữa: app.js tự lazy-load qua CDN CHỈ khi chọn đồ thị 3D. -->
   <script src="/static/graph.js?v=15"></script>
-  <script src="/static/graph3d.js?v=18"></script>
-  <script src="/static/chat-render.js?v=6"></script>
+  <script src="/static/chat-render.js?v=7"></script>
   <script src="/static/dataview.js?v=1"></script>
   <script src="/static/task-suggest.js?v=1"></script>
-  <script src="/static/file-editor.js?v=6"></script>
+  <script src="/static/file-editor.js?v=7"></script>
   <script src="/static/chat-ask.js?v=1"></script>
   <script src="/static/chat-slash.js?v=1"></script>
   <script src="/static/chat-acts.js?v=1"></script>
-  <script src="/static/app.js?v=70"></script>
+  <script src="/static/app.js?v=73"></script>
   <script src="/static/model-picker.js?v=2"></script>
   <script src="/static/branding.js?v=7"></script>
   <script src="/static/quick-settings.js?v=4"></script>

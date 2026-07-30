@@ -7,7 +7,7 @@ let cancelledTurn = false;     // (giữ để tương thích - không còn dùn
 // ĐA HỘI THOẠI SONG SONG: mỗi phiên giữ trạng thái stream RIÊNG, định tuyến theo session_id. Mở
 // "hội thoại mới" KHÔNG giết phiên đang chạy - nó chạy nền + tự lưu, vào Lịch sử bấm lại xem tiếp.
 const turns = {};              // sid -> { text, bubble, spoke, running }
-if (!window.JavisRunning) window.JavisRunning = new Set();   // sid đang generate → sidebar hiện ⏳
+if (!window.JavisRunning) window.JavisRunning = new Set();   // sid đang generate → sidebar hiện icon đang chạy
 function newSid() { try { return crypto.randomUUID().replace(/-/g, ""); } catch (e) { return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); } }
 function setSessionRunning(sid, on) {
   if (!sid) return;
@@ -169,12 +169,12 @@ function handleMessage(data) {
     if (data.tool) trackMCP(data.tool);
     if (isActive) showActivity(data.content);
   } else if (data.type === "tool_result") {
-    if (isActive) showActivity("✓ Nhận data - đang phân tích...");
+    if (isActive) showActivity(ic("check", { cls: "ic-ok" }) + " Nhận data - đang phân tích...");
   } else if (data.type === "stream") {
     if (!t) return;
     t.text += (data.content || "");
     if (isActive) {
-      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity("✍ Đang soạn câu trả lời..."); }
+      if (!t.bubble) { t.bubble = createStreamingBubble(); showActivity(ic("pen-line") + " Đang soạn câu trả lời..."); }
       t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
       scrollBottom();
       // Đọc NGAY đoạn trung gian (chỉ đọc phiên đang xem). OpenRouter gửi tts:false → đọc 1 lần ở cuối.
@@ -204,7 +204,7 @@ function handleMessage(data) {
     }
     refreshUsage();     // cập nhật panel Mức dùng sau mỗi lượt
   } else if (data.type === "error") {
-    if (isActive) { hideActivity(); appendJavisMessage("⚠ " + data.content); setOrbState("", "SẴN SÀNG"); }
+    if (isActive) { hideActivity(); appendJavisMessage(ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(data.content)); setOrbState("", "SẴN SÀNG"); }
   } else if (data.type === "system") {
     if (isActive) appendJavisMessage(data.content);
   } else if (data.type === "turn_done") {
@@ -328,7 +328,7 @@ async function openStoredSession(id) {
     if (t && t.running) {
       t.bubble = createStreamingBubble();
       if (t.text) t.bubble.querySelector(".bubble").innerHTML = markdownToHtml(t.text);
-      showActivity("✍ Đang soạn câu trả lời...");
+      showActivity(ic("pen-line") + " Đang soạn câu trả lời...");
       setOrbState("thinking", "ĐANG SUY NGHĨ");
     }
     persistSession();
@@ -382,7 +382,7 @@ function appendUserMessage(text, attachments, ts) {
     attHtml = `<div class="msg-attach">` + attachments.map(a =>
       a.preview
         ? `<img src="${a.preview}" alt="${escapeHtml(a.name)}">`
-        : `<span class="file-tag">📝 ${escapeHtml(a.name)}</span>`
+        : `<span class="file-tag">${ic("file-text")} ${escapeHtml(a.name)}</span>`
     ).join("") + `</div>`;
   }
   // Tin dài (>10 dòng hoặc >900 ký tự) thu gọn lại, bấm "Xem thêm" để mở
@@ -535,7 +535,7 @@ function copyText(s) {
 }
 function flashCopied(btn, label) {
   const old = btn.textContent;
-  btn.textContent = "✓ Đã copy";
+  btn.innerHTML = ic("check", { cls: "ic-ok" }) + " Đã copy";
   setTimeout(() => { btn.textContent = label || old; }, 1200);
 }
 // Bấm một nút trong hàng .msg-acts. Gửi lại / sửa lại đều lấy chữ GỐC của tin người
@@ -592,22 +592,53 @@ function updateSysStatus(s) {
 }
 
 const usedMCPs = new Map();
+function compactToolLabel(toolName) {
+  const raw = String(toolName || "").trim();
+  let label = raw || "Tool", cat = "Tool";
+  // CLI đôi khi gửi NGUYÊN câu lệnh đang chạy thay vì tên tool. Không đưa command/path dài
+  // lên status bar: vừa rối, vừa làm min-content nới cả layout.
+  if (/^(?:\/(?:usr\/)?bin\/)?(?:ba|z|k)?sh(?:\s|$)/i.test(raw)
+      || /^(?:powershell|pwsh|cmd(?:\.exe)?)(?:\s|$)/i.test(raw)
+      || /(?:^|__)(?:shell|exec)_command$/i.test(raw)) {
+    return { label: "Terminal", cat: "Local" };
+  }
+  if (raw.includes("pos_")) { cat = "POS"; label = "Pancake POS"; }
+  else if (/facebook|fb_/i.test(raw)) { cat = "Ads"; label = "Facebook"; }
+  else if (/instagram|ig_/i.test(raw)) { cat = "Social"; label = "Instagram"; }
+  else if (/youtube|yt_/i.test(raw)) { cat = "Social"; label = "YouTube"; }
+  else if (/ga4|analytics/i.test(raw)) { cat = "Web"; label = "Analytics"; }
+  else if (/Read|Grep|Glob|vault/i.test(raw)) { cat = "Local"; label = "Files/Vault"; }
+  else if (raw.startsWith("mcp__")) {
+    const p = raw.split("__");
+    if (p.length >= 3) label = p[2].replace(/_/g, " ");
+    cat = "MCP";
+  }
+  if (label.length > 48) label = label.slice(0, 47) + "…";
+  return { label, cat };
+}
 function trackMCP(toolName) {
   const list = document.getElementById("mcpList");
-  let label = toolName, cat = "Tool";
-  if (toolName.includes("pos_")) { cat = "POS"; label = "Pancake POS"; }
-  else if (/facebook|fb_/i.test(toolName)) { cat = "Ads"; label = "Facebook"; }
-  else if (/instagram|ig_/i.test(toolName)) { cat = "Social"; label = "Instagram"; }
-  else if (/youtube|yt_/i.test(toolName)) { cat = "Social"; label = "YouTube"; }
-  else if (/ga4|analytics/i.test(toolName)) { cat = "Web"; label = "Analytics"; }
-  else if (/Read|Grep|Glob|vault/i.test(toolName)) { cat = "Local"; label = "Files/Vault"; }
-  else if (toolName.startsWith("mcp__")) { const p = toolName.split("__"); if (p.length >= 3) label = p[2].replace(/_/g, " "); }
+  if (!list) return;
+  const { label, cat } = compactToolLabel(toolName);
   if (!usedMCPs.has(label)) {
     if (list.querySelector(".dim")) list.innerHTML = "";
     const div = document.createElement("div");
     div.className = "mcp-item active";
-    div.innerHTML = `⬤ ${label} <span style="color:var(--text3);font-size:10px">· ${cat}</span>`;
+    div.title = String(toolName || label);
+    div.insertAdjacentHTML("beforeend", `${ic("circle", { cls: "ic-fill ic-sm" })} ${escapeHtml(label)} `);
+    const meta = document.createElement("span");
+    meta.className = "mcp-kind";
+    meta.textContent = `· ${cat}`;
+    div.appendChild(meta);
     list.appendChild(div); usedMCPs.set(label, div);
+    // Đây là trạng thái gần đây, không phải nhật ký. Giữ tối đa 4 loại để DOM/dải ngang
+    // không phình mãi trong một phiên chat dài.
+    while (usedMCPs.size > 4) {
+      const oldest = usedMCPs.keys().next().value;
+      const oldEl = usedMCPs.get(oldest);
+      if (oldEl && oldEl.parentNode) oldEl.parentNode.removeChild(oldEl);
+      usedMCPs.delete(oldest);
+    }
   } else {
     const el = usedMCPs.get(label);
     el.classList.add("loading");
@@ -616,38 +647,14 @@ function trackMCP(toolName) {
 }
 
 // ============================================
-// 3D Graph (always visible centerpiece)
+// Knowledge graph (2D canvas)
 // ============================================
-const graph3dContainer = document.getElementById("graph3dContainer");
-const graphTooltip = document.getElementById("graphTooltip");
 const graphStats = document.getElementById("graphStats");
 const graphSource = document.getElementById("graphSource");
 let javisGraph = null;
 
-graph3dContainer.addEventListener("mousemove", (e) => {
-  graphTooltip.style.left = (e.clientX + 14) + "px";
-  graphTooltip.style.top = (e.clientY + 14) + "px";
-});
-// Tooltip chỉ được ẩn bởi onNodeHover(null) của canvas; khi editor/overlay phủ lên thì canvas
-// hết nhận pointer event nên tooltip treo mãi. Chuột rời vùng graph là ẩn thẳng tay.
-graph3dContainer.addEventListener("mouseleave", () => { graphTooltip.style.display = "none"; });
-
-let _graphMode = "2d";                 // mặc định 2D (canvas thuần, nhẹ, đỡ lag). Đổi trong Cài đặt.
-let _libs3dPromise = null;
-function _ensure3DLibs() {              // nạp three.js + 3d-force-graph LAZY, chỉ khi cần 3D
-  if (window.ForceGraph3D) return Promise.resolve();
-  if (_libs3dPromise) return _libs3dPromise;
-  const loadScript = (src) => new Promise((res, rej) => {
-    const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej;
-    document.head.appendChild(s);
-  });
-  _libs3dPromise = loadScript("https://unpkg.com/three@0.159.0/build/three.min.js")
-    .then(() => loadScript("https://unpkg.com/3d-force-graph@1.73.4/dist/3d-force-graph.min.js"))
-    .catch(() => {});
-  return _libs3dPromise;
-}
 let _lib2dPromise = null;
-function _ensure2DLib() {               // nạp force-graph (2D, d3-force) LAZY khi cần 2D - nhẹ, không WebGL
+function _ensure2DLib() {               // force-graph + d3-force, self-hosted và không dùng WebGL
   if (window.ForceGraph) return Promise.resolve();
   if (_lib2dPromise) return _lib2dPromise;
   _lib2dPromise = new Promise((resolve) => {
@@ -659,63 +666,25 @@ function _ensure2DLib() {               // nạp force-graph (2D, d3-force) LAZY
   return _lib2dPromise;
 }
 
-async function initGraph(forceMode) {
+async function initGraph() {
   const c2d = document.getElementById("graph2d");
-  // Nguồn chọn 2D/3D: forceMode (vừa bấm) → localStorage (bền, không cần server) → /settings → mặc định 2D.
-  if (forceMode === "2d" || forceMode === "3d") {
-    _graphMode = forceMode;
-  } else {
-    const ls = localStorage.getItem("javis.graphMode");
-    if (ls === "2d" || ls === "3d") { _graphMode = ls; }
-    else {
-      try {
-        const s = await (await fetch("/settings")).json();
-        if (s && s.dashboard && s.dashboard.graph_mode) _graphMode = s.dashboard.graph_mode;
-      } catch (e) {}
-    }
-  }
-  if (_graphMode === "3d") {
-    await _ensure3DLibs();
-    if (!window.JavisGraph3D || !window.ForceGraph3D) {
-      graphStats.textContent = "⚠ Lỗi tải thư viện 3D (kiểm tra mạng)";
-      return;
-    }
-    if (c2d) c2d.style.display = "none";
-    graph3dContainer.style.display = "";
-    javisGraph = new JavisGraph3D(graph3dContainer, graphTooltip);
-  } else {
-    graph3dContainer.style.display = "none";
-    if (c2d) c2d.style.display = "block";   // "" sẽ rơi về CSS #graph2d{display:none} → bị ẩn
-    await _ensure2DLib();
-    if (!window.ForceGraph) { graphStats.textContent = "⚠ Lỗi tải thư viện đồ thị 2D (kiểm tra mạng)"; return; }
-    javisGraph = new JavisGraph(c2d, graphTooltip);   // resize() gọi bên trong load()
-  }
+  if (c2d) c2d.style.display = "block";   // "" sẽ rơi về CSS #graph2d{display:none} → bị ẩn
+  await _ensure2DLib();
+  if (!window.ForceGraph) { graphStats.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Lỗi tải thư viện đồ thị (kiểm tra mạng)"; return; }
+  javisGraph = new JavisGraph(c2d);   // resize() gọi bên trong load()
   await reloadGraph();
 }
-
-// Đổi 2D/3D trong Cài đặt → dựng lại đồ thị tại chỗ (console.js gọi sau khi lưu setting).
-window.reinitGraph = async function (forceMode) {
-  try { if (javisGraph && javisGraph.pause) javisGraph.pause(); } catch (e) {}
-  javisGraph = null;
-  try { graph3dContainer.innerHTML = ""; } catch (e) {}
-  const c2d = document.getElementById("graph2d");
-  if (c2d) { try { c2d.innerHTML = ""; } catch (e) {} }   // #graph2d giờ là div force-graph gắn canvas vào
-  await initGraph(forceMode);
-  connectGraphWatch();
-};
 
 // Click node trong graph → Javis mở & thao tác note đó trong vault
 window.onGraphNodeClick = (node) => {
   if (!node || !node.path) return;
-  // Editor mở phủ lên canvas → canvas không còn hover event để tự ẩn tooltip, phải ẩn ngay tại đây
-  try { graphTooltip.style.display = "none"; } catch (e) {}
   const brainRel = (node.path || "").split("/").slice(1).join("/") || node.path;   // bỏ đoạn gốc → path tương đối brain
   if (typeof window.JavisOpenNote === "function") window.JavisOpenNote(brainRel);   // mở editor cây (WYSIWYG + công cụ)
   else openNodePopup(node);   // dự phòng nếu editor cây chưa sẵn
 };
 
 // ============================================
-// Popup đọc / sửa 1 node của graph 3D. Node.path = "<tên thư mục gốc>/<đường dẫn>"; bỏ đoạn gốc
+// Popup đọc / sửa 1 node của graph. Node.path = "<tên thư mục gốc>/<đường dẫn>"; bỏ đoạn gốc
 // để hợp path tương đối của /files. Đọc qua /files/read, lưu qua /files/write (như trang Tệp tin).
 // ============================================
 let _nodeModal = null;
@@ -743,8 +712,8 @@ function _ensureNodeModal() {
         '<span class="node-title" id="nodeTitle"></span>' +
         '<span class="node-actions">' +
           '<a class="nm-btn" id="nodeOpenTab" target="_blank" rel="noopener">↗ Tab mới</a>' +
-          '<button class="nm-btn" id="nodeSave" type="button">💾 Lưu</button>' +
-          '<button class="nm-btn" id="nodeCloseBtn" type="button">✕</button>' +
+          '<button class="nm-btn" id="nodeSave" type="button">' + ic("save") + ' Lưu</button>' +
+          '<button class="nm-btn" id="nodeCloseBtn" type="button">' + ic("x") + '</button>' +
         '</span>' +
       '</div>' +
       '<div class="node-path" id="nodePath"></div>' +
@@ -780,7 +749,7 @@ async function openNodePopup(node) {
   body.innerHTML = '<textarea id="nodeText" spellcheck="false"></textarea>';
   body.querySelector("#nodeText").value = d.content || "";
   saveBtn.style.display = "";
-  saveBtn.textContent = "💾 Lưu";
+  saveBtn.innerHTML = ic("save") + " Lưu";
   saveBtn.onclick = async () => {
     saveBtn.textContent = "Đang lưu…";
     const fd = new FormData();
@@ -788,8 +757,8 @@ async function openNodePopup(node) {
     fd.append("content", body.querySelector("#nodeText").value);
     let r = {};
     try { r = await (await fetch("/files/write", { method: "POST", body: fd })).json(); } catch (e) { r = { error: (e && e.message) || "lỗi" }; }
-    saveBtn.textContent = (r && r.ok) ? "✓ Đã lưu" : "⚠ Lỗi";
-    setTimeout(() => { saveBtn.textContent = "💾 Lưu"; }, 1600);
+    saveBtn.innerHTML = (r && r.ok) ? ic("check", { cls: "ic-ok" }) + " Đã lưu" : ic("triangle-alert", { cls: "ic-warn" }) + " Lỗi";
+    setTimeout(() => { saveBtn.innerHTML = ic("save") + " Lưu"; }, 1600);
   };
   setTimeout(() => { try { body.querySelector("#nodeText").focus(); } catch (e) {} }, 30);
 }
@@ -803,8 +772,7 @@ async function reloadGraph() {
   try {
     const data = await javisGraph.load(query);
     const stats = data.stats || {};
-    const hidden = stats.hidden ? ` · ẩn ${stats.hidden}` : "";
-    graphStats.textContent = `${stats.total_notes} note · ${stats.total_links} kết nối${hidden}`;
+    graphStats.textContent = `${stats.total_notes} note · ${stats.total_links} kết nối`;
     renderConceptLabels(data.categories || [], stats.total_notes || 0);
   } catch (e) { graphStats.textContent = "Lỗi: " + e.message; }
 }
@@ -892,7 +860,7 @@ vbInit.addEventListener("click", async () => {
     fd.append("brain", currentBrainPath());
     const d = await (await fetch("/vault/init", { method: "POST", body: fd })).json();
     if (d.ok) {
-      vbText.textContent = `✓ Đã tạo: ${(d.created || []).join(", ") || "(đã đủ)"}`;
+      vbText.innerHTML = `${ic("check", { cls: "ic-ok" })} Đã tạo: ${escapeHtml((d.created || []).join(", ") || "(đã đủ)")}`;
       vbInit.style.display = "none";
       setTimeout(() => { vaultBanner.classList.remove("show"); vbInit.style.display = ""; checkVault(); }, 2500);
     }
@@ -945,7 +913,7 @@ function renderConceptLabels(categories, total) {
     div.dataset.cat = catKey;
     div.innerHTML = `<div class="cl-name">${escapeHtml(c.name.toUpperCase())}</div>` +
       `<div class="cl-meta">${c.count} note · <span class="cl-fire"${catCol ? ` style="color:${catCol}"` : ""}>${share}% Vault</span></div>`;
-    // Bấm nhãn danh mục → rọi sáng đúng cụm đó trong đồ thị (chỉ đồ thị 2D hỗ trợ; 3D bỏ qua an toàn).
+    // Bấm nhãn danh mục → rọi sáng đúng cụm đó trong đồ thị.
     div.style.cursor = "pointer";
     div.title = "Bấm để rọi sáng cụm " + c.name;
     div.onclick = () => {
@@ -962,18 +930,30 @@ function renderConceptLabels(categories, total) {
   }
 }
 
-// Brain folder tùy chọn - lưu localStorage, hiện trong dropdown
+// Brain folder tùy chọn - lưu localStorage, hiện trong dropdown.
+//
+// Thẻ <option> chỉ nhận CHỮ, không nhận SVG, nên đây là chỗ duy nhất trong
+// dashboard không dùng được icon. Phân biệt "thư mục ngoài" với brain thật bằng
+// <optgroup> - cách gốc của HTML, hiển thị đúng trên mọi máy và vẫn giữ trọn
+// thông tin mà trước đây icon thư mục đang mang.
 function loadCustomBrains() {
   const brains = JSON.parse(localStorage.getItem("javis.brains") || "[]");
-  // Xóa option cũ
+  // Xóa nhóm + option cũ
+  const oldGrp = graphSource.querySelector('optgroup[data-custom-group]');
+  if (oldGrp) oldGrp.remove();
   [...graphSource.querySelectorAll("option[data-custom]")].forEach(o => o.remove());
+  if (!brains.length) return;
+  const grp = document.createElement("optgroup");
+  grp.label = "Thư mục ngoài";
+  grp.dataset.customGroup = "1";
   brains.forEach(b => {
     const opt = document.createElement("option");
     opt.value = "path:" + b.path;
-    opt.textContent = "📁 " + b.name;
+    opt.textContent = b.name;
     opt.dataset.custom = "1";
-    graphSource.appendChild(opt);
+    grp.appendChild(opt);
   });
+  graphSource.appendChild(grp);
 }
 function addCustomBrain(path) {
   const brains = JSON.parse(localStorage.getItem("javis.brains") || "[]");
@@ -1014,7 +994,7 @@ async function fmBrowse(path) {
     if (data.parent !== null && data.parent !== undefined) {
       const up = document.createElement("div");
       up.className = "fm-row up";
-      up.innerHTML = `<span class="fm-name">⬆ .. (lên trên)</span>`;
+      up.innerHTML = `<span class="fm-name">${ic("arrow-up")} .. (lên trên)</span>`;
       up.onclick = () => fmBrowse(data.parent);
       fmList.appendChild(up);
     }
@@ -1022,7 +1002,7 @@ async function fmBrowse(path) {
       const row = document.createElement("div");
       row.className = "fm-row";
       const mdBadge = d.md ? `<span class="fm-md">${d.md} .md</span>` : "";
-      row.innerHTML = `<span class="fm-name">📁 ${d.name}</span>${mdBadge}`;
+      row.innerHTML = `<span class="fm-name">${ic("folder")} ${escapeHtml(d.name)}</span>${mdBadge}`;
       row.onclick = () => fmBrowse(d.path);
       fmList.appendChild(row);
     });
@@ -1103,6 +1083,7 @@ function initStarfield() {
   const ctx = cv.getContext("2d");
   let stars = [];
   let sky = SKY_DARK;
+  let cssW = 0, cssH = 0, dpr = 1, lastDraw = 0;
   const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
   function paintStars() {
@@ -1112,13 +1093,21 @@ function initStarfield() {
 
   function resize() {
     const rect = cv.parentElement.getBoundingClientRect();
-    cv.width = Math.round(rect.width);
-    cv.height = Math.round(rect.height);
+    cssW = Math.round(rect.width);
+    cssH = Math.round(rect.height);
+    // Canvas cỡ CSS bị trình duyệt kéo giãn trên màn HiDPI → lưới, sao và quầng đều mờ.
+    // Giới hạn 1.5 để lấy lại độ nét mà không nhân 4-9 lần chi phí vẽ như DPR 2-3 nguyên bản.
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    cv.width = Math.max(1, Math.round(cssW * dpr));
+    cv.height = Math.max(1, Math.round(cssH * dpr));
+    cv.style.width = cssW + "px";
+    cv.style.height = cssH + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // Ít sao + rải đều, mờ - không tạo cụm lạc
-    const count = Math.max(40, Math.floor((cv.width * cv.height) / 16000));
+    const count = Math.max(40, Math.floor((cssW * cssH) / 16000));
     stars = Array.from({ length: count }, () => ({
-      x: Math.random() * cv.width,
-      y: Math.random() * cv.height,
+      x: Math.random() * cssW,
+      y: Math.random() * cssH,
       r: Math.random() * 1.0 + 0.2,
       tw: Math.random() * Math.PI * 2,
       sp: Math.random() * 0.04 + 0.006,
@@ -1135,42 +1124,48 @@ function initStarfield() {
   window.addEventListener("javis-theme-change", e => syncSky(!!(e && e.detail && e.detail.light)));
   syncSky(document.documentElement.getAttribute("data-theme") === "light");
 
-  function draw() {
+  function draw(now) {
     requestAnimationFrame(draw);
     if (document.hidden) return;
-    // Tự đo lại kích thước (sửa lỗi nền dồn 1 góc khi layout chưa xong lúc boot)
-    const pw = Math.round(cv.parentElement.getBoundingClientRect().width);
-    if (pw > 0 && cv.width !== pw) resize();
-    if (!cv.width) return;
+    // Nền 2D từng tự dựng gradient + grid ở 60 FPS dù não đứng yên. 15 FPS lúc nghỉ vẫn
+    // đủ cho sao nhấp nháy chậm; khi có giọng/đang nghĩ nâng lên 30 FPS.
     const lvl = voice.getLevel();
-    ctx.clearRect(0, 0, cv.width, cv.height);
+    const interval = (lvl > 0.01 || _thinkingActive) ? 33 : 66;
+    if (now && now - lastDraw < interval) return;
+    lastDraw = now || 0;
+    // Tự đo lại kích thước (sửa lỗi nền dồn 1 góc khi layout chưa xong lúc boot)
+    const rect = cv.parentElement.getBoundingClientRect();
+    const pw = Math.round(rect.width), ph = Math.round(rect.height);
+    if (pw > 0 && (cssW !== pw || cssH !== ph)) resize();
+    if (!cssW) return;
+    ctx.clearRect(0, 0, cssW, cssH);
 
     // Quầng ở TRUNG TÂM - phồng nhẹ theo giọng
-    const cx = cv.width / 2, cy = cv.height / 2;
-    const rr = Math.min(cv.width, cv.height) * (0.6 + lvl * 0.15);
+    const cx = cssW / 2, cy = cssH / 2;
+    const rr = Math.min(cssW, cssH) * (0.6 + lvl * 0.15);
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr);
     const a = sky.haloBase + lvl * sky.haloGain;
     g.addColorStop(0, rgba(sky.haloIn, a));
     g.addColorStop(0.5, rgba(sky.haloMid, a * 0.4));
     g.addColorStop(1, sky.haloOut);
     ctx.fillStyle = g;
-    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillRect(0, 0, cssW, cssH);
 
     // Grid floor phối cảnh (HUD command center) - đáy màn hình
-    const horizonY = cv.height * 0.72;
-    const vpX = cv.width / 2;
+    const horizonY = cssH * 0.72;
+    const vpX = cssW / 2;
     ctx.strokeStyle = rgba(sky.grid, sky.gridBase + lvl * sky.gridGain);
     ctx.lineWidth = 1;
     const cols = 18;
     for (let i = 0; i <= cols; i++) {
-      const fx = (i / cols) * cv.width;
-      ctx.beginPath(); ctx.moveTo(fx, cv.height); ctx.lineTo(vpX, horizonY); ctx.stroke();
+      const fx = (i / cols) * cssW;
+      ctx.beginPath(); ctx.moveTo(fx, cssH); ctx.lineTo(vpX, horizonY); ctx.stroke();
     }
     const rows = 9;
     for (let j = 1; j <= rows; j++) {
       const t = j / rows;
-      const y = horizonY + (cv.height - horizonY) * (t * t);
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cv.width, y); ctx.stroke();
+      const y = horizonY + (cssH - horizonY) * (t * t);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(cssW, y); ctx.stroke();
     }
 
     // Sóng nơron khi đang suy nghĩ - vòng lan toả CHẬM, dịu (bỏ tia nhấp nháy cho đỡ rối)
@@ -1179,7 +1174,7 @@ function initStarfield() {
       const ringCount = 2;
       for (let i = 0; i < ringCount; i++) {
         const phase = ((now / 1700) + i / ringCount) % 1;
-        const r = phase * Math.min(cv.width, cv.height) * 0.5;
+        const r = phase * Math.min(cssW, cssH) * 0.5;
         const alpha = (1 - phase) * 0.15 * sky.ringGain;
         ctx.strokeStyle = rgba(sky.ring, alpha);
         ctx.lineWidth = 1.4;
@@ -1272,23 +1267,23 @@ async function doReflect(auto) {
   if (reflecting) return;
   reflecting = true;
   turnsSinceReflect = 0;
-  if (!auto && learnBtn) { learnBtn.disabled = true; learnBtn.textContent = "🧠 Đang học..."; }
-  if (memResult) memResult.textContent = auto ? "🧠 Đang tự học nền..." : "Javis đang đọc lại hội thoại và rút ra ký ức...";
+  if (!auto && learnBtn) { learnBtn.disabled = true; learnBtn.innerHTML = ic("brain") + " Đang học..."; }
+  if (memResult) memResult.innerHTML = auto ? ic("brain") + " Đang tự học nền..." : "Javis đang đọc lại hội thoại và rút ra ký ức...";
   try {
     const fd = new FormData();
     fd.append("brain", currentBrainPath());
     const d = await (await fetch("/reflect", { method: "POST", body: fd })).json();
     if (d.ok) {
-      if (memResult) memResult.textContent = (auto ? "🧠 Tự học: " : "") + (d.summary || "Đã học xong.");
+      if (memResult) memResult.innerHTML = (auto ? ic("brain") + " Tự học: " : "") + escapeHtml(d.summary || "Đã học xong.");
       if (d.facts != null && memCount) memCount.textContent = d.facts;
     } else {
-      if (memResult) memResult.textContent = "⚠ " + (d.error || "Học thất bại");
+      if (memResult) memResult.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(d.error || "Học thất bại");
     }
   } catch (e) {
-    if (memResult) memResult.textContent = "⚠ Lỗi mạng";
+    if (memResult) memResult.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Lỗi mạng";
   } finally {
     reflecting = false;
-    if (!auto && learnBtn) { learnBtn.textContent = "🧠 Học từ hội thoại"; learnBtn.disabled = false; }
+    if (!auto && learnBtn) { learnBtn.innerHTML = ic("brain") + " Học từ hội thoại"; learnBtn.disabled = false; }
   }
 }
 
@@ -1322,11 +1317,11 @@ function renderChips() {
     chip.className = "attach-chip" + (a.uploading ? " uploading" : "");
     const thumb = a.preview
       ? `<img src="${a.preview}" alt="">`
-      : `<div class="chip-ico">${a.uploading ? "⏳" : "📝"}</div>`;
+      : `<div class="chip-ico">${a.uploading ? ic("loader", { cls: "ic-spin" }) : ic("file-text")}</div>`;
     const meta = a.uploading
       ? (a.statusText || "đang xử lý...")
       : (a.statusText ? a.statusText : (fmtSize(a.size) + (a.folder ? ` → ${escapeHtml(a.folder)}` : "")));
-    chip.innerHTML = `${thumb}<div class="chip-info"><span class="chip-name">${escapeHtml(a.name)}</span><span class="chip-meta">${meta}</span></div><button class="chip-x" data-i="${i}">✕</button>`;
+    chip.innerHTML = `${thumb}<div class="chip-info"><span class="chip-name">${escapeHtml(a.name)}</span><span class="chip-meta">${meta}</span></div><button class="chip-x" data-i="${i}">${ic("x")}</button>`;
     attachBar.appendChild(chip);
   });
   attachBar.querySelectorAll(".chip-x").forEach(b =>
@@ -1553,8 +1548,8 @@ async function refreshTgStatus() {
   try {
     const s = await (await fetch("/telegram/status")).json();
     if (!s.enabled) el.textContent = "● Tắt";
-    else if (!s.token_set) el.textContent = "⚠ Đã bật nhưng chưa có token";
-    else el.textContent = s.running ? "🟢 Đang chạy" + (s.chat_id ? " · chỉ chat_id " + s.chat_id : " · MỌI người (nên đặt chat_id)") : "⏳ Chưa chạy (lưu lại)";
+    else if (!s.token_set) el.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " Đã bật nhưng chưa có token";
+    else el.innerHTML = s.running ? ic("circle", { cls: "ic-fill ic-ok" }) + " Đang chạy" + (s.chat_id ? " · chỉ chat_id " + s.chat_id : " · MỌI người (nên đặt chat_id)") : ic("loader") + " Chưa chạy (lưu lại)";
   } catch (e) { el.textContent = ""; }
 }
 async function refreshEngineBadge() {
@@ -1687,7 +1682,7 @@ async function openSettings() {
     refreshTgStatus();
     document.getElementById("setAuthUser").value = (s.auth && s.auth.username) || "";
     document.getElementById("setAuthState").textContent = (s.auth && s.auth.has_password)
-      ? "✓ Đã đặt mật khẩu - đăng nhập bắt buộc." : "⚠ Chưa đặt mật khẩu - ai mở trang cũng dùng được. Đặt mật khẩu trước khi lên VPS.";
+      ? ic("check", { cls: "ic-ok" }) + " Đã đặt mật khẩu - đăng nhập bắt buộc." : ic("triangle-alert", { cls: "ic-warn" }) + " Chưa đặt mật khẩu - ai mở trang cũng dùng được. Đặt mật khẩu trước khi lên VPS.";
   } catch (e) {}
 }
 function _saveSetting(section, dataObj, btn) {
@@ -1696,7 +1691,7 @@ function _saveSetting(section, dataObj, btn) {
   fd.append("data", JSON.stringify(dataObj));
   const old = btn.textContent; btn.disabled = true; btn.textContent = "Đang lưu...";
   return fetch("/settings", { method: "POST", body: fd }).then(r => r.json()).then(d => {
-    btn.textContent = d.ok ? "✓ Đã lưu" : ("⚠ " + (d.error || "lỗi"));
+    btn.innerHTML = d.ok ? ic("check", { cls: "ic-ok" }) + " Đã lưu" : (ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(d.error || "lỗi"));
     setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 1500);
     return d;
   }).catch(() => { btn.textContent = old; btn.disabled = false; });
@@ -1743,9 +1738,9 @@ if (document.getElementById("settingsBtn")) {
     try {
       const r = await (await fetch("/telegram/test", { method: "POST" })).json();
       btn.textContent = r.ok
-        ? (r.total > 1 ? `✓ Đã gửi ${r.sent}/${r.total} ID` + (r.error ? " (có lỗi)" : "") : "✓ Đã gửi (xem Telegram)")
-        : ("⚠ " + (r.error || "lỗi"));
-    } catch (e) { btn.textContent = "⚠ lỗi mạng"; }
+        ? (r.total > 1 ? `${ic("check", { cls: "ic-ok" })} Đã gửi ${r.sent}/${r.total} ID` + (r.error ? " (có lỗi)" : "") : ic("check", { cls: "ic-ok" }) + " Đã gửi (xem Telegram)")
+        : (ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(r.error || "lỗi"));
+    } catch (e) { btn.innerHTML = ic("triangle-alert", { cls: "ic-warn" }) + " lỗi mạng"; }
     setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 2500);
   });
   document.getElementById("savePassword").addEventListener("click", async (e) => {
@@ -1758,7 +1753,7 @@ if (document.getElementById("settingsBtn")) {
       const fd = new FormData(); fd.append("username", user || "admin"); fd.append("password", pass);
       const btn = e.target; btn.disabled = true; const old = btn.textContent; btn.textContent = "Đang đặt...";
       const d = await (await fetch("/auth/setup", { method: "POST", body: fd })).json();
-      btn.textContent = d.ok ? "✓ Đã đặt mật khẩu" : ("⚠ " + (d.error || "lỗi")); btn.disabled = false;
+      btn.innerHTML = d.ok ? ic("check", { cls: "ic-ok" }) + " Đã đặt mật khẩu" : (ic("triangle-alert", { cls: "ic-warn" }) + " " + escapeHtml(d.error || "lỗi")); btn.disabled = false;
       if (d.ok) { document.getElementById("setAuthPass").value = ""; openSettings(); }
     } else {
       const data = { username: user }; if (pass) data.new_password = pass;
@@ -1788,10 +1783,10 @@ async function loadOrModels(saved, force) {
   const input = document.getElementById("setOrModel");
   if (!sel) return;
   if (!_orModelsLoaded || force) {
-    sel.innerHTML = '<option value="__custom__">✏️ Nhập tên model khác (custom)…</option><option disabled>đang tải…</option>';
+    sel.innerHTML = '<option value="__custom__">Nhập tên model khác (custom)…</option><option disabled>đang tải…</option>';
     try {
       const d = await (await fetch("/openrouter/models")).json();
-      sel.innerHTML = '<option value="__custom__">✏️ Nhập tên model khác (custom)…</option>';
+      sel.innerHTML = '<option value="__custom__">Nhập tên model khác (custom)…</option>';
       (d.models || []).forEach(m => {
         const o = document.createElement("option");
         o.value = m.id; o.textContent = m.id;
@@ -1799,7 +1794,7 @@ async function loadOrModels(saved, force) {
       });
       _orModelsLoaded = (d.models || []).length > 0;
     } catch (e) {
-      sel.innerHTML = '<option value="__custom__">✏️ Nhập tên model khác (custom)…</option>';
+      sel.innerHTML = '<option value="__custom__">Nhập tên model khác (custom)…</option>';
     }
   }
   // Chọn model đã lưu nếu có trong list, ngược lại dùng custom

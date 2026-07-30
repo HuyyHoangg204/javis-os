@@ -24,7 +24,7 @@
 /* Header (.hud-top) thành thanh top TOÀN CỤC: luôn nằm trên cùng, cview quản lý bắt đầu dưới nó.
    .hud render sẵn phía sau → header (row 52px đầu) lộ ra; z-index để chắc chắn nổi trên cview. */
 .hud-top { position: relative; z-index: 45; }
-/* Nút điều khiển trợ lý (⚙ voice 🔊 ↻) chỉ thuộc cockpit Javis → ẩn khi đang ở trang quản lý */
+/* Nút điều khiển trợ lý (cài đặt, giọng nói, làm mới) chỉ thuộc cockpit Javis → ẩn khi đang ở trang quản lý */
 body.in-console .hud-actions { display: none; }
 
 /* ===== Rail (sidebar dọc, kính mờ) ===== */
@@ -389,13 +389,13 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
     --topbar-h: calc(46px + env(safe-area-inset-top, 0px));
   }   /* header thấp hơn trên mobile nhưng vẫn chừa tai thỏ khi chạy full-screen */
 
-  /* Header mobile: chỉ ☰ · chip model · ＋. Ẩn phần rườm rà. */
+  /* Header mobile: chỉ nút menu, chip model, nút thêm. Ẩn phần rườm rà. */
   .nav-toggle-btn, .new-chat-btn { display: inline-flex; }
-  /* Header CỐ ĐỊNH trên cùng: luôn thấy ☰/chip model/＋ ở mọi trang, không bị cuộn trôi mất. */
+  /* Header CỐ ĐỊNH trên cùng: luôn thấy nút menu, chip model, nút thêm ở mọi trang, không bị cuộn trôi mất. */
   .hud-top { position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 55;
     background: var(--bg2); border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 6px; padding: 0 8px; }
-  .hud-top-left, .hud-top-right { display: none; }    /* rỗng ở mobile: ☰ · chip model · ＋ là con trực tiếp header */
+  .hud-top-left, .hud-top-right { display: none; }    /* rỗng ở mobile: nút menu, chip model, nút thêm là con trực tiếp header */
   .hud-top .brand, .hud-top .navbar-brain,
   .hud-top #themeToggle, .hud-top #studioOpenBtn,
   .hud-top #settingsBtn, .hud-top #ttsToggle, .hud-top #resetBtn { display: none; }
@@ -449,8 +449,14 @@ body.has-rail .hud { margin-left: var(--rail-w); width: calc(100% - var(--rail-w
   .rail-sys .graph-select { flex: 1 1 auto; min-width: 0; max-width: 100%; }
   .rail-sys-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .rail-sys-btns .hud-icon-btn { display: inline-flex; }
-  .rail-sys .sysbar { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; overflow: visible; }
-  .rail-sys .sys-status, .rail-sys .mcp-list { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .rail-sys .sysbar {
+    display: flex; flex: none; width: 100%; min-width: 0; max-width: 100%;
+    flex-direction: column; align-items: flex-start; gap: 6px; overflow: visible;
+  }
+  .rail-sys .sys-status, .rail-sys .mcp-list {
+    width: 100%; min-width: 0; flex-direction: column; align-items: flex-start;
+    gap: 3px; overflow: hidden;
+  }
 
   /* Nền mờ khi mở ngăn kéo */
   .nav-backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 55; }

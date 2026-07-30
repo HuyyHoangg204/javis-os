@@ -2,7 +2,7 @@
 //  - dời chip model (#mbOpen + #mbPop) và nút + (#newChatBtn) lên header khi mobile, trả về khi desktop
 //  - dời nhóm Hệ thống (chọn brain, đổi tông, loa, dải HỆ THỐNG) vào đáy ngăn kéo
 //  - nút + = hội thoại mới (reset) + focus ô nhập
-//  - ngăn kéo điều hướng: ☰ mở/đóng, backdrop / Esc / chọn mục thì đóng
+//  - ngăn kéo điều hướng: nút menu mở/đóng, backdrop / Esc / chọn mục thì đóng
 //  - rút gọn placeholder ô nhập cho vừa bề ngang điện thoại
 (function () {
   function init() {
