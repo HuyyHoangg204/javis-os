@@ -149,7 +149,8 @@
       "mic",
       "send",
       "palette",
-      "type"
+      "type",
+      "pin"
     ]
   }
 }
