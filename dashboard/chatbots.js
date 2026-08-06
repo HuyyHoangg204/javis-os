@@ -191,20 +191,32 @@
           '</b> <span class="cb-nhomcho-id">' + esc(g.chat_id) + '</span></div>' +
         '<div class="cb-nhomcho-d">' + (g.lan
           ? 'Có người gọi bot ở đây ' + g.lan + ' lần mà bot chưa được bật cho nhóm này.'
-          : 'Bot vừa được thêm vào nhóm này nhưng chưa được bật cho nó.') + '</div>' +
+          : 'Bot đang ở trong nhóm này nhưng chưa được bật cho nó.') + '</div>' +
         '<div class="cb-nhomcho-a">' +
           '<button class="s-btn cb-ok-nhom" type="button">' + ic("check") + ' Cho phép nhóm này</button>' +
           '<button class="s-btn-ghost cb-bo-nhom" type="button">Bỏ qua</button>' +
         '</div></div>';
     }).join("");
-    // Chế độ riêng tư của Telegram vô hiệu hoá tuỳ chọn "trả lời mọi tin" từ phía Telegram,
-    // trước khi Javis kịp nhìn thấy tin nào. Không nói ra thì cấu hình hứa một đằng, bot làm
-    // một nẻo, và mọi dấu hiệu trên trang này đều xanh.
-    var riengTu = (b.reply_when === "always" && st.da_hoi_telegram && !st.doc_moi_tin_nhom)
-      ? '<div class="cb-quyen ghi">' + ic("triangle-alert") + ' Bot đặt <b>trả lời mọi tin trong ' +
-        'nhóm</b>, nhưng Telegram đang bật chế độ riêng tư nên nó chỉ nhận được tin nhắc tên, ' +
-        'tin trả lời vào nó và lệnh. Muốn nhận mọi tin thì vào @BotFather, gõ /setprivacy, chọn ' +
-        'bot này rồi chọn Disable.</div>' : "";
+    // getMe hỏng: bot vẫn trả lời tin nhắn riêng hoàn hảo nhưng ĐIẾC trong mọi nhóm, vì không
+    // biết @username của chính mình thì không nhận ra ai đang gọi tên. Chấm vẫn xanh, lượt vẫn
+    // chạy, không có gì đỏ - nên nếu không có dòng này thì không ai đoán ra được.
+    var loiTen = st.loi_danh_tinh
+      ? '<div class="cb-err">' + ic("triangle-alert") + ' ' + esc(st.loi_danh_tinh) + '</div>' : "";
+    // Chế độ riêng tư của Telegram chặn Ở PHÍA TELEGRAM, trước khi Javis nhìn thấy tin nào.
+    // Hiện cho MỌI bot có dùng nhóm, không riêng bot đặt "trả lời mọi tin": nó là nguyên nhân
+    // số một của "nhắn riêng thì được, trong nhóm tag tên thì im re", và người dùng không có
+    // cách nào đoán ra vì mọi dấu hiệu trên trang này đều xanh.
+    var duNhom = (b.groups || []).length || (b.nhom_cho || []).length;
+    var riengTu = (duNhom && st.da_hoi_telegram && !st.doc_moi_tin_nhom)
+      ? '<div class="cb-quyen ghi">' + ic("triangle-alert") + ' Telegram đang bật <b>chế độ riêng ' +
+        'tư</b> cho bot này. Trong nhóm, thứ chắc chắn tới được nó là <b>lệnh /...</b> và <b>tin ' +
+        'trả lời thẳng vào tin của nó</b>' +
+        (b.reply_when === "always"
+          ? '; đặt "trả lời mọi tin" cũng không có tác dụng chừng nào chế độ này còn bật'
+          : '. Tag tên mà bot im thì gần như luôn là vì cái này') + '.<br>' +
+        'Sửa bằng MỘT trong hai cách: mở <b>@BotFather</b> gõ <b>/setprivacy</b>, chọn bot này, ' +
+        'chọn <b>Disable</b>; hoặc cho bot làm <b>quản trị viên</b> nhóm. Xong thì tắt bật lại ' +
+        'bot ở đây.</div>' : "";
     var c = el(
       '<div class="cb-card">' +
         '<div class="cb-head">' +
@@ -228,7 +240,7 @@
           (b.handoff_to ? '<span>' + ic("user") + ' có chuyển người trực</span>'
                         : '<span class="cb-warn">chưa đặt người nhận</span>') +
         '</div>' +
-        cho + quyen + riengTu + mat + lluot + cbao + loi +
+        cho + quyen + loiTen + riengTu + mat + lluot + cbao + loi +
         '<div class="cb-acts">' +
           '<button class="s-btn-ghost cb-toggle" type="button">' +
             (b.enabled ? ic("circle-stop") + " Tắt" : ic("play") + " Bật") + '</button>' +

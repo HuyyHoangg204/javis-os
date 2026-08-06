@@ -235,10 +235,18 @@ check("CANARY: ô nhóm KHÔNG còn bị giấu sau form Sửa",
   !/\(sua \? '<label>Nhóm được phép/.test(CB) && /id="cbGroups"/.test(CB));
 check("form tạo cũng gửi nhóm lên server", /groups: gr, reply_when: rw/.test(CB));
 check("chọn được khi nào bot lên tiếng trong nhóm", /id="cbReplyWhen"/.test(CB));
-// Chế độ riêng tư của Telegram vô hiệu hoá "trả lời mọi tin" từ phía Telegram, trước khi Javis
-// nhìn thấy tin nào. Không nói ra thì cấu hình hứa một đằng, bot làm một nẻo, mọi dấu hiệu xanh.
-check("cảnh báo khi cấu hình đòi thứ chế độ riêng tư không cho",
-  /st\.doc_moi_tin_nhom/.test(CB) && /setprivacy/.test(CB));
+// Chế độ riêng tư của Telegram chặn Ở PHÍA TELEGRAM, trước khi Javis nhìn thấy tin nào. Đây là
+// nguyên nhân số một của "nhắn riêng thì được, trong nhóm tag tên thì im re", nên cảnh báo phải
+// hiện cho MỌI bot có dùng nhóm - không riêng bot đặt "trả lời mọi tin" như bản trước.
+check("cảnh báo chế độ riêng tư cho mọi bot có dùng nhóm",
+  /var duNhom = \(b\.groups \|\| \[\]\)\.length \|\| \(b\.nhom_cho \|\| \[\]\)\.length/.test(CB) &&
+  /duNhom && st\.da_hoi_telegram && !st\.doc_moi_tin_nhom/.test(CB));
+check("cảnh báo chỉ ra CẢ HAI cách sửa, không chỉ BotFather",
+  /setprivacy/.test(CB) && /quản trị viên/.test(CB));
+// getMe hỏng: bot trả lời tin nhắn riêng hoàn hảo nhưng điếc trong mọi nhóm, vì không biết
+// @username của chính mình. Chấm vẫn xanh, lượt vẫn chạy - không có dòng này thì không ai đoán ra.
+check("thẻ nói ra khi bot không hỏi được danh tính của chính nó",
+  /st\.loi_danh_tinh/.test(CB) && /loiTen/.test(CB));
 
 // ============================================================
 // 7. Luật chung của dashboard

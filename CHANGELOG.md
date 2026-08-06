@@ -4,6 +4,26 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.1] - 2026-08-06
+Chủ repo cập nhật 0.25.0 rồi báo lại: *"chat trong nhóm vẫn im re, còn chat riêng thì vẫn được"*. Nghĩa là 0.25.0 mới vá đúng MỘT trong ba nguyên nhân cho ra cùng một triệu chứng đó, và hai nguyên nhân còn lại đều nằm ở chỗ Javis không nhìn thấy tin nào.
+
+Ba nguyên nhân, sửa khác nhau hoàn toàn, và đứng trong nhóm thì không phân biệt được cái nào: **nhóm chưa được bật**, **chế độ riêng tư của Telegram còn bật**, **bot chưa hỏi được danh tính của chính nó**.
+### Sửa lỗi
+- **getMe hỏng một lần là bot ĐIẾC trong mọi nhóm, vĩnh viễn, không dấu vết.** Bot không biết `@username` của chính mình thì `_co_nhac_ten` trả False cho MỌI tin - tin nhắn riêng vẫn chạy hoàn hảo (không cần nhận ra tên), còn trong nhóm thì im tuyệt đối. Bản trước nuốt lỗi này bằng đúng một dòng stderr rồi đặt trạng thái `polling`, nên thẻ vẫn chấm xanh và không có chỗ nào nói ra. Một cú mạng rớt đúng giây khởi động là đủ.
+
+  Nay getMe **thử lại ba lần**, thất bại thì **giữ lại lý do** cho thẻ bot hiện thành một dòng đỏ, và vòng lặp **tự hỏi lại mỗi phút** chừng nào còn chưa có danh tính - thay vì đợi ai đó nghĩ ra việc tắt bật lại bot. Lý do này để riêng khỏi `last_error` vì vòng lặp xoá `last_error` sau mỗi lượt poll thành công, mà lượt nào cũng thành công.
+- **Gõ `/id` trong nhóm xong quay lại dashboard vẫn không thấy nhóm nào để bấm cho phép.** 0.25.0 chỉ đưa nhóm lên hàng đợi khi có người GỌI BOT, mà tin gọi bot lại chính là thứ chế độ riêng tư chặn - vòng luẩn quẩn. Nay **tin bất kỳ về từ một nhóm** cũng đưa nhóm đó lên thẻ, và lệnh `/...` thì luôn về tới nơi bất kể chế độ riêng tư. Nhưng không tính là một lần gọi bot: đếm gộp thì con số "có người gọi bot N lần" mất sạch ý nghĩa.
+### Cải thiện
+- **`/id` thành một bản chẩn đoán, không còn là một con số trơ.** Nó là chỗ DUY NHẤT chắc chắn nói được ra khi bot im trong nhóm. Nay nó trả lời: id nhóm, nhóm này đã được bật chưa, chế độ riêng tư đang bật hay tắt, bot đã biết danh tính của mình chưa, và phải làm gì tiếp. Trong tin nhắn riêng thì vẫn chỉ một dòng id như cũ, không giảng giải thừa.
+- **Cảnh báo chế độ riêng tư hiện cho MỌI bot có dùng nhóm**, không riêng bot đặt "trả lời mọi tin" như 0.25.0. Nó là nguyên nhân số một của "nhắn riêng thì được, trong nhóm tag tên thì im re", và người dùng không có cách nào đoán ra vì mọi dấu hiệu trên trang đều xanh.
+- **Nói cả HAI cách sửa**, không chỉ một: `@BotFather` → `/setprivacy` → **Disable**, **hoặc** cho bot làm **quản trị viên** nhóm (admin nhận được mọi tin, không phụ thuộc chế độ riêng tư). Cách thứ hai làm được ngay trong nhóm, không phải đi tìm BotFather.
+### Kiểm thử
+- Canary getMe: phải có thử lại, phải giữ lý do, và lý do đó phải TÁCH khỏi `last_error` - test canh đúng dòng `self.last_error = ""` trong vòng lặp để bản sau không gộp lại.
+- `/id` trong nhóm chưa bật / đã bật / trong tin nhắn riêng: ba đường ra ba câu khác nhau, và đọc nhóm từ KHO chứ không từ bản ghi chụp lúc dựng lệnh (bấm Cho phép là ăn ngay từ câu sau, không phải tắt bật lại bot).
+- Tin bất kỳ từ nhóm đưa nhóm lên hàng đợi nhưng KHÔNG thổi phồng bộ đếm lần gọi.
+### Tài liệu
+- `docs/25-chatbot.md`: Bước 4 đổi sang dùng `/id` thay vì gọi tên bot, kèm lý do; thêm hẳn một mục **Chế độ riêng tư của Telegram** liệt kê chính xác thứ gì tới được bot và thứ gì không, cùng cả ba nguyên nhân của triệu chứng "riêng thì được, nhóm im re".
+
 ## [0.25.0] - 2026-08-06
 Chủ repo gửi hai ảnh. Ảnh một: một nhóm Telegram, bot vừa trả lời `/id` xong, rồi ba tin gọi thẳng tên nó - `@ten_bot em hỗ trợ được gì bọn anh nhé?`, `@ten_bot ALo`, `chốt mịa rồi ném vào nhóm nhỏ méo phản hồi`. Không có tin nào của bot sau đó. Ảnh hai: thẻ bot trên dashboard vẫn báo **Đang khởi động** trong khi con bot đó vừa trả lời trong nhóm.
 

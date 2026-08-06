@@ -261,16 +261,23 @@ def _nen_tra_loi(bot_cfg: dict, meta: dict) -> bool:
 # ============================================================
 # Nhóm đang chờ chủ cho phép
 # ============================================================
-def _ghi_nhom_cho(bot_id: str, meta: dict, cau: str = "") -> None:
-    """Ghi nhận "có người gọi bot ở một nhóm chưa được bật" để trang Chatbot hiện ra."""
+def _ghi_nhom_cho(bot_id: str, meta: dict, cau: str = "", dem: bool = True) -> None:
+    """Đưa một nhóm chưa được bật lên hàng đợi duyệt của trang Chatbot.
+
+    `dem=False` = chỉ THẤY nhóm (có tin bất kỳ về từ đó), không phải một lần gọi bot. Phân biệt
+    vì hai thứ nói hai chuyện khác nhau với chủ: "bot đang nằm trong nhóm này" là thông tin,
+    còn "có người gọi bot 5 lần mà nó không trả lời được" là việc cần làm ngay. Đếm gộp thì
+    con số mất hết ý nghĩa - mọi câu người ta nói với nhau trong nhóm đều cộng vào.
+    """
     cid = str((meta or {}).get("chat_id") or "").strip()
     if not cid:
         return
     ds = _NHOM_CHO.setdefault(bot_id, {})
     cu = ds.get(cid)
     if cu:
-        cu["lan"] = cu.get("lan", 0) + 1
-        cu["ts"] = time.time()
+        if dem:
+            cu["lan"] = cu.get("lan", 0) + 1
+            cu["ts"] = time.time()
         if cau:
             cu["cau"] = str(cau)[:200]
         if (meta or {}).get("chat_title"):
@@ -281,7 +288,7 @@ def _ghi_nhom_cho(bot_id: str, meta: dict, cau: str = "") -> None:
         cu_nhat = min(ds, key=lambda k: ds[k].get("ts", 0))
         ds.pop(cu_nhat, None)
     ds[cid] = {"chat_id": cid, "ten": str((meta or {}).get("chat_title") or "")[:80],
-               "ts": time.time(), "lan": 1, "cau": str(cau or "")[:200]}
+               "ts": time.time(), "lan": 1 if dem else 0, "cau": str(cau or "")[:200]}
 
 
 def nhom_cho(bot_id: str) -> list:
@@ -344,10 +351,15 @@ def _make_event_fn(bot_id: str):
     """Tin dịch vụ của nhóm. Xem `TelegramBot._bao_su_kien` để biết vì sao cần nghe."""
     async def _su_kien(loai, tt):
         cid = str((tt or {}).get("chat_id") or "")
-        if loai == "vao_nhom":
+        if loai in ("vao_nhom", "thay_nhom"):
+            # `thay_nhom` = có tin bất kỳ về từ nhóm này. Nghe cả loại đó vì khi chế độ riêng
+            # tư của Telegram đang bật, tin nhắc tên KHÔNG chắc tới được Javis, còn lệnh `/...`
+            # thì luôn tới. Không có nhánh này thì người dùng gõ /id trong nhóm, quay lại
+            # dashboard, và vẫn không thấy nhóm nào để bấm cho phép - ngõ cụt hoàn toàn.
             cfg = chatbot_store.get_bot(bot_id)
             if cfg and not _khop_nhom(cfg.get("groups") or [], cid):
-                _ghi_nhom_cho(bot_id, {"chat_id": cid, "chat_title": (tt or {}).get("chat_title")})
+                _ghi_nhom_cho(bot_id, {"chat_id": cid, "chat_title": (tt or {}).get("chat_title")},
+                              dem=False)
         elif loai == "roi_nhom":
             bo_nhom_cho(bot_id, cid)
             _DA_BAO_NHOM.discard((bot_id, cid))
@@ -371,8 +383,51 @@ def _make_event_fn(bot_id: str):
 # ============================================================
 # Lệnh: danh sách TRẮNG, không có lệnh quản trị nào
 # ============================================================
+def _chan_doan_nhom(bot_id: str, chat: str, meta: dict) -> str:
+    """Vì sao bot im trong nhóm này, nói bằng lời người, kèm cách sửa.
+
+    Đây là câu trả lời cho một câu hỏi KHÔNG chẩn đoán được từ bên ngoài. Ba nguyên nhân cho
+    ra đúng một triệu chứng - "nhắn riêng thì được, trong nhóm tag tên thì im re":
+
+      1. Nhóm chưa được chủ cho phép.
+      2. Chế độ riêng tư của Telegram còn bật, nên tin nhắc tên không tới được Javis.
+      3. Bot chưa hỏi được danh tính của chính nó (getMe hỏng), nên không nhận ra tên mình.
+
+    Người đứng trong nhóm không phân biệt được ba thứ đó, và ba thứ đó sửa khác nhau hoàn
+    toàn. Lệnh `/...` thì LUÔN về tới bot bất kể chế độ riêng tư, nên `/id` là chỗ duy nhất
+    chắc chắn nói được câu này ra.
+    """
+    run = _RUNNING.get(bot_id or "")
+    tb = run and run.get("bot")
+    cfg = chatbot_store.get_bot(bot_id) or {}
+    dong = [f"ID cuộc trò chuyện này: `{chat}`"]
+    if str((meta or {}).get("chat_type") or "private") == "private":
+        return dong[0]
+
+    if not _khop_nhom(cfg.get("groups") or [], chat):
+        dong.append("Nhóm này **chưa được bật** cho em. Chủ bot mở trang Chatbot của Javis, "
+                    "thẻ của em sẽ thấy nhóm này đang chờ, bấm **Cho phép** một cái là xong.")
+    else:
+        dong.append("Nhóm này **đã được bật** cho em rồi ạ.")
+
+    if tb is not None and not getattr(tb, "bot_id", 0):
+        dong.append("⚠ Em chưa hỏi được danh tính của chính mình từ Telegram, nên em **không "
+                    "nhận ra khi có người gọi tên em**. Chủ bot vào trang Chatbot tắt rồi bật "
+                    "lại em giúp ạ.")
+    elif tb is not None and not getattr(tb, "doc_moi_tin_nhom", False):
+        # Chế độ riêng tư chặn Ở PHÍA TELEGRAM, trước khi Javis nhìn thấy tin nào. Không nói ra
+        # thì chủ chỉnh trong dashboard cả buổi mà không đổi được gì.
+        dong.append("Chế độ riêng tư của Telegram đang **BẬT** cho em. Trong nhóm, thứ chắc "
+                    "chắn tới được em là **lệnh `/...`** và **tin trả lời thẳng vào tin của "
+                    "em**. Tag tên mà em im thì gần như luôn là vì cái này.")
+        dong.append("Sửa bằng MỘT trong hai cách: mở **@BotFather** gõ `/setprivacy`, chọn em, "
+                    "chọn **Disable**; hoặc cho em làm **quản trị viên** nhóm này. Xong thì tắt "
+                    "bật lại em ở trang Chatbot.")
+    return "\n\n".join(dong)
+
+
 def _make_command_fn(bot_cfg: dict):
-    async def _cmd(cmd, arg, chat):
+    async def _cmd(cmd, arg, chat, meta=None):
         c = (cmd or "").lstrip("/").lower()
         if c in ("start", "help"):
             # KHÔNG gắn "của cửa hàng" vào sau tên bot. Bot tên "Coach kỷ luật" mà Javis tự nối
@@ -382,8 +437,8 @@ def _make_command_fn(bot_cfg: dict):
                              f"Anh chị cứ hỏi, em trả lời trong phạm vi em biết ạ."}
         if c == "id":
             # Cần để lấy id nhóm khi thả bot vào nhóm. Id nhóm không phải bí mật với người đã
-            # ở trong nhóm đó, nên để công khai được.
-            return {"reply": f"ID cuộc trò chuyện này: `{chat}`"}
+            # ở trong nhóm đó, nên để công khai được. Kèm luôn chẩn đoán: xem `_chan_doan_nhom`.
+            return {"reply": _chan_doan_nhom(bot_cfg.get("id") or "", chat, meta or {})}
         if c in ("nhanvien", "nhan_vien", "human"):
             return {"reply": _bao_nhan_vien(bot_cfg, chat, "Người hỏi chủ động xin gặp người thật.")}
         # Mọi lệnh khác (kể cả /brain, /model, /status của bot chủ) im lặng: nói "không có lệnh
@@ -620,10 +675,14 @@ def status(bot_id: str) -> dict:
         "answered": run.get("answered", 0),
         "started_at": run.get("started"),
         "last_at": run.get("last_at"),
-        # Chế độ riêng tư của Telegram, hỏi getMe lúc khởi động. Chỉ có nghĩa khi bot đã
-        # polling; trước đó nó là False vì CHƯA HỎI, không phải vì đã tắt riêng tư.
+        # Chế độ riêng tư của Telegram, hỏi getMe lúc khởi động. Chỉ có nghĩa khi bot đã biết
+        # danh tính của nó; trước đó nó là False vì CHƯA HỎI ĐƯỢC, không phải vì đã tắt riêng tư.
         "doc_moi_tin_nhom": bool(getattr(tb, "doc_moi_tin_nhom", False)),
-        "da_hoi_telegram": tt == "polling",
+        "da_hoi_telegram": bool(getattr(tb, "bot_id", 0)),
+        # getMe hỏng: bot vẫn trả lời tin nhắn riêng nhưng ĐIẾC trong mọi nhóm. Phải là một
+        # dòng riêng chứ không gộp vào `last_error` - vòng lặp xoá `last_error` sau mỗi lượt
+        # poll thành công, và lượt nào cũng thành công nên nó không bao giờ hiện ra.
+        "loi_danh_tinh": getattr(tb, "loi_danh_tinh", "") or "",
     }
 
 

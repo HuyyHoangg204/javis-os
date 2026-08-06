@@ -1,7 +1,7 @@
 """
 Telegram bot cho Javis - long-polling getUpdates, whitelist theo chat_id (MỘT hoặc NHIỀU ID).
 - Trả lời chạy ở BACKGROUND task → vẫn nhận /stop giữa chừng.
-- Lệnh /...: command_fn(cmd, arg, chat) -> {"reply": str} | {"ask": str} | None
+- Lệnh /...: command_fn(cmd, arg, chat, meta) -> {"reply": str} | {"ask": str} | None
   (chat = chat_id người gõ → /reset //stop /retry chỉ tác động PHIÊN của họ).
 - answer_fn(text, meta) nhận thêm META KÊNH (chat/user/loại chat) để engine biết
   mình đang trả lời qua đâu (port ý tưởng gateway hermes-agent), và có thể trả
@@ -138,7 +138,7 @@ class TelegramBot:
         # lệnh quản trị mà chính nó từ chối chạy.
         self.commands = BOT_COMMANDS if commands is None else list(commands)
         self.answer_fn = answer_fn          # async (text, meta, progress) -> str | {"text":..., "files":[...]}; progress(txt) = báo trạng thái trung gian
-        self.command_fn = command_fn        # async (cmd, arg, chat) -> dict|None
+        self.command_fn = command_fn        # async (cmd, arg, chat, meta) -> dict|None
         self.callback_fn = callback_fn      # async (data, chat) -> dict|None (bấm nút inline; chat = ai bấm)
         # Chốt chặn TRƯỚC khi tốn một lượt: sync (text, meta) -> None|dict. None = chạy tiếp;
         # dict = bỏ lượt, và `reply` trong đó (nếu có) được gửi thẳng như một câu nói thường.
@@ -171,6 +171,13 @@ class TelegramBot:
         # tin trong nhóm" mà riêng tư còn bật thì Telegram chặn từ trước khi Javis nhìn thấy,
         # và trang Chatbot cứ hiện xanh trong khi bot điếc một nửa.
         self.doc_moi_tin_nhom = False
+        # getMe hỏng thì bot KHÔNG biết @username của chính nó, và lúc đó `_co_nhac_ten` trả
+        # False cho MỌI tin - bot điếc trong mọi nhóm trong khi tin nhắn riêng vẫn chạy ngon
+        # lành. Bản trước nuốt lỗi này bằng một dòng stderr rồi đặt trạng thái "polling", nên
+        # thẻ vẫn xanh và không có chỗ nào nói ra. Giữ riêng khỏi `last_error` vì vòng lặp xoá
+        # `last_error` sau mỗi lượt poll thành công, còn lỗi này thì vẫn còn nguyên đó.
+        self.loi_danh_tinh = ""
+        self._lan_hoi_danh_tinh = 0.0
 
     def _url(self, method):
         return TG_API.format(token=self.token, method=method)
@@ -353,6 +360,44 @@ class TelegramBot:
         rep = msg.get("reply_to_message") or {}
         return bool(self.bot_id) and (rep.get("from") or {}).get("id") == self.bot_id
 
+    async def _hoi_danh_tinh(self, client, lan=3):
+        """getMe: bot phải biết @username và id của CHÍNH NÓ. Hỏng cái này là điếc trong nhóm.
+
+        Vì sao đáng một hàm riêng có thử lại, trong khi mấy lời gọi khởi động khác thì không:
+        `deleteWebhook` hay `setMyCommands` hỏng thì hậu quả nhìn thấy được ngay. Còn getMe
+        hỏng thì bot vẫn poll, vẫn trả lời tin nhắn riêng hoàn hảo, chỉ **im trong mọi nhóm** -
+        vì `_co_nhac_ten` không có gì để so nên trả False cho mọi tin. Triệu chứng đó (riêng
+        thì được, nhóm im re) trùng khít với chế độ riêng tư của Telegram, nên đứng ngoài nhìn
+        không thể phân biệt được hai nguyên nhân, và cả hai đều không để lại dấu vết nào.
+
+        Một cú mạng hỏng đúng giây khởi động là đủ. Nên: thử lại, và thất bại thì GIỮ LẠI lý do
+        cho trang Chatbot nói ra, chứ không nuốt bằng một dòng stderr.
+        """
+        self._lan_hoi_danh_tinh = time.monotonic()
+        loi = ""
+        for i in range(max(1, lan)):
+            try:
+                r = await client.get(self._url("getMe"))
+                d = r.json() or {}
+                me = d.get("result") or {}
+                if me.get("id"):
+                    self.bot_id = me["id"]
+                    self.bot_username = me.get("username") or ""
+                    self.doc_moi_tin_nhom = bool(me.get("can_read_all_group_messages"))
+                    self.loi_danh_tinh = ""
+                    return True
+                loi = str(d.get("description") or f"getMe HTTP {r.status_code}")
+            except Exception as e:
+                loi = f"{type(e).__name__}: {e}"
+            if i < lan - 1:
+                await asyncio.sleep(2 ** i)
+        self.loi_danh_tinh = (
+            f"Không hỏi được danh tính bot từ Telegram ({loi}). Bot vẫn trả lời tin nhắn RIÊNG, "
+            "nhưng trong nhóm nó không nhận ra được ai đang gọi tên mình nên sẽ im. "
+            "Tắt rồi bật lại bot để thử lại.")
+        print(f"[telegram getMe] {loi}", file=sys.stderr)
+        return False
+
     async def _bao_su_kien(self, msg):
         """Tin DỊCH VỤ của nhóm - thứ Javis nghe được BẤT KỂ chế độ riêng tư của Telegram.
 
@@ -377,6 +422,12 @@ class TelegramBot:
             loai = "roi_nhom"
         elif msg.get("migrate_to_chat_id"):
             loai = "nhom_nang_cap"
+        elif str(chat_obj.get("type") or "private") != "private":
+            # Bất kỳ tin nào về từ một nhóm. Nghe cả loại này vì nó là đường DUY NHẤT còn chắc
+            # chắn khi chế độ riêng tư của Telegram đang bật: lệnh `/...` luôn về tới nơi, còn
+            # tin nhắc tên thì chưa chắc. Không nghe thì gõ /id trong nhóm xong quay lại
+            # dashboard vẫn không thấy nhóm nào - đúng ngõ cụt cần tránh.
+            loai = "thay_nhom"
         if not loai:
             return
         try:
@@ -504,16 +555,7 @@ class TelegramBot:
                 await client.post(self._url("deleteWebhook"))
             except Exception as e:
                 print(f"[telegram deleteWebhook] {e}", file=sys.stderr)
-            try:
-                # Danh tính của chính mình. Hỏi ở ĐÂY chứ không nhận từ cấu hình: cấu hình có
-                # thể chép sai hoặc cũ, còn getMe luôn nói đúng con bot mà token này mở ra.
-                r = await client.get(self._url("getMe"))
-                me = (r.json() or {}).get("result") or {}
-                self.bot_id = me.get("id") or 0
-                self.bot_username = me.get("username") or ""
-                self.doc_moi_tin_nhom = bool(me.get("can_read_all_group_messages"))
-            except Exception as e:
-                print(f"[telegram getMe] {e}", file=sys.stderr)
+            await self._hoi_danh_tinh(client)
             try:
                 await client.post(self._url("setMyCommands"), json={"commands": self.commands})
             except Exception as e:
@@ -537,6 +579,11 @@ class TelegramBot:
                             await asyncio.sleep(10)
                         continue
                     self.status = "polling"; self.last_error = ""
+                    # Danh tính hỏng lúc khởi động thì hỏi lại mỗi phút. Mạng rớt đúng giây
+                    # khởi động là chuyện thường, và không có nhánh này thì bot điếc trong nhóm
+                    # cho tới khi có người nghĩ ra việc tắt bật lại nó.
+                    if not self.bot_id and time.monotonic() - self._lan_hoi_danh_tinh > 60:
+                        await self._hoi_danh_tinh(client, lan=1)
                     for upd in data.get("result", []):
                         self.offset = upd["update_id"] + 1
                         cq = upd.get("callback_query")
@@ -583,11 +630,11 @@ class TelegramBot:
                 t = self._current.get(chat)
                 if t and not t.done():
                     t.cancel()
-                res = await self.command_fn("stop", "", chat) if self.command_fn else None
+                res = await self.command_fn("stop", "", chat, meta) if self.command_fn else None
                 await self._send(client, chat, (res or {}).get("reply", "⏹ Đã dừng."))
                 return
             if self.command_fn:
-                res = await self.command_fn(cmd, arg, chat)
+                res = await self.command_fn(cmd, arg, chat, meta)
                 if res and "reply" in res:
                     await self._send(client, chat, res["reply"], res.get("reply_markup"))
                     return

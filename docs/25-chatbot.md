@@ -95,11 +95,12 @@ Muốn bot im khi không tìm thấy tài liệu thì đó là việc của ch�
 ### Bước 4: Thả bot vào một nhóm
 
 1. Mời bot vào nhóm như mời một thành viên.
-2. Trong nhóm, gọi tên nó một câu: `@ten_bot em hỗ trợ được gì?`
-3. Bot đáp lại đúng một lần rằng nó **chưa được bật cho nhóm này**, và cùng lúc nhóm đó **hiện lên thẻ bot** ở trang Chatbot.
-4. Bấm **Cho phép nhóm này** trên thẻ. Xong. Câu tiếp theo trong nhóm là bot trả lời thật.
+2. Trong nhóm, gõ **`/id`**. Bot trả về id nhóm **và nói luôn tình trạng**: nhóm này đã được bật chưa, chế độ riêng tư của Telegram đang bật hay tắt, và phải làm gì tiếp.
+3. Nhóm đó **hiện lên thẻ bot** ở trang Chatbot. Bấm **Cho phép nhóm này**. Xong.
 
-Không muốn chờ thì khai tay cũng được: gõ `/id` trong nhóm để lấy id (một số **âm**, dạng `-1001234567890`), rồi dán vào ô **Nhóm được phép** trong form tạo hoặc sửa bot, mỗi id một dòng.
+Dùng `/id` chứ không phải gọi tên bot, và đó là chủ ý: **lệnh `/...` luôn tới được bot** dù Telegram đang bật chế độ riêng tư, còn tin nhắc tên thì chưa chắc (xem mục dưới). Nếu bước 2 mà bot **không trả lời gì cả** thì vấn đề không nằm ở nhóm - hoặc bot đang tắt, hoặc token hỏng; xem chấm trạng thái trên thẻ.
+
+Khai tay cũng được: lấy id ở bước 2 (một số **âm**, dạng `-1001234567890`) rồi dán vào ô **Nhóm được phép** trong form tạo hoặc sửa bot, mỗi id một dòng.
 
 **Chưa cho phép nhóm thì bot không trả lời trong nhóm đó.** Đây là mặc định cố ý: bot bị thả vào một nhóm lạ mà tự nhận việc là nó chen vào giữa cuộc nói chuyện của người khác. Nhưng từ chối không có nghĩa là biến mất - bot nói một câu cho người đang gọi biết phải làm gì, và nhóm đó nằm chờ ngay trên thẻ để bạn quyết.
 
@@ -107,10 +108,28 @@ Nhóm nào bạn không muốn thì bấm **Bỏ qua**, nó rời khỏi danh s�
 
 Trong nhóm đã cho phép, mặc định bot chỉ trả lời khi có người **nhắc tên nó** (gõ `@ten_bot`, hoặc bấm chọn tên nó từ danh sách thành viên) hoặc **reply vào tin của nó**. Nhóm có nhiều bot thì nó phân biệt được: nhắc tên bot khác hay reply vào bot khác thì nó không nhận vơ.
 
-Muốn nó trả lời **mọi câu trong nhóm** thì đổi ô "Trong nhóm thì khi nào bot lên tiếng". Hai lưu ý:
+Muốn nó trả lời **mọi câu trong nhóm** thì đổi ô "Trong nhóm thì khi nào bot lên tiếng". Cân nhắc kỹ: nhóm đông người thì rất ồn và đốt quota model nhanh. Và nó chỉ có tác dụng khi đã tắt chế độ riêng tư - đọc mục ngay dưới.
 
-- Cân nhắc kỹ. Nhóm đông người thì rất ồn và đốt quota model nhanh.
-- Còn phải **tắt chế độ riêng tư** ở BotFather: gõ `/setprivacy`, chọn bot này, chọn **Disable**. Chế độ đó bật sẵn cho mọi bot mới và nó chặn ngay từ phía Telegram - tin trong nhóm không nhắc tên bot thì Javis không bao giờ nhìn thấy, dù bạn đặt gì trong dashboard. Thẻ bot sẽ nhắc bạn nếu hai thứ đang nói ngược nhau.
+### Chế độ riêng tư của Telegram (đọc mục này nếu bot im trong nhóm)
+
+Mọi bot mới đều **bật sẵn** chế độ riêng tư. Khi nó bật, Telegram **không chuyển** phần lớn tin trong nhóm cho bot, và chặn ngay từ phía Telegram - Javis không bao giờ nhìn thấy những tin đó, dù bạn đặt gì trong dashboard.
+
+Thứ **chắc chắn** tới được bot khi chế độ này bật:
+
+- **Lệnh** `/...` (đó là lý do `/id` luôn chạy được).
+- **Tin trả lời thẳng vào tin của bot** (bấm Reply vào một câu bot đã nói).
+- Tin dịch vụ (thêm/bớt thành viên).
+
+Tin chỉ **nhắc tên** bot thì tuỳ phiên bản và tuỳ loại nhóm, **không bảo đảm**. Nếu bạn tag tên bot mà nó im re trong khi nhắn riêng vẫn chạy tốt, đây gần như luôn là lý do.
+
+Sửa bằng **một trong hai cách**:
+
+1. Mở **@BotFather**, gõ `/setprivacy`, chọn bot này, chọn **Disable**.
+2. Hoặc cho bot làm **quản trị viên** nhóm đó. Bot là admin thì nhận được mọi tin, không phụ thuộc chế độ riêng tư.
+
+Xong thì **tắt rồi bật lại bot** ở trang Chatbot để nó đọc lại trạng thái mới. Thẻ bot hiện trạng thái này sẵn cho mọi bot có dùng nhóm, và `/id` trong nhóm cũng nói ra.
+
+Còn một nguyên nhân thứ ba cho đúng triệu chứng đó, hiếm hơn: **bot không hỏi được danh tính của chính nó từ Telegram** (mạng rớt đúng giây khởi động). Khi đó nó không biết `@username` của mình nên không nhận ra ai đang gọi tên, dù tin nhắn riêng vẫn chạy hoàn hảo. Thẻ bot báo bằng một dòng đỏ, và Javis tự hỏi lại mỗi phút; tắt bật lại bot là xong ngay.
 
 **Nhóm thường được nâng thành siêu nhóm thì Telegram đổi id của nó** (thêm tiền tố `-100`). Javis nghe được lúc đó và tự cập nhật danh sách, nên bạn không phải khai lại - đây từng là cách bot im lặng mà không để lại manh mối nào.
 
@@ -332,9 +351,9 @@ Bấm **Xoá** trên thẻ. Bot ngừng trả lời ngay.
 
 **Bot có nhớ người đã nhắn không?** Có, mỗi người một mạch hội thoại riêng trong brain của bot.
 
-**Tôi thả bot vào nhóm, tag tên nó mà nó không trả lời?** Gần như luôn là nhóm đó chưa được cho phép. Nhìn thẻ bot ở trang Chatbot: nhóm đang chờ hiện ngay trên đó kèm nút **Cho phép nhóm này**. Bot cũng đã nói một câu trong nhóm để báo điều đó. Nếu thẻ không hiện nhóm nào thì tin nhắn chưa về tới Javis - kiểm hai thứ: bot có đang chạy không (chấm xanh), và bạn có gõ đúng `@ten_bot` không (bấm chọn tên nó từ danh sách gợi ý cho chắc).
+**Tôi thả bot vào nhóm, tag tên nó mà nó không trả lời, nhưng nhắn riêng thì được?** Gõ **`/id`** trong chính nhóm đó - bot sẽ trả lời và nói luôn nguyên nhân. Ba nguyên nhân cho ra đúng một triệu chứng này: nhóm chưa được bật (bấm **Cho phép nhóm này** trên thẻ bot), chế độ riêng tư của Telegram còn bật (xem mục [Chế độ riêng tư](#chế-độ-riêng-tư-của-telegram-đọc-mục-này-nếu-bot-im-trong-nhóm)), hoặc bot chưa hỏi được danh tính của chính nó (tắt bật lại bot). Nếu ngay cả `/id` cũng không có phản hồi thì bot đang không chạy - xem chấm trạng thái trên thẻ.
 
-**Bot đặt "trả lời mọi tin" mà nó vẫn chỉ trả lời khi được gọi tên?** Chế độ riêng tư của Telegram còn bật. Nó chặn từ phía Telegram nên Javis không nhìn thấy những tin đó. Vào @BotFather, gõ `/setprivacy`, chọn bot này, chọn **Disable**, rồi tắt bật lại bot ở trang Chatbot. Thẻ bot có nhắc sẵn khi rơi vào tình huống này.
+**Bot đặt "trả lời mọi tin" mà nó vẫn chỉ trả lời khi được gọi tên?** Chế độ riêng tư của Telegram còn bật, nó chặn từ phía Telegram nên Javis không nhìn thấy những tin đó. Tắt nó ở @BotFather (`/setprivacy` → Disable) hoặc cho bot làm quản trị viên nhóm, rồi tắt bật lại bot. Thẻ bot có nhắc sẵn khi rơi vào tình huống này.
 
 **Tắt Javis thì bot có chạy không?** Không. Bot chạy trong tiến trình Javis, nên máy/VPS phải bật. Bật lại Javis thì bot nào đang bật tự chạy lại.
 

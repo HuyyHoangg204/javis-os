@@ -9949,7 +9949,7 @@ async def _tg_callback(data, chat=None):
     return None
 
 
-async def _tg_command(cmd, arg, chat=None):
+async def _tg_command(cmd, arg, chat=None, meta=None):
     """Xử lý lệnh Telegram cho 1 chat. Trả {'reply':...} hoặc {'ask':...} hoặc None.
     chat = chat_id của người gõ lệnh → reset/stop/retry/brain chỉ tác động PHIÊN của họ."""
     chat_key = str(chat or "default")

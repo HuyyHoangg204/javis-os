@@ -278,6 +278,21 @@ check("không ai gọi tên thì KHÔNG vào hàng đợi (im tuyệt đối)",
       _chan("hai người nói chuyện", {"chat_type": "group", "chat_id": "-777"}) == {}
       and len(chatbot_runtime.nhom_cho(bid)) == 1)
 
+# Chế độ riêng tư của Telegram chặn tin nhắc tên Ở PHÍA TELEGRAM. Lúc đó đường DUY NHẤT còn
+# chắc chắn là lệnh `/...`, nên chỉ nghe tin-gọi-bot là chưa đủ: gõ /id trong nhóm rồi quay lại
+# dashboard mà vẫn không thấy nhóm nào để bấm cho phép thì đó là ngõ cụt hoàn toàn.
+_sk = chatbot_runtime._make_event_fn(bid)
+asyncio.run(_sk("thay_nhom", {"chat_id": "-8888", "chat_title": "Nhóm nội bộ"}))
+_cho2 = [g for g in chatbot_runtime.nhom_cho(bid) if g["chat_id"] == "-8888"]
+check("tin BẤT KỲ từ nhóm chưa bật cũng đưa nhóm đó lên hàng đợi", len(_cho2) == 1)
+# Nhưng KHÔNG đếm là một lần gọi bot: đếm gộp thì mọi câu người ta nói với nhau đều cộng vào
+# và con số "có người gọi bot N lần" mất sạch ý nghĩa.
+check("chỉ THẤY nhóm thì không tính là một lần gọi bot", _cho2[0]["lan"] == 0)
+asyncio.run(_sk("thay_nhom", {"chat_id": "-4242", "chat_title": "Nhóm khách VIP"}))
+check("thấy lại nhóm đã có người gọi thì không thổi phồng bộ đếm",
+      [g for g in chatbot_runtime.nhom_cho(bid) if g["chat_id"] == "-4242"][0]["lan"] == 2)
+chatbot_runtime.bo_nhom_cho(bid, "-8888")
+
 chatbot_store.update_bot(bid, {"groups": ["-4242"]})
 chatbot_runtime.bo_nhom_cho(bid, "-4242")
 check("cho phép rồi thì ra khỏi hàng đợi", chatbot_runtime.nhom_cho(bid) == [])
@@ -306,13 +321,29 @@ check("bot KHÁC đếm riêng",
 cmd = chatbot_runtime._make_command_fn(cfg)
 
 
-def chay(c, arg="", chat="77"):
-    return (asyncio.run(cmd(c, arg, chat)) or {}).get("reply", "")
+def chay(c, arg="", chat="77", meta=None):
+    return (asyncio.run(cmd(c, arg, chat, meta)) or {}).get("reply", "")
 
 
 check("/start chào khách", "Bot CSKH" in chay("/start"))
 check("/help cũng chào", bool(chay("/help")))
 check("/id trả về id cuộc trò chuyện", "77" in chay("/id"))
+check("/id trong tin nhắn RIÊNG chỉ trả id, không giảng giải về nhóm",
+      chay("/id", meta={"chat_type": "private", "chat_id": "77"}).count("\n") == 0)
+
+# `/id` là chỗ DUY NHẤT chắc chắn nói được ra khi bot im trong nhóm: lệnh luôn về tới bot bất
+# kể chế độ riêng tư của Telegram, còn tin nhắc tên thì chưa chắc. Ba nguyên nhân cho ra cùng
+# một triệu chứng "riêng thì được, nhóm im re", nên nó phải nói được nhóm này đã bật chưa.
+_id_nhom = chay("/id", chat="-4242", meta={"chat_type": "group", "chat_id": "-4242"})
+check("/id trong nhóm chưa bật thì nói thẳng là chưa bật",
+      "-4242" in _id_nhom and "chưa được bật" in _id_nhom)
+check("/id chỉ đúng chỗ bấm cho phép", "trang Chatbot" in _id_nhom)
+# Đọc nhóm từ KHO chứ không từ bản ghi chụp lúc dựng lệnh: chủ bấm "Cho phép" trên dashboard
+# là ăn ngay từ câu tiếp theo, không phải tắt bật lại bot.
+chatbot_store.update_bot(bid, {"groups": ["-100999"]})
+_id_da_bat = chay("/id", chat="-100999", meta={"chat_type": "group", "chat_id": "-100999"})
+check("/id trong nhóm ĐÃ bật thì nói đã bật", "đã được bật" in _id_da_bat)
+chatbot_store.update_bot(bid, {"groups": []})
 for xau in ("/brain", "/model", "/status", "/reset", "/mcp", "/task"):
     r = chay(xau)
     check(f"lệnh quản trị {xau} KHÔNG lọt sang bot khách",
@@ -416,6 +447,27 @@ check("kênh nghe tin dịch vụ của nhóm (vào nhóm / bị đá / đổi i
       "async def _bao_su_kien" in _TG and '"migrate_to_chat_id"' in _TG)
 check("đọc được chế độ riêng tư của Telegram từ getMe",
       'me.get("can_read_all_group_messages")' in _TG)
+
+# CANARY - getMe hỏng thì bot KHÔNG biết @username của chính nó, `_co_nhac_ten` trả False cho
+# MỌI tin, và bot điếc trong mọi nhóm trong khi tin nhắn riêng vẫn chạy hoàn hảo. Triệu chứng
+# trùng khít với chế độ riêng tư của Telegram nên đứng ngoài không phân biệt được, và bản trước
+# nuốt nó bằng đúng một dòng stderr rồi đặt trạng thái "polling" - thẻ xanh, không ai đoán ra.
+check("getMe có thử lại chứ không bỏ cuộc sau một cú mạng hỏng",
+      "async def _hoi_danh_tinh" in _TG and "lan=3" in _TG)
+check("getMe hỏng thì GIỮ LẠI lý do cho trang Chatbot nói ra",
+      "self.loi_danh_tinh" in _TG and "trong nhóm nó không nhận ra được ai đang gọi tên" in _TG)
+check("lý do đó tách khỏi last_error (vòng lặp xoá last_error mỗi lượt poll)",
+      'self.status = "polling"; self.last_error = ""' in _TG
+      and "loi_danh_tinh" not in _TG.split('self.last_error = ""')[1].split("\n")[0])
+check("mất danh tính thì hỏi lại định kỳ, không đợi người tắt bật tay",
+      "if not self.bot_id and time.monotonic() - self._lan_hoi_danh_tinh > 60" in _TG)
+_RT = (SERVER / "chatbot_runtime.py").read_text(encoding="utf-8")
+check("trạng thái phơi lý do mất danh tính ra giao diện", '"loi_danh_tinh"' in _RT)
+check("'đã hỏi được Telegram' đo bằng danh tính, không bằng trạng thái poll",
+      '"da_hoi_telegram": bool(getattr(tb, "bot_id", 0))' in _RT)
+check("lệnh nhận được meta để chẩn đoán đúng nhóm đang đứng",
+      "res = await self.command_fn(cmd, arg, chat, meta)" in _TG
+      and "async def _cmd(cmd, arg, chat, meta=None)" in _RT)
 
 print()
 if _fails:
