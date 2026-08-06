@@ -96,7 +96,7 @@ Mở khung trò chuyện và hỏi thẳng, ví dụ "bây giờ mấy giờ" (p
 
 Nếu tool bị chặn vì mức quyền, câu trả lời sẽ chứa nguyên văn dòng lỗi bắt đầu bằng `ERROR: tool '<tên>' cần mức quyền cao hơn`. Nếu tool cần một kết nối chưa có, lỗi sẽ nói rõ phải vào trang nào để đấu nối.
 
-## Bảy plugin có sẵn
+## Các plugin có sẵn
 
 Đây là các plugin đi kèm app (nhãn **Có sẵn**). Tất cả bật sẵn trừ `tool-audit`.
 
@@ -105,6 +105,7 @@ Nếu tool bị chặn vì mức quyền, câu trả lời sẽ chứa nguyên v
 | Thời gian & ngày (VN) | `datetime-vn` | `javis_now`, `javis_date_add` | chỉ đọc | Bật |
 | Đặt việc định kỳ & nhắc hẹn | `javis-schedule` | `javis_schedule` | ghi (safe) | Bật |
 | Giao việc Kanban | `javis-task` | `javis_task` | ghi (safe) | Bật |
+| Đấu thêm MCP | `javis-connect` | `javis_add_mcp` | ghi (safe) | Bật |
 | Tạo ảnh (ChatGPT) | `image-chatgpt` | `javis_generate_image` | ghi (safe) | Bật |
 | Meta Ads (Graph API) | `meta-ads-graph` | `meta_ads_accounts`, `meta_ads_insights`, `meta_ads_campaigns`, `meta_ads_get` | chỉ đọc | Bật |
 | Facebook Trang (Graph API) | `meta-pages-graph` | `fb_pages_list`, `fb_page_posts`, `fb_page_comments`, `fb_page_post`, `fb_page_photo`, `fb_page_album`, `fb_page_video`, `fb_page_edit`, `fb_page_delete`, `fb_page_reply` | toàn quyền | Bật |
@@ -115,6 +116,7 @@ Nếu tool bị chặn vì mức quyền, câu trả lời sẽ chứa nguyên v
 Từng cái làm được gì:
 
 - **Giao việc Kanban**: giao một việc nền vào hàng đợi ngay từ chat (`op=add`) và xem việc đang chạy tới đâu (`op=list`). Có từ 0.17.1. Trước đó đường duy nhất để giao việc là `POST /kanban/task`, mà gọi được nó thì phải chạy được lệnh máy - nên chỉ Claude Code với Codex làm được, dù tài liệu vẫn hứa mọi bộ não đều làm được. Tool này gọi thẳng vào hàng đợi in-process, không mở thêm cửa HTTP nào. Hai rào cứng: **không tạo được việc mức `full`** (mức tự tiêu tiền, tạo đơn, gửi tin - phải do chính bạn đặt ở trang Việc), và mặc định là `suggest`. Chuyển cột, huỷ việc, duyệt việc chờ phê duyệt vẫn làm ở trang Việc.
+- **Đấu thêm MCP**: nhờ Javis ngay trong chat đấu một nguồn MCP mới, và nó **hiện ra trang Kết nối** ở khu "Đã kết nối" như tài khoản bạn tự thêm bằng tay, dùng chung cho mọi bộ não. Trước plugin này Javis không có đường nào ghi vào kho kết nối, nên nó chỉ còn cách chạy `claude mcp add` - server đó rơi vào cấu hình riêng của Claude Code, sáu bộ não còn lại không thấy, và trên trang Kết nối nó không nằm ở khu "Đã kết nối" mà lọt xuống khu gập "Kết nối sẵn của Claude Code và Codex" (mặc định đóng), nên nhìn vào tưởng như chẳng có gì được thêm. Ba rào an toàn: mức quyền mặc định là **chỉ đọc** (muốn cho ghi thì bạn tự nâng ở trang Kết nối); nguồn chạy bằng **lệnh trên máy** (stdio) được thêm ở trạng thái **tắt** để bạn tự đọc lệnh rồi mới bật; dịch vụ đã có sẵn trong Kho kết nối (Gmail, Lịch, POS...) thì Javis chỉ tay sang đúng card chứ không đẻ một bản tự khai song song. Thử kết nối hỏng thì mục đó **vẫn nằm lại** trang Kết nối kèm lý do, chứ không biến mất im lặng.
 - **Gửi ảnh & file qua Zalo**: gửi ảnh (ví dụ ảnh Javis vừa tạo) hoặc file kèm lời nhắn qua Zalo, bằng chính tài khoản đã quét QR ở trang Kết nối. Có vì tool `zalo_send_message` của MCP chuẩn chỉ gửi được chữ, trong khi thư viện bên dưới làm được từ lâu và bản 1.6.2 đã là bản mới nhất nên chờ upstream là chờ vô hạn. Chỉ gửi được file NẰM TRONG bộ não đang dùng - rào cố ý, vì tin nhắn Zalo gửi đi thì không thu hồi được. Cần Node.js 20+. Chi tiết ở [Zalo](12-zalo.md).
 - **Thời gian & ngày (VN)**: cho Javis biết hôm nay là ngày nào, mấy giờ, thứ mấy theo giờ Việt Nam (UTC+7), và tính ngày tương đối ("3 ngày nữa", "tuần trước"). Thuần thư viện chuẩn, không cần mạng. Đây cũng là plugin mẫu đơn giản nhất để đọc khi bạn muốn tự viết plugin.
 - **Đặt việc định kỳ & nhắc hẹn**: cho phép tạo, liệt kê, huỷ việc định kỳ và nhắc hẹn **ngay trong câu chat**, khỏi gõ YAML tay. Việc lặp và bền được ghi ra `Javis/loops/<slug>.md` (mở sửa được trong Obsidian); nhắc một lần hoặc lịch cron thì vào kho nhắc hẹn. Chi tiết ở [Việc định kỳ & Nhắc hẹn](08-viec-dinh-ky.md).

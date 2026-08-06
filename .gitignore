@@ -56,6 +56,11 @@ server/logs/
 server/brain-trash/
 server/tmp/
 server/_selfupdate.bat
+# Bổ sung 0.12.4: kho bot Telegram của trang Chatbot (0.19.0) và nhật ký hội thoại của
+# chúng. Cả hai là dữ liệu chạy trong STATE_DIR (chatbot_store.py, chatbot_log.py) và
+# chatbots.json còn chứa token bot.
+server/chatbots.json
+server/chatbot-logs/
 # Video làm bằng HyperFrames (rất nặng, không thuộc mã nguồn)
 videos/
 

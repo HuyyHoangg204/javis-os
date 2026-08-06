@@ -4,6 +4,22 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.24.4] - 2026-08-06
+Chủ repo báo: *"khi yêu cầu Javis thêm mcp nào đó thì nó đang không hiện ra phần kết nối"*. Đúng, và lý do không phải giao diện quên vẽ - **Javis chưa từng có đường nào ghi vào kho kết nối của chính mình.**
+### Thêm mới
+- **Plugin đi kèm `javis-connect`, tool `javis_add_mcp`.** Nhờ Javis đấu một MCP ngay trong chat, và nó hiện ở khu **"Đã kết nối"** trang Kết nối như tài khoản bạn tự thêm bằng tay, mọi bộ não dùng chung qua hub.
+
+  Kho kết nối trước nay chỉ ghi được qua `/connect/add`, mà endpoint đó nằm sau lớp đăng nhập nên chỉ trang web gọi được. Javis còn đúng hai lối, cả hai đều hỏng: chạy `claude mcp add` bằng Bash - server rơi vào cấu hình riêng của Claude Code, sáu bộ não còn lại không thấy, và trên trang Kết nối nó không nằm ở khu "Đã kết nối" mà lọt xuống khu gập *"Kết nối sẵn của Claude Code và Codex"* (mặc định ĐÓNG, chỉ tải khi bấm mở); hoặc nói suông "anh vào trang Kết nối tự thêm nhé". Người dùng nhìn trang Kết nối thấy y như cũ, và kết luận Javis nói dối - hợp lý.
+
+  `op=find` tra Kho kết nối trước, `op=add` đấu nguồn mới. Tool đi thẳng vào `mcp_store`, cùng một kho mà `/connect/catalog` đọc.
+### Bảo mật
+- **Ba rào cứng, không tham số nào mở được.** Mức quyền mặc định là **chỉ đọc** (luật `CLAUDE.md`: Javis không tự nâng quyền, người dùng tự nâng ở trang Kết nối). Nguồn chạy bằng **lệnh trên máy** (stdio) được thêm ở trạng thái **tắt** và không dial thử, vì chỉ riêng việc thử kết nối đã là chạy lệnh đó - cho engine API đẻ một stdio tự chạy là mở cửa hậu đúng bằng Bash mà chúng vốn không có. Dịch vụ đã có sẵn trong Kho kết nối (Gmail, Lịch, POS...) thì tool chỉ tay sang đúng card chứ không đẻ bản tự khai song song, vì một connection rỗng token nằm lại trang Kết nối trông y hệt tài khoản thật mà không chạy được.
+### Sửa lỗi
+- **Thử kết nối hỏng thì mục đó vẫn nằm lại trang Kết nối** kèm nguyên văn lý do, ở trạng thái tắt. Khác `/connect/add` (xoá sạch khi validate lỗi) - hợp lý cho form vì người dùng đang nhìn thẳng vào nó, nhưng sai hoàn toàn cho chat: thứ họ cần là NHÌN THẤY nó nằm đó và biết vì sao chưa chạy.
+- **`server/chatbots.json` và `server/chatbot-logs/` vào `.gitignore`.** Hai artifact chạy của trang Chatbot (0.19.0) vừa không track vừa không ignore từ đó tới nay, nên một cú `git add -A` là commit thẳng **token bot** vào repo. `test_ignore_files.py` bắt được.
+### Ghi chú
+- System prompt (`channel_context`) nay dặn thẳng: thêm MCP thì dùng `javis_add_mcp`, tuyệt đối không `claude mcp add` / `codex mcp add`, và thêm xong phải nói rõ nó nằm ở trang Kết nối, đang bật hay tắt, mức quyền nào.
+
 ## [0.24.3] - 2026-08-06
 Chủ repo đọc thẳng mã nguồn và chỉ ra: **toàn bộ hệ Tiết kiệm chỉ được nối vào đúng handler WebSocket của dashboard.** Đúng, và đây là lỗ hổng kiến trúc thật.
 ### Sửa lỗi

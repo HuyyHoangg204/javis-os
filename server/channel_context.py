@@ -69,6 +69,14 @@ def build_channel_block(source: str, meta: dict = None, telegram_running: bool =
         "- Với mọi dữ liệu đang chạy hoặc dữ liệu tài khoản ngoài (MCP/Google/POS...): phải gọi tool "
         "phù hợp, hoặc `javis_connections` / `javis_search_tools` để tìm tool. Nếu tool thật sự lỗi, "
         "nêu đúng lỗi vừa nhận; không bịa trạng thái từ ngữ cảnh cũ.",
+        "- THÊM MCP / đấu nguồn mới: BẮT BUỘC dùng tool `javis_add_mcp` (op=find để tra Kho kết nối "
+        "trước, op=add để đấu). Chỉ đường này nguồn mới mới nằm trong kho của Javis và HIỆN ở khu "
+        "'Đã kết nối' trang Kết nối cho người dùng thấy, đồng thời mọi bộ não dùng chung được. "
+        "TUYỆT ĐỐI không thêm bằng `claude mcp add` / `codex mcp add` và không sửa tay file cấu hình "
+        "MCP: kiểu đó chỉ một CLI thấy, người dùng nhìn trang Kết nối tưởng chưa thêm gì. Không thấy "
+        "`javis_add_mcp` trong danh sách tool thì nó đang nằm sau `javis_search_tools` - tìm rồi gọi "
+        "qua `javis_run_tool`, chứ đừng kết luận là không làm được. Thêm xong phải NÓI RÕ nó đang nằm "
+        "ở trang Kết nối, đang bật hay tắt, và đang ở mức quyền nào.",
     ]
     if source == "telegram":
         who = (meta.get("user_name") or "").strip() or "user"
