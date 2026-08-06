@@ -4,6 +4,20 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.24.5] - 2026-08-06
+Hai chỗ vướng khi Javis đưa một file HTML vào chat: bấm vào link thì file rơi xuống máy, và mở ra sửa thì code một màu xám đọc mỏi mắt.
+### Cải thiện
+- **Bấm link `.html` trong chat giờ mở thẳng trình sửa, không tải về nữa.** Đó là file NGUỒN, mà ép một cú bấm phải rơi file xuống máy là đường vòng dài nhất: muốn xem thì phải mở bằng app khác, muốn sửa một chữ thì phải sửa ngoài rồi tải lên lại. Trình sửa đã có sẵn cả nút **Mở tab mới** lẫn nút **Tải về**, nên mở trình sửa là đường ngắn hơn cho CẢ hai ý định. Ảnh, video, pdf, docx, zip vẫn tải về như cũ.
+- **Khung sửa bung giữa màn hình có thêm nút "Mở tab mới"** (↗), trước chỉ có nút tải. Trình sửa đính đã có đôi nút này từ trước, giờ hai chỗ giống nhau.
+- **Tô màu cú pháp khi sửa code**, cho cả trình sửa đính lẫn khung bung giữa màn hình: `.html`, `.css`, `.js`, `.json`, `.py`, `.yaml`, `.sh` và các đuôi thường gặp khác. Tên thẻ, tên thuộc tính, chuỗi, số, chú thích và từ khoá mỗi thứ một màu, có bảng màu riêng cho giao diện sáng và tối.
+
+  HTML có bộ đọc riêng chứ không dùng chung bộ tô màu của khối code trong chat: bộ đó coi mọi thứ là ngôn ngữ kiểu C nên đọc HTML ra rất sai, tô `class` thành từ khoá còn tên thẻ với tên thuộc tính thì không tô gì. Ruột `<style>` và `<script>` được đọc theo đúng ngôn ngữ của nó. CSS và JSON cũng có bộ riêng; các ngôn ngữ còn lại vẫn giao lại cho bộ chung, không chép lại logic.
+### Ghi chú
+- Ô sửa vẫn là `<textarea>` thật, lớp màu nằm CHỒNG KHÍT bên dưới. Cố ý không đổi sang `contenteditable`: đổi là mất undo của trình duyệt, mất bộ gõ tiếng Việt ngoài, mất mọi phím tắt quen tay.
+- `.md` không tô màu: nó mở bằng trình soạn WYSIWYG có thanh công cụ tự chèn chữ vào ô sửa mà không bắn sự kiện `input`, lớp màu sẽ lệch khỏi nội dung thật.
+- Hai bẫy hình học đã bịt sẵn, cả hai đều thuộc loại chỉ lộ ra khi file đã dài: hai lớp phải chừa **cùng một chỗ cho thanh cuộn** (`scrollbar-gutter`), nếu không thì từ lúc xuất hiện thanh cuộn dọc, bề ngang chỗ chữ trong ô sửa hụt đi khoảng 15px còn lớp màu thì không, và chữ màu trôi hẳn khỏi chữ thật; test canh ràng buộc **gỡ hết thẻ đi phải ra lại đúng chuỗi gốc**, vì chỉ cần bộ tô màu nuốt hay thêm một ký tự là từ đó trở đi mọi dòng đều lệch mà không có lỗi nào được ném ra.
+- File lớn hơn 300 nghìn ký tự thì bỏ tô màu (mỗi lần gõ là dựng lại cả cây HTML). Sửa vẫn bình thường, chỉ là chữ một màu.
+
 ## [0.24.4] - 2026-08-06
 Chủ repo báo: *"khi yêu cầu Javis thêm mcp nào đó thì nó đang không hiện ra phần kết nối"*. Đúng, và lý do không phải giao diện quên vẽ - **Javis chưa từng có đường nào ghi vào kho kết nối của chính mình.**
 ### Thêm mới

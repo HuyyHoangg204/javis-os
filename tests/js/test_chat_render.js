@@ -153,12 +153,15 @@ global.window = {
 const brokenExport = "/brains/My%20Bullet%20Journal/exports/javis-tiec-tra-ai-warrior-plus.html";
 check("export /brains: giai ma dung path trong brain",
   appFilePath(brokenExport) === "exports/javis-tiec-tra-ai-warrior-plus.html");
+// Tu 0.24.5 .html mo TRINH SUA thay vi tai ve, nen phep thu o day doi tu "co dung endpoint
+// tai khong" sang "co doc dung path trong brain khong" - do van la dieu muc 25 canh (link
+// /brains/... sai kieu duoc tu sua ve file that), khong phai hanh vi bam.
 h = mdToHtml("[Tải export](" + brokenExport + ")");
-check("export /brains: render thanh link tai qua /files/raw",
-  has(h, 'class="jv-fdownload"') && has(h, "/files/raw?brain=") && has(h, "dl=1"));
+check("export /brains: render thanh link file trong vault",
+  has(h, 'class="jv-floc"') && has(h, 'data-vault-path="exports/javis-tiec-tra-ai-warrior-plus.html"'));
 h = mdToHtml("[Tải export](https://javis.example.com" + brokenExport + ")");
 check("export URL day du cung domain: cung duoc sua",
-  has(h, 'class="jv-fdownload"') && has(h, "/files/raw?brain=") && has(h, "dl=1"));
+  has(h, 'class="jv-floc"') && has(h, 'data-vault-path="exports/javis-tiec-tra-ai-warrior-plus.html"'));
 
 // ---- 26. Editor nhan ca path goc brain va path da kem home cua Quan ly file ----
 const { ceilPath } = require("../../dashboard/file-editor.js");
@@ -167,10 +170,16 @@ check("editor: path goc brain duoc ghep home",
 check("editor: path Quan ly file khong bi ghep home hai lan",
   ceilPath("brains/My Brain", "brains/My Brain/06 - Sources/ghi-chu.md") === "brains/My Brain/06 - Sources/ghi-chu.md");
 
-// ---- 27. File thanh pham/media trong brain -> tai ve; URL ngoai van mo tab moi ----
+// ---- 27. File media trong brain -> tai ve; file NGUON -> mo trinh sua; URL ngoai -> tab moi ----
+// 0.24.5 doi hanh vi CO Y cho .html: truoc day bam mot cai la file roi xuong may, muon xem
+// phai mo bang app khac, muon sua mot chu phai sua ngoai roi tai len lai. Nay mo thang trinh
+// sua - noi da co san ca nut "Mo tab moi" lan nut "Tai ve", tuc la ngan hon cho CA hai y dinh.
 h = mdToHtml("[trang web](attachments/landing.html)");
-check("html noi bo: thanh link tai ve", has(h, 'class="jv-fdownload"') && has(h, "download"));
-check("html noi bo: dung endpoint dl=1", has(h, "dl=1") && !has(h, 'target="_blank"'));
+check("html noi bo: mo trinh sua, KHONG tai ve",
+  has(h, 'class="jv-floc"') && !has(h, "jv-fdownload") && !has(h, "dl=1"));
+check("html noi bo: khong mo tab moi", !has(h, 'target="_blank"'));
+check("html noi bo: giu dung path de trinh sua mo dung file",
+  has(h, 'data-vault-path="attachments/landing.html"'));
 // 0.9.285 doi hanh vi CO Y: anh bam vao la XEM PHONG TO (lightbox), khong con tai file ve.
 // Tai ve chuyen vao trong lightbox. File khong phai anh (html, pdf...) van tai ve nhu cu -
 // hai dong tren van kiem dieu do. Chi tiet o tests/js/test_lightbox_anh.js.

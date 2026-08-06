@@ -109,7 +109,12 @@
   }
   // File thanh pham/media trong brain: click o chat la TAI VE. Note .md va file nguon text
   // van mo editor; URL http(s) duoc xu ly rieng va luon mo tab moi.
-  var DOWNLOAD_EXT_RE = /\.(?:html?|svg|png|jpe?g|gif|webp|bmp|ico|mp4|webm|mov|avi|mkv|m4v|mp3|wav|m4a|ogg|flac|pdf|docx?|xlsx?|pptx?|zip|rar|7z|tar|gz)$/i;
+  //
+  // .html KHONG con nam trong danh sach nay (0.24.5). No la file NGUON, va bat mot cu bam
+  // phai roi file xuong may la duong vong dai nhat: muon xem thi phai mo bang app khac,
+  // muon sua mot chu thi phai sua ngoai roi tai len lai. Trinh sua da co san ca hai nut
+  // "Mo tab moi" va "Tai ve", nen mo trinh sua la duong ngan hon cho CA hai y dinh.
+  var DOWNLOAD_EXT_RE = /\.(?:svg|png|jpe?g|gif|webp|bmp|ico|mp4|webm|mov|avi|mkv|m4v|mp3|wav|m4a|ogg|flac|pdf|docx?|xlsx?|pptx?|zip|rar|7z|tar|gz)$/i;
   function isDownloadFile(rawpath) {
     var clean = String(rawpath || "").split(/[?#]/)[0].replace(/\/+$/, "");
     return DOWNLOAD_EXT_RE.test(clean);
@@ -892,6 +897,9 @@
 
   if (typeof window !== "undefined") {
     window.mdToHtml = mdToHtml;
+    // Bo to mau chung: code-hl.js goi lai cho cac ngon ngu kieu C (js/py/sh...) de mot luat
+    // chi nam o mot cho. Markup/CSS/JSON thi code-hl tu doc lay (xem chu thich ben do).
+    window.JavisHighlight = highlight;
     window.jvImgGone = imgGone;   // goi tu thuoc tinh onerror noi tuyen cua the <img>
     // get(id): cho turndown (console.js) tra artifact card ve lai dung fence ``` khi luu note WYSIWYG
     window.JavisArtifacts = { open: openArtifact, close: closePanel,

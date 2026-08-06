@@ -165,15 +165,15 @@
   }
 
   function renderImage(b, ceil, brainRel) {
-    elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
+    elActions.appendChild(openLink(b, ceil)); elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
     elBody.innerHTML = '<div class="jvfe-img"><img src="' + esc(rawUrl(b, ceil)) + '" alt="' + esc(baseOf(brainRel)) + '"></div>';
   }
   function renderPdf(b, ceil, brainRel) {
-    elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
+    elActions.appendChild(openLink(b, ceil)); elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
     elBody.innerHTML = '<iframe class="jvfe-frame" src="' + esc(rawUrl(b, ceil)) + '"></iframe>';
   }
   function renderReadonly(b, ceil, brainRel, d) {
-    elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
+    elActions.appendChild(openLink(b, ceil)); elActions.appendChild(dlLink(b, ceil)); elActions.appendChild(closeBtn());
     elBody.innerHTML = '<div class="jvfe-prev"><pre style="white-space:pre-wrap;margin:0">' + esc(d.content || "") + "</pre></div>";
   }
   function renderError(b, ceil, brainRel, msg) {
@@ -186,6 +186,15 @@
     var a = document.createElement("a");
     a.href = rawUrl(b, ceil, 1); a.title = "Tải về";
     a.innerHTML = '<button class="jvfe-btn icon" type="button">⇩</button>';
+    return a;
+  }
+  // Nut "Mo tab moi": xem file dung nhu trinh duyet hien no (vd .html chay that). Bam link
+  // file trong chat gio mo THANG trinh sua thay vi tai ve, nen ca hai y dinh cu - xem va tai -
+  // phai co san ngay tren thanh nay. Trinh sua dinh (console.js) da co doi nut nay tu truoc.
+  function openLink(b, ceil) {
+    var a = document.createElement("a");
+    a.href = rawUrl(b, ceil); a.target = "_blank"; a.rel = "noopener"; a.title = "Mở tab mới";
+    a.innerHTML = '<button class="jvfe-btn icon" type="button">↗</button>';
     return a;
   }
 
@@ -210,6 +219,7 @@
     };
     save.onclick = curSave;
     elActions.appendChild(save);
+    elActions.appendChild(openLink(b, ceil));
     elActions.appendChild(dlLink(b, ceil));
     elActions.appendChild(closeBtn());
   }
@@ -221,12 +231,18 @@
     else renderPlainEditor(b, ceil, d);
   }
 
-  // File text thuong (khong phai .md): textarea nguon don gian.
+  // File text thuong (khong phai .md): textarea nguon, co to mau cu phap neu la file code.
   function renderPlainEditor(b, ceil, d) {
     elActions.innerHTML = "";
     elBody.innerHTML = '<textarea class="jvfe-text" spellcheck="false"></textarea>';
     var ta = elBody.querySelector(".jvfe-text");
     ta.value = d.content || "";
+    // .html, .css, .js, .json, .py... -> lop mau chong khit ben duoi (code-hl.js). Khong nhan
+    // ra ngon ngu hoac file qua to thi attach tra null va o sua chay y nhu cu.
+    try {
+      var lang = window.JavisCodeHL ? window.JavisCodeHL.langFromPath(ceil) : "";
+      if (lang) window.JavisCodeHL.attach(ta, lang);
+    } catch (e) {}
     appendSaveAndClose(b, ceil, function () { return ta.value; });
     setTimeout(function () { try { ta.focus(); } catch (e) {} }, 30);
   }

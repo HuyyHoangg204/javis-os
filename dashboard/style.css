@@ -101,6 +101,8 @@
   --tok-s: #7ee787;          /* chuỗi */
   --tok-n: #f0883e;          /* số */
   --tok-k: #c792ea;          /* từ khoá */
+  --tok-t: #79c0ff;          /* tên thẻ HTML/XML */
+  --tok-a: #ffa657;          /* tên thuộc tính, tên trường JSON, thuộc tính CSS */
 
   /* --- KHOANG NÃO (.hud-center) --- */
   --brain-bg: radial-gradient(ellipse 55% 55% at 50% 48%,
@@ -196,6 +198,8 @@
   --tok-s: #0a7d3f;
   --tok-n: #b4430d;
   --tok-k: #7c3aed;
+  --tok-t: #0b5fa5;
+  --tok-a: #9a5b00;
 
   /* Khoang não: giấy ngà có quầng lavender-đào rất nhạt ở giữa, tối dần ra rìa
      bằng chính màu giấy (không phải bằng màu đen). */
@@ -1699,6 +1703,40 @@ body.jv-lb-open { overflow: hidden; }        /* khoá cuộn nền để lăn ch
 .code-block .tok-s { color: var(--tok-s); }
 .code-block .tok-n { color: var(--tok-n); }
 .code-block .tok-k { color: var(--tok-k); font-weight: 600; }
+
+/* ---- To mau cu phap trong O SUA code (code-hl.js) ----
+   Hai lop chong khit: <pre.jvhl-view> nam duoi lo mau, <textarea.jvhl-ta> nam tren voi chu
+   TRONG SUOT nhung con tro van thay. Moi thuoc tinh anh huong toi cho xuong dong phai giong
+   HET nhau o ca hai, khong thi chu mau se lech khoi chu that. Doi mot dong o day = phai doi
+   ca hai selector, dung tach ra. */
+.jvhl { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
+.jvhl-view, .jvhl .jvhl-ta {
+  margin: 0; border: 0; box-sizing: border-box; padding: 14px;
+  font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  letter-spacing: normal; tab-size: 2;
+  white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
+  /* Cho DU CHO thanh cuon o CA HAI lop, ke ca khi chua co thanh cuon nao. Thieu dong nay la
+     co mot loi rat kho doan: file dai toi muc hien thanh cuon doc thi be ngang cho chu trong
+     textarea hut di khoang 15px, con lop mau ben duoi khong hut - tu dong dai dau tien tro di
+     hai ben xuong dong khac nhau va chu mau troi han khoi chu that. */
+  scrollbar-gutter: stable;
+}
+.jvhl-view { position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  background: none; color: var(--text); }
+.jvhl .jvhl-ta { position: absolute; inset: 0; width: 100%; height: 100%; resize: none;
+  outline: none; overflow: auto; background: transparent; color: transparent;
+  caret-color: var(--text); }
+/* Boi den vung chon: giu nen, KHONG tra lai mau chu (chu that phai trong suot de khong
+   in dam len chu da to mau ben duoi). */
+.jvhl .jvhl-ta::selection { background: var(--accent-line); color: transparent; }
+.jvhl-view .tok-c { color: var(--tok-c); font-style: italic; }
+.jvhl-view .tok-s { color: var(--tok-s); }
+.jvhl-view .tok-n { color: var(--tok-n); }
+.jvhl-view .tok-k { color: var(--tok-k); font-weight: 600; }
+.jvhl-view .tok-t { color: var(--tok-t); }
+.jvhl-view .tok-a { color: var(--tok-a); }
+/* Khung sua bung giua man hinh: .jvfe-body la flex doc, o sua phai gian ra nhu textarea cu. */
+.jvfe-body > .jvhl { flex: 1; min-height: 52vh; height: auto; }
 
 /* Wikilink [[..]] + duong dan file trong inline code: bam de mo/di chuyen toi note (chat-render.js) */
 a.jv-wikilink { color: var(--accent); text-decoration: none; cursor: pointer;

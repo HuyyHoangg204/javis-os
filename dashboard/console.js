@@ -5396,6 +5396,14 @@
           seg.appendChild(b);
         });
         actions.appendChild(seg);
+      } else {
+        // File nguồn (.html, .css, .js, .json, .py...): tô màu cú pháp cho dễ đọc. .md không
+        // đi nhánh này vì thanh công cụ soạn thảo tự chèn chữ vào textarea mà không bắn sự
+        // kiện input, lớp màu sẽ lệch khỏi nội dung thật.
+        try {
+          const hlLang = window.JavisCodeHL ? window.JavisCodeHL.langFromPath(rel) : "";
+          if (hlLang) window.JavisCodeHL.attach(ta, hlLang);
+        } catch (e) {}
       }
       const saveBtn = document.createElement("button"); saveBtn.innerHTML = SAVE_ICON + " Lưu"; saveBtn.title = "Lưu (Ctrl+S)";
       _neSaveFn = async () => {
