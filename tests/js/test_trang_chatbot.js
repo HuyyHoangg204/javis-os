@@ -139,8 +139,15 @@ check("cảnh báo nói thẳng người điều khiển là người nhắn cho
 // Nhìn lưới thẻ phải phân biệt được ngay con nào có quyền thao tác. Không thì chủ nhớ nhầm
 // con nào là con nào rồi thả nhầm vào nhóm khách.
 check("thẻ bot hiện mức quyền khi được nới", /cb-quyen/.test(CB));
-check("thẻ bot mức chỉ đọc KHÔNG dán nhãn (mặc định thì không cần)",
-  /mq === "suggest" \? "" :/.test(CB));
+// Đổi ý có lý do, ghi lại để khỏi quay về: bản trước bỏ trống nhãn cho mức chỉ đọc vì "mặc
+// định thì không cần dán nhãn". Nhưng ô trống đọc ra được HAI nghĩa ngược nhau - bot đang chỉ
+// đọc, hay trang này không nói? Chủ repo hỏi đúng câu đó (2026-08-06) khi nhìn một thẻ không
+// có dòng mức nào. Nay cả ba mức đều có nhãn, mức chỉ đọc mang màu xám để vẫn phân biệt được
+// từ xa với hai mức có quyền thao tác.
+check("thẻ bot dán nhãn mức quyền ở CẢ BA mức, kể cả chỉ đọc",
+  !/mq === "suggest" \? "" :/.test(CB) && /cb-quyen ' \+ \(mq === "full"/.test(CB));
+check("mức chỉ đọc có màu riêng chứ không mượn màu cảnh báo",
+  /\.cb-quyen\.doc \{/.test(CSS) && /"doc"\)/.test(CB));
 check("bật bot có quyền thao tác thì hỏi lại", /if \(on && mucCua\(mq\)\.can_xac_nhan/.test(CB));
 check("CSS cho nhãn mức quyền và khối cảnh báo",
   /\.cb-quyen\.full/.test(CSS) && /\.cb-canhbao\.full/.test(CSS) && /\.cb-ack/.test(CSS));
@@ -191,6 +198,47 @@ check("từng lượt hiện NGUỒN bot đã dùng", /t\.nguon/.test(CB));
 check("lượt không tìm ra tài liệu bị đánh dấu", /không tìm thấy tài liệu/.test(CB));
 check("chưa có lượt nào thì dạy bước tiếp theo", /Nhắn thử cho bot/.test(CB));
 check("CSS của nhật ký đã có", /\.cb-tab/.test(CSS) && /\.cb-turn/.test(CSS));
+
+// ============================================================
+// 6c. Thẻ phải TỰ CẬP NHẬT - trạng thái bot đổi mà không ai bấm gì
+// ============================================================
+// Chủ repo báo (2026-08-06): "bot đã chạy rồi, đã khởi động rồi mà vẫn hiện đang khởi động".
+// Đúng vậy: bấm Bật xong server trả về "starting" (poller vừa tạo, chưa kịp hỏi Telegram), rồi
+// vài giây sau nó thành "polling" - nhưng trang chỉ nạp lại khi người dùng bấm cái gì đó. Thẻ
+// đứng nguyên ở "Đang khởi động" cho tới lúc rời trang rồi quay lại. Nhịp tự làm mới cũng là
+// thứ DUY NHẤT phát hiện được bot vừa chết.
+check("trang có nhịp tự làm mới", /setInterval\(/.test(CB) && /nhipTuLamMoi/.test(CB));
+check("nhịp dừng khi rời trang (node bị tháo khỏi DOM)",
+  /document\.body\.contains\(_host\)/.test(CB) && /clearInterval\(_timer\)/.test(CB));
+check("tab bị ẩn thì không gọi mạng vô ích", /document\.hidden/.test(CB));
+check("đang mở form thì không vẽ lại dưới chân người dùng",
+  /querySelector\("\.cb-modal"\)/.test(CB));
+// Nạp NGẦM khác nạp do người bấm: không được xoá lưới đang hiện để thay bằng "Đang tải…", và
+// mạng hỏng một nhịp thì giữ nguyên màn hình cũ. Nhấp nháy mỗi 5 giây tệ hơn số cũ vài giây.
+check("nạp ngầm không nhấp nháy màn hình", /async function tai\(im\)/.test(CB) &&
+  /if \(!im\) box\.innerHTML = '<div class="cb-empty">Đang tải…/.test(CB));
+
+// ============================================================
+// 6d. Nhóm chưa được bật phải NỔI LÊN thẻ, không được im lặng
+// ============================================================
+// Chủ repo báo cùng ngày: "cho vào nhóm tag tên để nhắn thì nó không phản hồi". Rào "bot không
+// tự nhận việc trong nhóm lạ" là đúng, nhưng cách từ chối thì sai: im hoàn toàn, không log,
+// không dòng nào ở đây. "Hành vi đúng" và "bot hỏng" trông y hệt nhau.
+check("thẻ hiện nhóm đang chờ chủ cho phép", /b\.nhom_cho/.test(CB) && /cb-nhomcho/.test(CB));
+check("cho phép nhóm bằng ĐÚNG một cú bấm",
+  /cb-ok-nhom/.test(CB) && /\/groups"/.test(CB) && /choNhom\(b, cid, true\)/.test(CB));
+check("và bỏ qua được nhóm không muốn", /cb-bo-nhom/.test(CB) && /choNhom\(b, cid, false\)/.test(CB));
+check("CSS cho khối nhóm chờ đã có", /\.cb-nhomcho \{/.test(CSS));
+// Khai nhóm ngay lúc TẠO. Bản trước chỉ cho khai ở form Sửa, nên đường đi tự nhiên nhất (tạo
+// bot rồi thả thẳng vào nhóm) bảo đảm lần thử đầu của mọi người dùng gặp một con bot im lặng.
+check("CANARY: ô nhóm KHÔNG còn bị giấu sau form Sửa",
+  !/\(sua \? '<label>Nhóm được phép/.test(CB) && /id="cbGroups"/.test(CB));
+check("form tạo cũng gửi nhóm lên server", /groups: gr, reply_when: rw/.test(CB));
+check("chọn được khi nào bot lên tiếng trong nhóm", /id="cbReplyWhen"/.test(CB));
+// Chế độ riêng tư của Telegram vô hiệu hoá "trả lời mọi tin" từ phía Telegram, trước khi Javis
+// nhìn thấy tin nào. Không nói ra thì cấu hình hứa một đằng, bot làm một nẻo, mọi dấu hiệu xanh.
+check("cảnh báo khi cấu hình đòi thứ chế độ riêng tư không cho",
+  /st\.doc_moi_tin_nhom/.test(CB) && /setprivacy/.test(CB));
 
 // ============================================================
 // 7. Luật chung của dashboard

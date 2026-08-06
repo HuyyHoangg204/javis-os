@@ -17,6 +17,12 @@ Ba thứ module này chịu trách nhiệm, và cả ba đều là chỗ dễ h�
    theo đúng chữ đó sang đường không-tool hay đường có-tool-của-hub. Chữ trong prompt thì lách
    được; nhánh trong mã thì không.
 
+Một rào nữa đứng riêng vì nó từng hỏng theo kiểu tệ nhất: **nhóm phải được chủ cho phép**. Rào
+thì đúng, cách từ chối thì sai - bot im hoàn toàn, không log, không dòng nào trên trang Chatbot,
+nên "thả bot vào nhóm rồi gọi tên nó" trông y hệt "bot hỏng". Nay từ chối vẫn từ chối, nhưng nó
+NÓI: một câu duy nhất cho người đang gọi, và nhóm đó hiện lên thẻ bot để chủ bấm cho phép. Xem
+`_ly_do_im`, `_make_precheck_fn`, `nhom_cho`.
+
 Xem docs/dev/2026-08-bot-chuyen-trach-spec.md.
 """
 from __future__ import annotations
@@ -51,6 +57,29 @@ _BI_LIEN_TIEP: Dict[tuple, int] = {}
 # bot_id đã báo lỗi kỹ thuật cho nhân viên và chưa chạy lại được lượt nào. Chống báo mỗi lượt
 # khi engine hỏng - lúc đó MỌI lượt đều gãy.
 _DA_BAO_LOI: set = set()
+
+# bot_id -> {chat_id: {"chat_id", "ten", "ts", "lan", "cau"}} - những nhóm CÓ NGƯỜI GỌI BOT mà
+# chủ chưa cho phép. Đây là bản vá cho lỗi hỏng-lặng-lẽ nặng nhất của tính năng nhóm: thả bot
+# vào nhóm, gọi tên nó, và không có gì xảy ra - không câu trả lời, không log, không dòng nào
+# trên trang Chatbot. Chủ chỉ có thể kết luận "bot hỏng".
+#
+# Giữ trong RAM chứ không ghi đĩa: đây là hàng ĐỢI DUYỆT chứ không phải dữ liệu người dùng, và
+# nó tự đầy lại - ai gọi bot lần nữa là nhóm đó lại hiện ra. Ghi đĩa chỉ thêm một kho phải dọn.
+_NHOM_CHO: Dict[str, Dict[str, dict]] = {}
+MAX_NHOM_CHO = 20       # trần mỗi bot: người lạ thả bot vào 500 nhóm cũng không phình bộ nhớ
+
+# (bot_id, chat_id) đã nói câu "chưa được bật cho nhóm này". Nói ĐÚNG MỘT LẦN mỗi nhóm.
+_DA_BAO_NHOM: set = set()
+
+# Câu nói duy nhất bot gửi vào một nhóm chưa được cho phép.
+#
+# Vì sao nói thay vì im hẳn: im hoàn toàn đúng về mặt an toàn nhưng sai về mặt sự thật. Người
+# gọi bot gần như luôn là chủ hoặc người của chủ đang thử, và thứ họ nhận được là một con bot
+# "hỏng". Một câu, một lần mỗi nhóm, là đủ để biến một lỗi không thể chẩn đoán thành một việc
+# bấm một nút là xong.
+CAU_NHOM_CHUA_BAT = ("Em chưa được bật cho nhóm này ạ. Chủ bot mở trang Chatbot của Javis, "
+                     "ở thẻ của em sẽ thấy nhóm này đang chờ, bấm **Cho phép** một cái là em "
+                     "trả lời được ngay.")
 
 # Bí bao nhiêu lượt liên tiếp thì mới gọi người thật.
 #
@@ -169,8 +198,34 @@ def _qua_han_muc(bot_id: str, chat_id: str, tran: int) -> bool:
     return False
 
 
-def _nen_tra_loi(bot_cfg: dict, meta: dict) -> bool:
-    """Có mở miệng không.
+def _dang_khac(chat_id: str) -> str:
+    """Dạng CÒN LẠI của cùng một nhóm Telegram, hoặc "" nếu không có dạng nào khác.
+
+    Nhóm thường có id `-123`; nâng lên siêu nhóm thì Telegram đổi thành `-100123`. Việc nâng
+    cấp xảy ra ngoài tầm với của Javis (thêm quản trị viên, bật lịch sử cho thành viên mới,
+    nhóm đông lên) và không báo ai cả. Chủ khai id lúc còn là nhóm thường, hôm sau bot im -
+    đúng kiểu hỏng mà không có manh mối nào để lần.
+    """
+    s = str(chat_id or "").strip()
+    if not s.startswith("-") or not s[1:].isdigit():
+        return ""
+    if s.startswith("-100") and len(s) > 4:
+        return "-" + s[4:]
+    return "-100" + s[1:]
+
+
+def _khop_nhom(danh_sach, chat_id: str) -> bool:
+    """Nhóm này có nằm trong danh sách chủ đã khai không - tính cả dạng id trước/sau nâng cấp."""
+    cid = str(chat_id or "").strip()
+    if not cid:
+        return False
+    ds = {str(x).strip() for x in (danh_sach or [])}
+    khac = _dang_khac(cid)
+    return cid in ds or bool(khac and khac in ds)
+
+
+def _ly_do_im(bot_cfg: dict, meta: dict) -> str:
+    """Vì sao bot KHÔNG mở miệng ở lượt này. "" nghĩa là cứ trả lời.
 
     Tin nhắn riêng: luôn trả lời. Trong NHÓM: chỉ nhóm đã khai, và theo `reply_when`.
 
@@ -178,18 +233,139 @@ def _nen_tra_loi(bot_cfg: dict, meta: dict) -> bool:
     `reply_to_message` của chính tin nhắn. KHÔNG dựa vào chế độ riêng tư của Telegram để suy
     ra chúng: chế độ đó tắt được ở BotFather, và lúc tắt thì bot nhận MỌI câu khách nói với
     nhau - đúng lúc cần luật này nhất thì nó lại không còn đúng.
+
+    Trả LÝ DO chứ không trả bool vì hai lý do phải xử lý khác nhau hoàn toàn: "nhóm chưa được
+    cho phép" là việc của CHỦ và phải nổi lên trang Chatbot, còn "không ai gọi tên" là hành vi
+    đúng và phải im tuyệt đối.
     """
     loai = str((meta or {}).get("chat_type") or "private")
     if loai == "private":
-        return True
+        return ""
     nhom = [str(x) for x in (bot_cfg.get("groups") or [])]
-    if not nhom:
-        return False        # chưa khai nhóm nào thì bot không tự nhận việc trong nhóm lạ
-    if str((meta or {}).get("chat_id") or "") not in nhom:
-        return False
+    # Chưa khai nhóm nào thì bot không tự nhận việc trong nhóm lạ. Cùng một lý do với nhóm đã
+    # khai nhưng không phải nhóm này, nên cùng một mã: cả hai đều sửa bằng cách cho phép nhóm.
+    if not nhom or not _khop_nhom(nhom, (meta or {}).get("chat_id")):
+        return "nhom_chua_bat"
     if bot_cfg.get("reply_when") == "always":
-        return True
-    return bool((meta or {}).get("mentioned") or (meta or {}).get("reply_to_bot"))
+        return ""
+    if (meta or {}).get("mentioned") or (meta or {}).get("reply_to_bot"):
+        return ""
+    return "khong_goi_ten"
+
+
+def _nen_tra_loi(bot_cfg: dict, meta: dict) -> bool:
+    """Có mở miệng không. Vỏ bool của `_ly_do_im`, giữ cho chỗ gọi chỉ cần biết có/không."""
+    return not _ly_do_im(bot_cfg, meta)
+
+
+# ============================================================
+# Nhóm đang chờ chủ cho phép
+# ============================================================
+def _ghi_nhom_cho(bot_id: str, meta: dict, cau: str = "") -> None:
+    """Ghi nhận "có người gọi bot ở một nhóm chưa được bật" để trang Chatbot hiện ra."""
+    cid = str((meta or {}).get("chat_id") or "").strip()
+    if not cid:
+        return
+    ds = _NHOM_CHO.setdefault(bot_id, {})
+    cu = ds.get(cid)
+    if cu:
+        cu["lan"] = cu.get("lan", 0) + 1
+        cu["ts"] = time.time()
+        if cau:
+            cu["cau"] = str(cau)[:200]
+        if (meta or {}).get("chat_title"):
+            cu["ten"] = str(meta["chat_title"])[:80]
+        return
+    if len(ds) >= MAX_NHOM_CHO:
+        # Đầy thì bỏ mục CŨ NHẤT. Nhóm vừa có người gọi đáng nhìn hơn nhóm im từ tuần trước.
+        cu_nhat = min(ds, key=lambda k: ds[k].get("ts", 0))
+        ds.pop(cu_nhat, None)
+    ds[cid] = {"chat_id": cid, "ten": str((meta or {}).get("chat_title") or "")[:80],
+               "ts": time.time(), "lan": 1, "cau": str(cau or "")[:200]}
+
+
+def nhom_cho(bot_id: str) -> list:
+    """Danh sách nhóm đang chờ chủ cho phép, mới gọi nhất lên đầu."""
+    ds = list((_NHOM_CHO.get(bot_id) or {}).values())
+    ds.sort(key=lambda x: x.get("ts", 0), reverse=True)
+    return ds
+
+
+def bo_nhom_cho(bot_id: str, chat_id: str = "") -> None:
+    """Dọn hàng đợi sau khi chủ đã quyết (cho phép hoặc bỏ qua)."""
+    if not chat_id:
+        _NHOM_CHO.pop(bot_id, None)
+        return
+    cid = str(chat_id).strip()
+    ds = _NHOM_CHO.get(bot_id) or {}
+    for k in (cid, _dang_khac(cid)):
+        if k:
+            ds.pop(k, None)
+    if not ds:
+        _NHOM_CHO.pop(bot_id, None)
+
+
+def _make_precheck_fn(bot_id: str):
+    """Chốt chặn chạy TRƯỚC khi tốn một lượt engine.
+
+    Ba việc, theo đúng thứ tự quan trọng: (1) không để người ngoài thấy "(không có nội dung)",
+    (2) đưa nhóm chưa được bật lên trang Chatbot, (3) nói một câu duy nhất cho người đang gọi
+    biết phải làm gì - thay vì để họ kết luận bot hỏng.
+    """
+    def _chan(text, meta=None):
+        cfg = chatbot_store.get_bot(bot_id)
+        if not cfg:
+            return {}
+        ly_do = _ly_do_im(cfg, meta or {})
+        if not ly_do:
+            return None
+        if ly_do != "nhom_chua_bat":
+            return {}       # không ai gọi tên: im tuyệt đối, và không có gì để chủ duyệt
+        # Nhóm chưa bật, nhưng lượt này có phải một lần GỌI BOT thật không? Hỏi lại chính luật
+        # trên với giả định nhóm đã được bật: nếu vẫn im thì đây chỉ là hai người nói chuyện
+        # với nhau, không có gì để chủ duyệt và tuyệt đối không được chen vào. Hỏi lại luật cũ
+        # thay vì chép điều kiện ra đây: chép là có ngày hai chỗ nói khác nhau.
+        gia_dinh = dict(cfg)
+        gia_dinh["groups"] = [str((meta or {}).get("chat_id") or "")]
+        if _ly_do_im(gia_dinh, meta or {}):
+            return {}
+        _ghi_nhom_cho(bot_id, meta or {}, text)
+        khoa = (bot_id, str((meta or {}).get("chat_id") or ""))
+        if khoa in _DA_BAO_NHOM:
+            return {}
+        if len(_DA_BAO_NHOM) > 500:
+            _DA_BAO_NHOM.clear()    # trần thô: thà nói lại một câu còn hơn phình mãi
+        _DA_BAO_NHOM.add(khoa)
+        return {"reply": CAU_NHOM_CHUA_BAT}
+    return _chan
+
+
+def _make_event_fn(bot_id: str):
+    """Tin dịch vụ của nhóm. Xem `TelegramBot._bao_su_kien` để biết vì sao cần nghe."""
+    async def _su_kien(loai, tt):
+        cid = str((tt or {}).get("chat_id") or "")
+        if loai == "vao_nhom":
+            cfg = chatbot_store.get_bot(bot_id)
+            if cfg and not _khop_nhom(cfg.get("groups") or [], cid):
+                _ghi_nhom_cho(bot_id, {"chat_id": cid, "chat_title": (tt or {}).get("chat_title")})
+        elif loai == "roi_nhom":
+            bo_nhom_cho(bot_id, cid)
+            _DA_BAO_NHOM.discard((bot_id, cid))
+        elif loai == "nhom_nang_cap":
+            moi = str((tt or {}).get("chat_id_moi") or "")
+            cfg = chatbot_store.get_bot(bot_id)
+            if not (moi and cfg):
+                return
+            ds = [str(x) for x in (cfg.get("groups") or [])]
+            if moi in ds or not _khop_nhom(ds, cid):
+                return
+            # Thay id cũ bằng id mới TẠI CHỖ, giữ nguyên thứ tự: chủ đã cho phép đúng nhóm này
+            # rồi, việc Telegram đổi số hiệu của nó không phải là một quyết định mới.
+            ds = [moi if (x == cid or x == _dang_khac(cid)) else x for x in ds]
+            chatbot_store.update_bot(bot_id, {"groups": ds})
+            print(f"[chatbot {bot_id}] nhóm {cid} lên siêu nhóm {moi}, đã cập nhật danh sách",
+                  file=sys.stderr)
+    return _su_kien
 
 
 # ============================================================
@@ -272,9 +448,12 @@ def _make_answer_fn(bot_id: str):
     async def _answer(text, meta=None, progress=None):
         cfg = chatbot_store.get_bot(bot_id)
         if not cfg:
-            return {"text": "", "files": []}
+            return {"text": "", "files": [], "im_lang": True}
+        # Lớp thứ HAI của cùng một luật (`precheck_fn` đã chặn ở tầng kênh). Giữ cả hai vì hai
+        # cái canh hai thứ khác nhau: chốt kia để không nhấp nháy tin trạng thái trước mặt
+        # người ngoài, chốt này để một kênh tương lai quên nối chốt kia vẫn không lọt.
         if not _nen_tra_loi(cfg, meta or {}):
-            return {"text": "", "files": []}
+            return {"text": "", "files": [], "im_lang": True}
         chat_id = str((meta or {}).get("chat_id") or "")
         if _qua_han_muc(bot_id, chat_id, cfg.get("rate_limit")):
             return {"text": "Anh chị nhắn hơi nhanh, em xin phép trả lời lại sau ít phút ạ.",
@@ -399,6 +578,8 @@ def start_bot(bot_id: str) -> tuple[bool, str]:
         None,
         download_dir=_inbox_dir(cfg),
         commands=LENH_KHACH,      # menu Telegram của khách, KHÔNG phải menu quản trị của chủ
+        precheck_fn=_make_precheck_fn(bot_id),   # nhóm chưa được bật: im, nhưng KHÔNG im lặng
+        event_fn=_make_event_fn(bot_id),         # vào nhóm / bị đá / nhóm đổi id khi nâng cấp
     )
     tb.start()
     _RUNNING[bot_id] = {"bot": tb, "cfg": cfg, "started": time.time(), "answered": 0}
@@ -439,6 +620,10 @@ def status(bot_id: str) -> dict:
         "answered": run.get("answered", 0),
         "started_at": run.get("started"),
         "last_at": run.get("last_at"),
+        # Chế độ riêng tư của Telegram, hỏi getMe lúc khởi động. Chỉ có nghĩa khi bot đã
+        # polling; trước đó nó là False vì CHƯA HỎI, không phải vì đã tắt riêng tư.
+        "doc_moi_tin_nhom": bool(getattr(tb, "doc_moi_tin_nhom", False)),
+        "da_hoi_telegram": tt == "polling",
     }
 
 
@@ -463,6 +648,22 @@ def sync_all() -> dict:
         else:
             loi[bid] = err
     return {"running": ok, "errors": loi}
+
+
+def quen_bot(bot_id: str) -> None:
+    """Dọn mọi vết trong RAM của một bot vừa bị XOÁ.
+
+    Cố ý tách khỏi `stop_bot`: tắt rồi bật lại (đổi token, sửa cấu hình) không được làm mất
+    hàng đợi nhóm chờ duyệt - chủ vừa nhìn thấy một nhóm ở đó thì nó phải còn ở đó.
+    """
+    stop_bot(bot_id)
+    _NHOM_CHO.pop(bot_id, None)
+    _DA_BAO_LOI.discard(bot_id)
+    for k in [x for x in _DA_BAO_NHOM if x and x[0] == bot_id]:
+        _DA_BAO_NHOM.discard(k)
+    for kho in (_HITS, _BI_LIEN_TIEP):
+        for k in [x for x in kho if x and x[0] == bot_id]:
+            kho.pop(k, None)
 
 
 def stop_all() -> None:

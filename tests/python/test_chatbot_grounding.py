@@ -311,6 +311,21 @@ m = meta({"chat": {"id": -100, "type": "supergroup"}, "from": {"id": 5},
           "caption_entities": [{"type": "mention", "offset": 0, "length": 8}]})
 check("nhắc tên trong CAPTION của ảnh cũng tính", m["mentioned"] is True)
 
+# `entities` là thứ Telegram gắn thêm, không phải một bảo đảm: tin chuyển tiếp, tin do bot khác
+# dựng lại, và vài client đã thấy về tới nơi mà không kèm entity nào. Không có nhánh so chuỗi
+# thô thì đúng cái ca "gọi tên mà bot im" quay lại, và nó im lặng không log gì.
+m = meta({"chat": {"id": -100, "type": "supergroup"}, "from": {"id": 5},
+          "text": "@ShopBot em hỗ trợ được gì bọn anh nhé?"})
+check("gọi tên mà Telegram KHÔNG kèm entity -> vẫn tính là được gọi", m["mentioned"] is True)
+m = meta({"chat": {"id": -100, "type": "supergroup"}, "from": {"id": 5},
+          "text": "@ShopKhac giá bao nhiêu"})
+check("so chuỗi thô vẫn không nhận vơ tên bot khác", m["mentioned"] is False)
+# "@shopbot" và "@shopbotvn" là hai username hợp lệ khác nhau. So chuỗi trần trụi thì con thứ
+# nhất nhận vơ mọi câu gọi con thứ hai - và trong một nhóm có cả hai thì nó chen ngang liên tục.
+m = meta({"chat": {"id": -100, "type": "supergroup"}, "from": {"id": 5},
+          "text": "@ShopBotVN cho hỏi giá"})
+check("tên bot khác chỉ dài thêm đuôi -> vẫn không nhận vơ", m["mentioned"] is False)
+
 # Nối lại với luật mở miệng: đây mới là thứ người dùng thấy.
 cfg = {"id": "b1", "groups": ["-100"], "reply_when": "mention"}
 check("CANARY: nhóm đã khai + nhắc tên -> bot NÓI (0.19.0 im ở đây)",

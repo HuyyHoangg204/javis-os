@@ -10126,6 +10126,10 @@ async def chatbots_list(brain: str = ""):
         # Lượt gần nhất chạy được nhưng KHÔNG đúng mức đã đặt. Không gộp vào `loi_luot`: hai
         # chuyện sửa khác nhau, gộp lại là thẻ báo sai loại việc.
         b["canh_bao_luot"] = chatbot_log.canh_bao_gan_nhat(b["id"])
+        # Nhóm có người gọi bot mà chủ chưa cho phép. Không đưa lên đây thì hành vi đúng ("bot
+        # không tự nhận việc trong nhóm lạ") trông hệt hành vi hỏng: gọi tên bot trong nhóm và
+        # không có gì xảy ra, không chỗ nào nói vì sao.
+        b["nhom_cho"] = chatbot_runtime.nhom_cho(b["id"])
         out.append(b)
     # Nhãn + cảnh báo rủi ro của từng mức quyền đi kèm luôn: giao diện KHÔNG được giữ bản chép
     # riêng. Chép riêng thì một hôm server siết thêm một rào mà ô cảnh báo vẫn hứa như cũ, và
@@ -10193,6 +10197,7 @@ async def chatbots_create(name: str = Form(...), agent_slug: str = Form(...),
                           icon: str = Form(""), token: str = Form(""),
                           bot_username: str = Form(""), handoff_to: str = Form(""),
                           nguon_tra_loi: str = Form(""), muc_quyen: str = Form(""),
+                          groups: str = Form(""), reply_when: str = Form(""),
                           xac_nhan_rui_ro: str = Form("")):
     # Bot sống TRONG một brain: Agent nó dùng và tài liệu nó đọc là cùng một chỗ. Nhận cả hai
     # tên tham số và tự bù cho nhau, nên người gọi chỉ cần gửi một cái.
@@ -10205,6 +10210,9 @@ async def chatbots_create(name: str = Form(...), agent_slug: str = Form(...),
         "name": name, "agent_slug": agent_slug, "agent_brain": br, "brain": br,
         "icon": icon, "token": token, "bot_username": bot_username, "handoff_to": handoff_to,
         "nguon_tra_loi": nguon_tra_loi, "muc_quyen": muc_quyen, "xac_nhan_rui_ro": ack,
+        # Nhóm khai được NGAY LÚC TẠO. Bản trước chỉ cho khai ở form Sửa, nên đường đi tự nhiên
+        # nhất ("tạo bot, thả vào nhóm, gọi tên") luôn kết thúc bằng một con bot im lặng.
+        "groups": groups, "reply_when": reply_when,
     })
     if err:
         return JSONResponse({"ok": False, "error": err}, status_code=400)
@@ -10252,6 +10260,39 @@ async def chatbots_enable(bot_id: str, on: str = Form("1")):
     return {"ok": True, "status": chatbot_runtime.status(bot_id)}
 
 
+@app.post("/chatbots/{bot_id}/groups")
+async def chatbots_groups(bot_id: str, chat_id: str = Form(...), on: str = Form("1")):
+    """Cho phép (hoặc gỡ) MỘT nhóm cho bot, bằng đúng một cú bấm trên thẻ.
+
+    Đường này tồn tại vì đường cũ dài tới mức không ai đi hết: thả bot vào nhóm, gõ /id, chép
+    id, mở dashboard, bấm Sửa, kéo xuống cuối form, dán vào ô textarea, Lưu. Bỏ sót một bước
+    là bot im, và không có gì nói cho biết đã sót ở đâu.
+
+    Không khởi động lại poller: `_answer` đọc lại bản ghi bot MỖI LƯỢT, nên nhóm vừa cho phép
+    ăn ngay từ câu tiếp theo.
+    """
+    bot = chatbot_store.get_bot(bot_id)
+    if not bot:
+        return JSONResponse({"ok": False, "error": "Không có bot nào id đó"}, status_code=404)
+    cid = str(chat_id or "").strip()
+    if not cid:
+        return JSONResponse({"ok": False, "error": "Thiếu id nhóm"}, status_code=400)
+    bat = str(on).strip() not in ("0", "false", "")
+    ds = [str(x) for x in (bot.get("groups") or [])]
+    if bat:
+        if cid not in ds:
+            ds.append(cid)
+    else:
+        ds = [x for x in ds if x != cid]
+    ok, err = chatbot_store.update_bot(bot_id, {"groups": ds})
+    if not ok:
+        return JSONResponse({"ok": False, "error": err}, status_code=400)
+    # Ra khỏi hàng đợi dù chủ chọn gì: cho phép rồi thì hết chờ, mà bấm bỏ qua cũng là đã
+    # quyết. Nhóm nào bị gỡ mà sau này lại có người gọi bot thì nó tự quay lại hàng đợi.
+    chatbot_runtime.bo_nhom_cho(bot_id, cid)
+    return {"ok": True, "groups": (chatbot_store.get_bot(bot_id) or {}).get("groups") or []}
+
+
 @app.get("/chatbots/{bot_id}/log")
 async def chatbots_log(bot_id: str, limit: int = 50):
     """Nhật ký hội thoại khách + danh sách CÂU BOT TRẢ LỜI KHÔNG NỔI.
@@ -10268,7 +10309,7 @@ async def chatbots_log(bot_id: str, limit: int = 50):
 @app.post("/chatbots/{bot_id}/delete")
 async def chatbots_delete(bot_id: str):
     """Xoá bản ghi bot. KHÔNG đụng brain và Agent của nó - xem chatbot_store.delete_bot."""
-    chatbot_runtime.stop_bot(bot_id)
+    chatbot_runtime.quen_bot(bot_id)   # tắt + dọn hết vết trong RAM (hàng đợi nhóm, bộ đếm)
     ok, err = chatbot_store.delete_bot(bot_id)
     if not ok:
         return JSONResponse({"ok": False, "error": err}, status_code=404)

@@ -9,6 +9,10 @@ Telegram bot cho Javis - long-polling getUpdates, whitelist theo chat_id (MỘT 
 - Gửi tin: thử MarkdownV2 (đậm/nghiêng/code hiện đẹp) → hỏng thì gửi lại plain
   (mirror vòng (True, False) trong telegram adapter của hermes).
 - Nhận file/ảnh từ user: tự tải về download_dir rồi đưa đường dẫn vào tin nhắn.
+- precheck_fn(text, meta) -> None|{"reply":...}: chặn một tin TRƯỚC khi tốn lượt (bot chuyên
+  trách dùng để không mở miệng trong nhóm chưa được cho phép).
+- event_fn(loai, thong_tin): tin DỊCH VỤ của nhóm (bot vào nhóm / bị đá / nhóm nâng cấp lên
+  siêu nhóm và đổi id). Telegram gửi mấy tin này bất kể chế độ riêng tư.
 Decoupled: main.py cấp answer_fn (1 lượt chat) + command_fn (xử lý lệnh).
 """
 import asyncio
@@ -124,7 +128,7 @@ def md_to_mdv2(text: str) -> str:
 
 class TelegramBot:
     def __init__(self, token, chat_id, answer_fn, command_fn=None, callback_fn=None,
-                 download_dir=None, commands=None):
+                 download_dir=None, commands=None, precheck_fn=None, event_fn=None):
         self.token = token
         # chat_id nhận chuỗi "id1,id2" hoặc list → whitelist NHIỀU người dùng chung 1 bot.
         self.chat_ids = parse_chat_ids(chat_id)
@@ -136,6 +140,16 @@ class TelegramBot:
         self.answer_fn = answer_fn          # async (text, meta, progress) -> str | {"text":..., "files":[...]}; progress(txt) = báo trạng thái trung gian
         self.command_fn = command_fn        # async (cmd, arg, chat) -> dict|None
         self.callback_fn = callback_fn      # async (data, chat) -> dict|None (bấm nút inline; chat = ai bấm)
+        # Chốt chặn TRƯỚC khi tốn một lượt: sync (text, meta) -> None|dict. None = chạy tiếp;
+        # dict = bỏ lượt, và `reply` trong đó (nếu có) được gửi thẳng như một câu nói thường.
+        #
+        # Vì sao chặn ở ĐÂY chứ không để answer_fn trả chuỗi rỗng: `_handle_turn` gửi tin
+        # "🤔 đang xử lý…" NGAY trước khi gọi answer_fn, nên bot từ chối một tin trong nhóm lạ
+        # vẫn kịp nhấp nháy một tin rồi xoá, và cuối cùng gửi "(không có nội dung)" vào mặt
+        # người ngoài. Im lặng phải là im lặng thật, quyết ngay từ lúc chưa gửi gì.
+        self.precheck_fn = precheck_fn
+        # Tin DỊCH VỤ của nhóm: async (loai, thong_tin) -> None. Xem `_bao_su_kien`.
+        self.event_fn = event_fn
         self.download_dir = download_dir    # str | callable(chat) -> str: nơi lưu file user gửi lên
         self._task = None
         # ĐA PHIÊN: mỗi chat_id có lượt trả lời RIÊNG → các tài khoản chạy song song,
@@ -149,6 +163,14 @@ class TelegramBot:
         # trong nhóm có nhắc tên nó hay reply vào nó không - xem _build_meta.
         self.bot_id = 0
         self.bot_username = ""
+        # Chế độ riêng tư của Telegram, đọc từ getMe (`can_read_all_group_messages`). True =
+        # ĐÃ TẮT riêng tư ở BotFather, bot nhận mọi tin trong nhóm. False = còn bật (mặc định),
+        # trong nhóm bot chỉ nhận tin nhắc tên nó, tin trả lời vào nó, và lệnh.
+        #
+        # Cần phơi ra vì nó im lặng vô hiệu hoá một tuỳ chọn của Javis: đặt bot "trả lời mọi
+        # tin trong nhóm" mà riêng tư còn bật thì Telegram chặn từ trước khi Javis nhìn thấy,
+        # và trang Chatbot cứ hiện xanh trong khi bot điếc một nửa.
+        self.doc_moi_tin_nhom = False
 
     def _url(self, method):
         return TG_API.format(token=self.token, method=method)
@@ -308,6 +330,18 @@ class TelegramBot:
                 elif loai == "text_mention" and self.bot_id:
                     if (e.get("user") or {}).get("id") == self.bot_id:
                         return True
+        # Không có entity nào khớp: rơi xuống so chuỗi thô. Cần vì `entities` là thứ Telegram
+        # gắn thêm chứ không phải một bảo đảm - tin chuyển tiếp, tin do bot khác dựng lại, và
+        # vài client đã thấy về tới nơi mà không kèm entity nào. Bỏ nhánh này thì đúng cái ca
+        # "gọi tên mà bot im" quay lại, và nó im lặng không log gì.
+        #
+        # Chặn hậu tố ở cuối: "@shopbot" và "@shopbotvn" là hai username hợp lệ khác nhau, và
+        # so chuỗi trần trụi thì con thứ nhất nhận vơ mọi câu gọi con thứ hai.
+        if self.bot_username:
+            re_ten = re.compile(re.escape(u) + r"(?![A-Za-z0-9_])", re.I)
+            for khoa_text in ("text", "caption"):
+                if re_ten.search(str(msg.get(khoa_text) or "")):
+                    return True
         return False
 
     def _la_reply_bot(self, msg):
@@ -318,6 +352,42 @@ class TelegramBot:
         """
         rep = msg.get("reply_to_message") or {}
         return bool(self.bot_id) and (rep.get("from") or {}).get("id") == self.bot_id
+
+    async def _bao_su_kien(self, msg):
+        """Tin DỊCH VỤ của nhóm - thứ Javis nghe được BẤT KỂ chế độ riêng tư của Telegram.
+
+        Ba loại đáng quan tâm, cả ba đều là lúc "im lặng" nghĩa là hỏng:
+
+          - **vao_nhom**: có người vừa thả bot vào một nhóm. Đây là lúc DUY NHẤT biết được id
+            nhóm mà không bắt chủ đi gõ /id rồi chép tay sang dashboard.
+          - **roi_nhom**: bot bị đá ra. Không dọn thì trang Chatbot còn nhắc mãi một nhóm
+            không còn nữa.
+          - **nhom_nang_cap**: nhóm thường lên siêu nhóm thì Telegram ĐỔI id (thêm tiền tố
+            -100). Danh sách nhóm chủ khai lúc trước lập tức trỏ vào một id không còn tồn tại,
+            và bot im trong đúng cái nhóm nó vừa trả lời được hôm qua.
+        """
+        if not self.event_fn:
+            return
+        chat_obj = msg.get("chat") or {}
+        loai = ""
+        if self.bot_id and any((u or {}).get("id") == self.bot_id
+                               for u in (msg.get("new_chat_members") or [])):
+            loai = "vao_nhom"
+        elif self.bot_id and (msg.get("left_chat_member") or {}).get("id") == self.bot_id:
+            loai = "roi_nhom"
+        elif msg.get("migrate_to_chat_id"):
+            loai = "nhom_nang_cap"
+        if not loai:
+            return
+        try:
+            await self.event_fn(loai, {
+                "chat_id": str(chat_obj.get("id", "")),
+                "chat_title": chat_obj.get("title", ""),
+                "chat_type": chat_obj.get("type", ""),
+                "chat_id_moi": str(msg.get("migrate_to_chat_id") or ""),
+            })
+        except Exception as e:
+            print(f"[telegram sự kiện nhóm] {type(e).__name__}: {e}", file=sys.stderr)
 
     # ---- User gửi file/ảnh lên bot → tải về, trả dòng mô tả (đường dẫn) cho engine ----
     async def _ingest_attachment(self, client, msg):
@@ -398,10 +468,17 @@ class TelegramBot:
             return   # /stop sẽ tự báo, không gửi trùng
         except Exception as e:
             reply = f"⚠ Lỗi: {type(e).__name__}: {e}"
+        im_lang = False
         if isinstance(reply, dict):
             files = reply.get("files") or []
+            # Im lặng CÓ CHỦ Ý (bot không được phép mở miệng ở nhóm này) khác hẳn câu trả lời
+            # rỗng vì hỏng. Không phân biệt thì cả hai cùng ra "(không có nội dung)" - vừa lộ
+            # với người ngoài, vừa che mất lượt hỏng thật.
+            im_lang = bool(reply.get("im_lang"))
             reply = reply.get("text") or ""
         await self._del_msg(client, chat, status_mid)   # bỏ tin trạng thái, thay bằng câu trả lời
+        if im_lang and not str(reply or "").strip() and not files:
+            return
         # Nếu câu trả lời chỉ là ![](local-path) và file đã được tách để gửi riêng, không gửi
         # thêm tin "(không có nội dung)" trước ảnh.
         if str(reply or "").strip() or not files:
@@ -434,6 +511,7 @@ class TelegramBot:
                 me = (r.json() or {}).get("result") or {}
                 self.bot_id = me.get("id") or 0
                 self.bot_username = me.get("username") or ""
+                self.doc_moi_tin_nhom = bool(me.get("can_read_all_group_messages"))
             except Exception as e:
                 print(f"[telegram getMe] {e}", file=sys.stderr)
             try:
@@ -469,6 +547,9 @@ class TelegramBot:
                         chat = str((msg.get("chat") or {}).get("id", ""))
                         if not chat:
                             continue
+                        # Tin dịch vụ đi TRƯỚC whitelist: "bot vừa bị thả vào nhóm nào" là
+                        # chuyện phải biết kể cả (nhất là) khi nhóm đó chưa được cho phép.
+                        await self._bao_su_kien(msg)
                         if self.chat_ids and chat not in self.chat_ids:
                             await self._send(client, chat, "Bạn không có quyền dùng bot Javis này.")
                             continue
@@ -513,6 +594,19 @@ class TelegramBot:
                 if res and "ask" in res:
                     text = res["ask"]   # chuyển thành câu hỏi cho Javis
                 # res None → coi như tin thường (gửi nguyên text)
+        # Chốt chặn trước khi tốn một lượt. Đặt SAU khối lệnh có chủ ý: /id là đường chính
+        # thức để lấy id nhóm, chặn nó thì chủ không còn cách nào khai nhóm cho bot.
+        if self.precheck_fn and not text.startswith("/"):
+            try:
+                chan = self.precheck_fn(text, meta or {})
+            except Exception as e:
+                print(f"[telegram precheck] {type(e).__name__}: {e}", file=sys.stderr)
+                chan = None
+            if chan:
+                loi_nhan = str((chan or {}).get("reply") or "")
+                if loi_nhan:
+                    await self._send(client, chat, loi_nhan)
+                return
         # Tin thường → chạy nền. Tuần tự THEO CHAT: chỉ chặn nếu chính chat này đang bận.
         if self._busy(chat):
             await self._send(client, chat, "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại.")

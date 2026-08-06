@@ -42,11 +42,31 @@
   // Nhãn + cảnh báo của từng mức quyền do SERVER cấp (kèm trong GET /chatbots). Không chép
   // cứng ở đây: chép rồi thì một hôm server siết thêm rào mà ô cảnh báo vẫn hứa như cũ, và
   // chủ bấm đồng ý dựa trên một câu đã sai.
-  var _bots = [], _q = "", _host = null, _mucDS = [];
+  var _bots = [], _q = "", _host = null, _mucDS = [], _timer = null, _dauVet = "";
+
+  // Trạng thái bot là thứ ĐỔI MÀ KHÔNG AI BẤM: bấm Bật xong server trả về "đang khởi động"
+  // (poller mới tạo, chưa kịp hỏi Telegram), rồi vài giây sau nó thành "đang chạy" - nhưng
+  // trang chỉ nạp lại khi người dùng bấm cái gì đó, nên thẻ đứng nguyên ở "Đang khởi động" cho
+  // tới lúc rời trang rồi quay lại. Chủ repo dính đúng ca này: bot chạy thật, trả lời thật, mà
+  // thẻ vẫn báo đang khởi động. Poller cũng là chỗ duy nhất thấy được bot vừa CHẾT.
+  var NHIP = 5000;
 
   function mucCua(id) {
     for (var i = 0; i < _mucDS.length; i++) if (_mucDS[i].id === id) return _mucDS[i];
     return { id: id || "suggest", nhan: "Chỉ đọc", canh_bao: [], can_xac_nhan: false };
+  }
+
+  // Nhịp tự làm mới. Dừng khi node của trang đã bị tháo khỏi DOM (console.js thay hẳn
+  // #cviewBody mỗi lần đổi trang) và khi tab bị ẩn - không thì mỗi trang từng mở để lại một
+  // vòng lặp gọi mạng mãi mãi.
+  function nhipTuLamMoi() {
+    if (_timer) { clearInterval(_timer); _timer = null; }
+    _timer = setInterval(function () {
+      if (!_host || !document.body.contains(_host)) { clearInterval(_timer); _timer = null; return; }
+      if (document.hidden) return;
+      if (document.querySelector(".cb-modal")) return;   // đang mở form: đừng vẽ lại dưới chân
+      tai(true);
+    }, NHIP);
   }
 
   function render(host) {
@@ -71,20 +91,30 @@
     var s = host.querySelector(".cb-search");
     s.oninput = function () { _q = s.value.trim().toLowerCase(); ve(); };
     tai();
+    nhipTuLamMoi();
   }
 
-  async function tai() {
+  // `im` = lần nạp của nhịp tự động: KHÔNG được xoá lưới đang hiện để thay bằng "Đang tải…",
+  // và mạng hỏng một nhịp thì giữ nguyên màn hình cũ chứ đừng thay bằng câu báo lỗi. Nhấp nháy
+  // mỗi năm giây còn khó chịu hơn con số cũ vài giây.
+  async function tai(im) {
     var box = _host && _host.querySelector(".cb-grid");
     if (!box) return;
-    box.innerHTML = '<div class="cb-empty">Đang tải…</div>';
+    if (!im) box.innerHTML = '<div class="cb-empty">Đang tải…</div>';
     try {
       // Lọc theo brain đang mở: trang này thuộc về một brain, y như trang Agents và Skills.
       // console.js tự gọi lại renderPage khi đổi brain nên không cần lắng nghe gì thêm.
       var d = await api("/chatbots?brain=" + encodeURIComponent(brain()));
       _bots = d.bots || [];
       _mucDS = d.muc_quyen || [];
+      var vet = JSON.stringify(_bots);
+      // Nhịp ngầm mà không có gì đổi thì ĐỪNG dựng lại DOM. Không phải để tiết kiệm: dựng lại
+      // mỗi 5 giây nghĩa là cứ 5 giây một lần có một khoảnh khắc nút vừa bị thay khỏi cây, và
+      // cú bấm rơi đúng lúc đó thì mất.
+      if (im && vet === _dauVet) return;
+      _dauVet = vet;
     } catch (e) {
-      box.innerHTML = '<div class="cb-empty">Không tải được danh sách bot: ' + esc(e.message) + '</div>';
+      if (!im) box.innerHTML = '<div class="cb-empty">Không tải được danh sách bot: ' + esc(e.message) + '</div>';
       return;
     }
     ve();
@@ -133,14 +163,48 @@
     // Mức quyền phải nhìn thấy TỪ NGOÀI THẺ, không phải mở form Sửa mới biết. Một con bot toàn
     // quyền lẫn giữa mấy con chỉ đọc mà nhìn giống hệt nhau là đúng kiểu hỏng im lặng: chủ nhớ
     // nhầm con nào là con nào rồi thả nhầm vào chỗ ai cũng nhắn được.
+    //
+    // Hiện CẢ mức chỉ đọc, dù nó là mặc định và không có rủi ro gì để cảnh báo. Bản trước bỏ
+    // trống ô này cho mức đó, và "không có nhãn" đọc ra được hai nghĩa trái ngược nhau: bot
+    // đang chỉ đọc, hay trang này không nói cho biết? Chủ repo hỏi đúng câu ấy. Một nhãn xám
+    // rẻ hơn nhiều so với một lần đoán sai theo hướng ngược lại.
     var mq = b.muc_quyen || "suggest";
-    var quyen = mq === "suggest" ? "" :
-      '<div class="cb-quyen ' + (mq === "full" ? "full" : "ghi") + '">' +
-        ic(mq === "full" ? "shield-alert" : "pencil") + ' Mức <b>' + esc(mucCua(mq).nhan) +
-        '</b>' + (mq === "full"
-          ? ' - bot tự gửi đi, thanh toán, đặt/huỷ, xoá được. Người điều khiển là người nhắn cho nó.'
-          : ' - bot ghi được file trong brain này và gọi được nguồn dữ liệu đã đấu.') +
+    var mqLoi = {
+      suggest: " - bot chỉ đọc brain này rồi trả lời. Không ghi file, không gọi nguồn dữ liệu.",
+      auto: " - bot ghi được file trong brain này và gọi được nguồn dữ liệu đã đấu.",
+      full: " - bot tự gửi đi, thanh toán, đặt/huỷ, xoá được. Người điều khiển là người nhắn cho nó.",
+    };
+    var quyen =
+      '<div class="cb-quyen ' + (mq === "full" ? "full" : mq === "auto" ? "ghi" : "doc") + '">' +
+        // "shield-alert" không có trong bộ icon đã vendor nên bản trước vẽ ra một ô trống ở
+        // đúng chỗ đáng chú ý nhất. Test icon không bắt được vì nó chỉ dò tên viết thẳng trong
+        // lời gọi, không dò lời gọi có biểu thức ở trong.
+        ic(mq === "full" ? "shield" : mq === "auto" ? "pencil" : "eye") +
+        ' Mức <b>' + esc(mucCua(mq).nhan) + '</b>' + (mqLoi[mq] || "") +
       '</div>';
+    // Nhóm có người gọi bot mà chủ chưa cho phép. Đây là chỗ sửa cho lỗi "thả bot vào nhóm,
+    // tag tên nó, không thấy gì": hành vi từ chối vẫn đúng, nhưng nay nó nổi lên đây kèm đúng
+    // một nút bấm, thay vì bắt chủ đoán rằng mình phải đi khai id nhóm ở đáy form Sửa.
+    var cho = (b.nhom_cho || []).map(function (g) {
+      return '<div class="cb-nhomcho" data-cid="' + esc(g.chat_id) + '">' +
+        '<div class="cb-nhomcho-t">' + ic("message-circle") + ' <b>' + esc(g.ten || "Nhóm " + g.chat_id) +
+          '</b> <span class="cb-nhomcho-id">' + esc(g.chat_id) + '</span></div>' +
+        '<div class="cb-nhomcho-d">' + (g.lan
+          ? 'Có người gọi bot ở đây ' + g.lan + ' lần mà bot chưa được bật cho nhóm này.'
+          : 'Bot vừa được thêm vào nhóm này nhưng chưa được bật cho nó.') + '</div>' +
+        '<div class="cb-nhomcho-a">' +
+          '<button class="s-btn cb-ok-nhom" type="button">' + ic("check") + ' Cho phép nhóm này</button>' +
+          '<button class="s-btn-ghost cb-bo-nhom" type="button">Bỏ qua</button>' +
+        '</div></div>';
+    }).join("");
+    // Chế độ riêng tư của Telegram vô hiệu hoá tuỳ chọn "trả lời mọi tin" từ phía Telegram,
+    // trước khi Javis kịp nhìn thấy tin nào. Không nói ra thì cấu hình hứa một đằng, bot làm
+    // một nẻo, và mọi dấu hiệu trên trang này đều xanh.
+    var riengTu = (b.reply_when === "always" && st.da_hoi_telegram && !st.doc_moi_tin_nhom)
+      ? '<div class="cb-quyen ghi">' + ic("triangle-alert") + ' Bot đặt <b>trả lời mọi tin trong ' +
+        'nhóm</b>, nhưng Telegram đang bật chế độ riêng tư nên nó chỉ nhận được tin nhắc tên, ' +
+        'tin trả lời vào nó và lệnh. Muốn nhận mọi tin thì vào @BotFather, gõ /setprivacy, chọn ' +
+        'bot này rồi chọn Disable.</div>' : "";
     var c = el(
       '<div class="cb-card">' +
         '<div class="cb-head">' +
@@ -156,13 +220,15 @@
           '<span>' + ic("bot") + ' ' + esc(b.agent_name || (b.agent || {}).slug || "?") + '</span>' +
         '</div>' +
         '<div class="cb-meta">' +
-          '<span>' + ((b.groups || []).length ? (b.groups.length + ' nhóm') : 'chỉ tin nhắn riêng') + '</span>' +
+          '<span>' + ((b.groups || []).length
+            ? ((b.groups.length + ' nhóm') + (b.reply_when === "always" ? ", trả lời mọi tin" : ", khi được gọi tên"))
+            : 'chỉ tin nhắn riêng') + '</span>' +
           '<span>' + (b.nguon_tra_loi === "tai_lieu" ? "chỉ tài liệu" : "chuyên môn Agent") + '</span>' +
           '<span>' + (st.answered || 0) + ' lượt trả lời</span>' +
           (b.handoff_to ? '<span>' + ic("user") + ' có chuyển người trực</span>'
                         : '<span class="cb-warn">chưa đặt người nhận</span>') +
         '</div>' +
-        quyen + mat + lluot + cbao + loi +
+        cho + quyen + riengTu + mat + lluot + cbao + loi +
         '<div class="cb-acts">' +
           '<button class="s-btn-ghost cb-toggle" type="button">' +
             (b.enabled ? ic("circle-stop") + " Tắt" : ic("play") + " Bật") + '</button>' +
@@ -175,7 +241,23 @@
     c.querySelector(".cb-log").onclick = function () { moNhatKy(b); };
     c.querySelector(".cb-edit").onclick = function () { moForm(b); };
     c.querySelector(".cb-del").onclick = function () { xoa(b); };
+    c.querySelectorAll(".cb-nhomcho").forEach(function (n) {
+      var cid = n.dataset.cid;
+      n.querySelector(".cb-ok-nhom").onclick = function () { choNhom(b, cid, true); };
+      n.querySelector(".cb-bo-nhom").onclick = function () { choNhom(b, cid, false); };
+    });
     return c;
+  }
+
+  // Một cú bấm thay cho: gõ /id trong nhóm, chép id, mở Sửa, kéo xuống đáy form, dán, Lưu.
+  async function choNhom(b, cid, on) {
+    try {
+      await api("/chatbots/" + encodeURIComponent(b.id) + "/groups",
+                { method: "POST", body: fd({ chat_id: cid, on: on ? "1" : "0" }) });
+    } catch (e) {
+      alert("Không cập nhật được nhóm: " + e.message);
+    }
+    tai();
   }
 
   // ---------------------------------------------------------------- nhật ký + lỗ hổng
@@ -408,8 +490,27 @@
         'Bỏ trống thì bot <b>vẫn trả lời bình thường</b> theo Agent, chỉ là không có ai để ' +
         'chuyển tiếp. Muốn nó im khi thiếu căn cứ thì chọn chế độ <b>Chỉ tài liệu</b> ở trên.</div>' +
 
-        (sua ? '<label>Nhóm được phép (mỗi id một dòng, mời bot vào nhóm rồi gõ /id để lấy)</label>' +
-               '<textarea id="cbGroups" rows="2">' + esc((b.groups || []).join("\n")) + '</textarea>' : "") +
+        // Khai được NGAY LÚC TẠO, không chỉ ở form Sửa. Đường đi tự nhiên nhất là tạo bot rồi
+        // thả thẳng vào nhóm; bắt quay lại bấm Sửa mới khai được nhóm là bảo đảm lần thử đầu
+        // tiên của mọi người dùng đều gặp một con bot im lặng.
+        '<label>Nhóm được phép (mỗi id một dòng)</label>' +
+        '<textarea id="cbGroups" rows="2" placeholder="Ví dụ: -1001234567890">' +
+          esc(((b && b.groups) || []).join("\n")) + '</textarea>' +
+        '<div class="cb-hint">Bỏ trống thì bot <b>chỉ trả lời tin nhắn riêng</b>, trong nhóm nó ' +
+        'im. Không cần chép tay: mời bot vào nhóm rồi nhắn cho nó một câu, nhóm đó sẽ hiện trên ' +
+        'thẻ bot ở trang này kèm nút <b>Cho phép</b>. Hoặc gõ <b>/id</b> trong nhóm để lấy id ' +
+        'rồi dán vào đây.</div>' +
+
+        '<label>Trong nhóm thì khi nào bot lên tiếng</label>' +
+        '<select id="cbReplyWhen">' +
+          '<option value="mention"' + (!b || b.reply_when !== "always" ? " selected" : "") + '>' +
+            'Chỉ khi được gọi tên hoặc trả lời vào nó (mặc định)</option>' +
+          '<option value="always"' + (b && b.reply_when === "always" ? " selected" : "") + '>' +
+            'Mọi tin trong nhóm đã cho phép</option>' +
+        '</select>' +
+        '<div class="cb-hint"><b>Mọi tin</b> chỉ hợp với nhóm nhỏ, và còn phải tắt chế độ riêng ' +
+        'tư ở @BotFather (<b>/setprivacy</b> → Disable) thì Telegram mới chuyển hết tin cho bot. ' +
+        'Bot chen vào mọi câu khách nói với nhau thì phiền hơn là giúp.</div>' +
 
         '<div class="cb-form-acts">' +
           '<button class="s-btn-ghost" id="cbCancel" type="button">Huỷ</button>' +
@@ -475,15 +576,16 @@
                    + "xoá, công bố ra ngoài. Những thao tác đó không hoàn tác được, và bot "
                    + "không hỏi lại bạn trước khi làm.\n\nChỉ nên dùng khi bạn kiểm soát được "
                    + "danh sách người nhắn vào. Vẫn muốn đặt mức này?")) return;
+      var gr = box.querySelector("#cbGroups").value;
+      var rw = box.querySelector("#cbReplyWhen").value;
       try {
         if (sua) {
-          var gr = box.querySelector("#cbGroups");
           await api("/chatbots/" + encodeURIComponent(b.id) + "/update", {
             method: "POST",
             body: fd({ name: ten, agent_slug: ag, agent_brain: br, brain: br,
                        handoff_to: ho, token: tok, bot_username: uname, nguon_tra_loi: ngu,
                        muc_quyen: muc, xac_nhan_rui_ro: "1",
-                       groups: gr ? gr.value : undefined }),
+                       groups: gr, reply_when: rw }),
           });
         } else {
           if (!tok) return alert("Dán token Telegram của bot (lấy ở @BotFather)");
@@ -491,7 +593,8 @@
             method: "POST",
             body: fd({ name: ten, agent_slug: ag, agent_brain: br, brain: br,
                        token: tok, bot_username: uname, handoff_to: ho, nguon_tra_loi: ngu,
-                       muc_quyen: muc, xac_nhan_rui_ro: "1" }),
+                       muc_quyen: muc, xac_nhan_rui_ro: "1",
+                       groups: gr, reply_when: rw }),
           });
         }
       } catch (e) { return alert("Không lưu được: " + e.message); }

@@ -4,6 +4,34 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.0] - 2026-08-06
+Chủ repo gửi hai ảnh. Ảnh một: một nhóm Telegram, bot vừa trả lời `/id` xong, rồi ba tin gọi thẳng tên nó - `@ten_bot em hỗ trợ được gì bọn anh nhé?`, `@ten_bot ALo`, `chốt mịa rồi ném vào nhóm nhỏ méo phản hồi`. Không có tin nào của bot sau đó. Ảnh hai: thẻ bot trên dashboard vẫn báo **Đang khởi động** trong khi con bot đó vừa trả lời trong nhóm.
+
+Ba việc, và cả ba đều là **hỏng lặng lẽ** chứ không phải hỏng chức năng.
+### Sửa lỗi
+- **Thả bot vào nhóm, gọi tên nó, không có gì xảy ra.** Rào thì đúng: bot không tự nhận việc trong nhóm chưa được chủ khai. Nhưng CÁCH TỪ CHỐI thì sai hoàn toàn - im hoàn toàn, không log, không dòng nào trên trang Chatbot. "Hành vi đúng" và "bot hỏng" trông y hệt nhau, và người dùng chỉ có thể kết luận vế thứ hai.
+
+  Nay từ chối vẫn từ chối, nhưng nó **nói**: bot đáp đúng một câu cho người đang gọi biết phải làm gì, và nhóm đó **hiện lên thẻ bot** kèm nút **Cho phép nhóm này**. Một cú bấm thay cho đường cũ dài bảy bước (gõ /id, chép id, mở dashboard, bấm Sửa, kéo xuống đáy form, dán, Lưu) mà sót một bước là quay lại đúng chỗ im lặng.
+- **Ô "Nhóm được phép" chỉ có trong form Sửa, không có trong form Tạo.** Nghĩa là đường đi tự nhiên nhất - tạo bot xong thả thẳng vào nhóm - bảo đảm lần thử đầu tiên của mọi người dùng gặp một con bot im lặng. Nay khai được ngay lúc tạo, và ô chọn "trong nhóm thì khi nào bot lên tiếng" cũng lên mặt giao diện (trước đây chỉ tồn tại trong kho, không có đường nào để đổi).
+- **Nhóm thường lên siêu nhóm thì Telegram đổi id** (thêm tiền tố `-100`), không báo ai cả. Id chủ khai hôm trước lập tức trỏ vào một nhóm không còn tồn tại, và bot im trong đúng nhóm nó vừa trả lời được hôm qua. Nay hai dạng id khớp nhau, và Javis nghe tin nâng cấp để tự cập nhật danh sách.
+- **Gọi tên bot mà Telegram không kèm `entities` thì cờ "được gọi" tắt.** `entities` là thứ Telegram gắn thêm, không phải một bảo đảm. Thêm nhánh so chuỗi thô làm lưới đỡ.
+- **Thẻ bot đứng nguyên ở "Đang khởi động".** Bấm Bật thì server trả về `starting` - poller vừa được tạo, chưa kịp bắt tay với Telegram - rồi vài giây sau nó thành `polling`. Nhưng trang chỉ nạp lại khi người dùng bấm cái gì đó, nên thẻ đứng ở "Đang khởi động" cho tới lúc rời trang rồi quay lại, trong khi bot đã trả lời thật từ lâu. Nay trang tự làm mới 5 giây một nhịp; nhịp đó cũng là thứ DUY NHẤT phát hiện được một con bot vừa chết.
+- **Icon mức Toàn quyền vẽ ra ô trống.** `shield-alert` không có trong bộ icon đã vendor. Test icon không bắt được vì nó chỉ dò tên viết thẳng trong lời gọi, còn chỗ này là một biểu thức ba ngôi.
+### Cải thiện
+- **Mức quyền hiện trên thẻ ở CẢ BA mức, kể cả Chỉ đọc.** Bản trước bỏ trống nhãn cho mức mặc định với lý do "mặc định thì không cần dán nhãn". Nhưng một ô trống đọc ra được hai nghĩa ngược nhau: bot đang chỉ đọc, hay trang này không nói cho biết? Xám cho Chỉ đọc, vàng cho Được ghi, đỏ cho Toàn quyền.
+- **Thẻ nói rõ trong nhóm bot lên tiếng khi nào** ("3 nhóm, khi được gọi tên") chứ không chỉ đếm số nhóm.
+- **Cảnh báo khi cấu hình đòi thứ Telegram không cho.** Đặt bot "trả lời mọi tin trong nhóm" mà chế độ riêng tư của Telegram còn bật thì Telegram chặn từ phía nó, Javis không bao giờ nhìn thấy những tin đó, và mọi dấu hiệu trên trang vẫn xanh. Nay `getMe` đọc `can_read_all_group_messages` và thẻ nói thẳng phải vào @BotFather gõ `/setprivacy` → Disable.
+### Bảo mật
+- **Im lặng có chủ ý nay là im lặng THẬT.** Trước bản này, bot từ chối một tin trong nhóm lạ vẫn đi hết đường: gửi tin "🤔 đang xử lý…", xoá nó, rồi gửi **"(không có nội dung)"** vào mặt người ngoài. Chốt chặn mới nằm ở tầng kênh, chạy TRƯỚC khi tốn một lượt engine và trước cả tin trạng thái. Câu trả lời rỗng vì engine gãy vẫn hiện ra như cũ - hai thứ đó không được lẫn vào nhau.
+- Lệnh `/...` cố ý KHÔNG đi qua chốt chặn: `/id` là đường chính thức để lấy id nhóm, chặn nó thì chủ không còn cách nào khai nhóm cho bot.
+- Rào "bot không tự nhận việc trong nhóm lạ" **không bị nới ra**. Hàng đợi nhóm chờ duyệt nằm trong RAM, có trần 20 nhóm mỗi bot, và câu báo trong nhóm chỉ nói đúng một lần cho mỗi nhóm.
+### Kiểm thử
+- `test_chatbot_store.py` thêm hai mục: lý do im phải phân biệt được (nhóm chưa bật ≠ không ai gọi tên - hai thứ sửa khác nhau hoàn toàn), và canary id nhóm thường ↔ siêu nhóm, kèm mục ngược để chuẩn hoá không nuốt nhầm một nhóm khác có đuôi trùng.
+- Canary mới ở tầng kênh: chốt chặn phải đứng trước tin trạng thái, lệnh không bị chặn, và im-lặng-có-chủ-ý phải phân biệt được với câu trả lời rỗng.
+- `test_trang_chatbot.js` đảo chiều một mục cũ ("mức chỉ đọc KHÔNG dán nhãn") kèm lý do đổi ý ghi tại chỗ, và thêm mục canh nhịp tự làm mới phải dừng khi rời trang.
+### Tài liệu
+- `docs/25-chatbot.md` viết lại Bước 4 theo đường mới (thả vào nhóm → gọi tên → bấm cho phép), thêm mục chế độ riêng tư của Telegram, và hai câu hỏi thường gặp đúng bằng lời chủ repo đã hỏi.
+
 ## [0.24.7] - 2026-08-06
 Chủ repo chốt bốn việc cùng một lúc: *"gom nút tiết kiệm sang bên Mức Dùng, đặt mặc định phiên bản mới là siêu tiết kiệm, và loại bỏ các thông số không có ý nghĩa với người dùng cuối. Menu tiết kiệm cũng không cần nữa."*
 ### Thay đổi hành vi

@@ -65,6 +65,8 @@ Bấm **Bot mới**, điền:
 | Bot được làm gì | Mức quyền. Cứ để **Chỉ đọc** cho lần đầu; xem mục [Ba mức quyền](#ba-mức-quyền---bot-được-làm-gì) trước khi nâng |
 | Token Telegram | Dán token từ BotFather rồi bấm **Kiểm tra** |
 | Chat ID người trực | Số Telegram của người nhận chuyển tiếp (xem bên dưới) |
+| Nhóm được phép | Để trống cũng được - thả bot vào nhóm rồi cho phép bằng một cú bấm sau (xem Bước 4) |
+| Khi nào bot lên tiếng trong nhóm | Mặc định chỉ khi được gọi tên hoặc reply vào nó |
 
 **Không có ô chọn brain**, và đó là cố ý: bot thuộc về brain bạn đang mở. Muốn bot ở brain khác thì đổi brain ở đầu trang rồi tạo lại - một chỗ để nhìn, không có hai lớp phải khớp nhau.
 
@@ -93,14 +95,24 @@ Muốn bot im khi không tìm thấy tài liệu thì đó là việc của ch�
 ### Bước 4: Thả bot vào một nhóm
 
 1. Mời bot vào nhóm như mời một thành viên.
-2. Trong nhóm, gõ `/id`. Bot trả về id của nhóm (một số **âm**, dạng `-1001234567890`).
-3. Về trang Chatbot, bấm **Sửa** trên thẻ bot, dán id đó vào ô **Nhóm được phép**, mỗi id một dòng.
+2. Trong nhóm, gọi tên nó một câu: `@ten_bot em hỗ trợ được gì?`
+3. Bot đáp lại đúng một lần rằng nó **chưa được bật cho nhóm này**, và cùng lúc nhóm đó **hiện lên thẻ bot** ở trang Chatbot.
+4. Bấm **Cho phép nhóm này** trên thẻ. Xong. Câu tiếp theo trong nhóm là bot trả lời thật.
 
-**Chưa khai id nhóm thì bot im lặng trong mọi nhóm.** Đây là mặc định cố ý: bot bị thả vào một nhóm lạ mà tự nhận việc là nó chen vào giữa cuộc nói chuyện của người khác.
+Không muốn chờ thì khai tay cũng được: gõ `/id` trong nhóm để lấy id (một số **âm**, dạng `-1001234567890`), rồi dán vào ô **Nhóm được phép** trong form tạo hoặc sửa bot, mỗi id một dòng.
 
-Trong nhóm đã khai, mặc định bot chỉ trả lời khi có người **nhắc tên nó** (gõ `@ten_bot`, hoặc bấm chọn tên nó từ danh sách thành viên) hoặc **reply vào tin của nó**. Nhóm có nhiều bot thì nó phân biệt được: nhắc tên bot khác hay reply vào bot khác thì nó không nhận vơ.
+**Chưa cho phép nhóm thì bot không trả lời trong nhóm đó.** Đây là mặc định cố ý: bot bị thả vào một nhóm lạ mà tự nhận việc là nó chen vào giữa cuộc nói chuyện của người khác. Nhưng từ chối không có nghĩa là biến mất - bot nói một câu cho người đang gọi biết phải làm gì, và nhóm đó nằm chờ ngay trên thẻ để bạn quyết.
 
-Muốn nó trả lời mọi câu trong nhóm thì đổi cách trả lời thành "luôn luôn" - cân nhắc kỹ, nhóm đông người thì rất ồn và đốt quota model nhanh.
+Nhóm nào bạn không muốn thì bấm **Bỏ qua**, nó rời khỏi danh sách chờ. Có người gọi bot ở đó lần nữa thì nó quay lại - trang này không giấu đi một chỗ có người đang cố dùng bot.
+
+Trong nhóm đã cho phép, mặc định bot chỉ trả lời khi có người **nhắc tên nó** (gõ `@ten_bot`, hoặc bấm chọn tên nó từ danh sách thành viên) hoặc **reply vào tin của nó**. Nhóm có nhiều bot thì nó phân biệt được: nhắc tên bot khác hay reply vào bot khác thì nó không nhận vơ.
+
+Muốn nó trả lời **mọi câu trong nhóm** thì đổi ô "Trong nhóm thì khi nào bot lên tiếng". Hai lưu ý:
+
+- Cân nhắc kỹ. Nhóm đông người thì rất ồn và đốt quota model nhanh.
+- Còn phải **tắt chế độ riêng tư** ở BotFather: gõ `/setprivacy`, chọn bot này, chọn **Disable**. Chế độ đó bật sẵn cho mọi bot mới và nó chặn ngay từ phía Telegram - tin trong nhóm không nhắc tên bot thì Javis không bao giờ nhìn thấy, dù bạn đặt gì trong dashboard. Thẻ bot sẽ nhắc bạn nếu hai thứ đang nói ngược nhau.
+
+**Nhóm thường được nâng thành siêu nhóm thì Telegram đổi id của nó** (thêm tiền tố `-100`). Javis nghe được lúc đó và tự cập nhật danh sách, nên bạn không phải khai lại - đây từng là cách bot im lặng mà không để lại manh mối nào.
 
 ## Đọc thẻ bot
 
@@ -115,7 +127,11 @@ Mỗi thẻ có một chấm màu và một dòng trạng thái. **Bốn** trạ
 
 Trạng thái **Lỗi** phải nhìn thấy được, vì bot chết âm thầm là thứ bạn chỉ phát hiện khi có người phàn nàn.
 
+Thẻ **tự làm mới vài giây một lần** khi bạn đang mở trang. Cần vì trạng thái đổi mà không ai bấm gì: vừa bấm Bật thì thẻ báo "Đang khởi động" (bot đang bắt tay với Telegram), rồi mấy giây sau nó thành "Đang chạy". Không tự làm mới thì thẻ đứng nguyên ở "Đang khởi động" cho tới lúc bạn rời trang rồi quay lại - trong khi bot đã trả lời được từ lâu.
+
 Thẻ cũng cảnh báo khi **Agent của bot không còn** (bạn xoá hoặc đổi slug ở trang Agents). Lúc đó bot vẫn chạy nhưng trả lời không có hướng dẫn vai trò, nên sửa ngay.
+
+**Mức quyền hiện ngay trên thẻ**, ở cả ba mức chứ không riêng hai mức có quyền thao tác: xám là Chỉ đọc, vàng là Được ghi, đỏ là Toàn quyền. Không phải mở form Sửa mới biết con nào đang ở mức nào, và một thẻ không có nhãn không còn đọc ra được hai nghĩa ngược nhau.
 
 ## Bot tốn bao nhiêu token
 
@@ -315,6 +331,10 @@ Bấm **Xoá** trên thẻ. Bot ngừng trả lời ngay.
 **Bot nói "chưa có thông tin" mà tài liệu rõ ràng có nói?** Thường là do file dài không chia tiêu đề, hoặc tài liệu dùng từ khác hẳn từ người ta hỏi (tài liệu ghi "hoàn trả", người hỏi gõ "đổi trả"). Thêm tiêu đề cho file, hoặc viết thêm cách gọi mà người ta hay dùng vào chính đoạn đó.
 
 **Bot có nhớ người đã nhắn không?** Có, mỗi người một mạch hội thoại riêng trong brain của bot.
+
+**Tôi thả bot vào nhóm, tag tên nó mà nó không trả lời?** Gần như luôn là nhóm đó chưa được cho phép. Nhìn thẻ bot ở trang Chatbot: nhóm đang chờ hiện ngay trên đó kèm nút **Cho phép nhóm này**. Bot cũng đã nói một câu trong nhóm để báo điều đó. Nếu thẻ không hiện nhóm nào thì tin nhắn chưa về tới Javis - kiểm hai thứ: bot có đang chạy không (chấm xanh), và bạn có gõ đúng `@ten_bot` không (bấm chọn tên nó từ danh sách gợi ý cho chắc).
+
+**Bot đặt "trả lời mọi tin" mà nó vẫn chỉ trả lời khi được gọi tên?** Chế độ riêng tư của Telegram còn bật. Nó chặn từ phía Telegram nên Javis không nhìn thấy những tin đó. Vào @BotFather, gõ `/setprivacy`, chọn bot này, chọn **Disable**, rồi tắt bật lại bot ở trang Chatbot. Thẻ bot có nhắc sẵn khi rơi vào tình huống này.
 
 **Tắt Javis thì bot có chạy không?** Không. Bot chạy trong tiến trình Javis, nên máy/VPS phải bật. Bật lại Javis thì bot nào đang bật tự chạy lại.
 

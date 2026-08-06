@@ -2052,14 +2052,26 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 .cb-warn { color: var(--warn-ink); }
 .cb-err { font-size: 12.5px; color: var(--red); line-height: 1.5;
   background: var(--surface-3); border-radius: 7px; padding: 6px 8px; }
-/* Mức quyền trên thẻ. Chỉ hiện khi bot ĐƯỢC nới quyền - mức chỉ đọc là mặc định nên không cần
-   dán nhãn, còn con làm việc thật thì phải nhận ra được từ xa giữa một lưới thẻ giống nhau. */
+/* Mức quyền trên thẻ - hiện ở CẢ BA mức, kể cả mức chỉ đọc. Bản trước bỏ trống ô này cho mức
+   mặc định, và "không có nhãn" đọc ra được hai nghĩa ngược nhau: bot đang chỉ đọc, hay trang
+   này không nói? Ba màu để phân biệt được từ xa giữa một lưới thẻ giống hệt nhau. */
 .cb-quyen { display: flex; align-items: flex-start; gap: 6px; font-size: 12.5px;
   line-height: 1.5; border-radius: 7px; padding: 6px 8px; }
+.cb-quyen.doc { color: var(--text3); background: var(--surface-3);
+  border: 1px solid var(--border); }
 .cb-quyen.ghi { color: var(--warn-ink); background: var(--warn-wash);
   border: 1px solid var(--warn-line); }
 .cb-quyen.full { color: var(--red); background: var(--danger-wash);
   border: 1px solid var(--danger-line); }
+/* Nhóm đang chờ chủ cho phép. Cố ý nổi bằng màu thông tin chứ không phải màu lỗi: không có gì
+   hỏng cả, chỉ là có một quyết định đang chờ đúng một cú bấm. */
+.cb-nhomcho { border: 1px solid var(--info-line); background: var(--info-wash);
+  border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.cb-nhomcho-t { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  font-size: 13px; color: var(--text); }
+.cb-nhomcho-id { font-family: var(--mono, monospace); font-size: 11.5px; color: var(--text3); }
+.cb-nhomcho-d { font-size: 12.5px; line-height: 1.5; color: var(--text3); }
+.cb-nhomcho-a { display: flex; gap: 6px; flex-wrap: wrap; }
 .cb-acts { display: flex; gap: 6px; margin-top: 2px; }
 .cb-empty { grid-column: 1 / -1; text-align: center; color: var(--text3); padding: 40px 16px;
   font-size: 14px; line-height: 1.7; }

@@ -227,6 +227,65 @@ check("chưa khai nhóm nào -> im trong MỌI nhóm",
       chatbot_runtime._nen_tra_loi({**cfg, "groups": [], "reply_when": "always"},
                                    {"chat_type": "group", "chat_id": "-100999"}) is False)
 
+# Lý do im phải PHÂN BIỆT ĐƯỢC. Hai kiểu im nhìn giống hệt nhau từ ngoài nhưng sửa khác hẳn:
+# "nhóm chưa được bật" là việc của chủ và phải nổi lên trang Chatbot, còn "không ai gọi tên" là
+# hành vi đúng và phải im tuyệt đối. Gộp làm một là hoặc spam chủ, hoặc giấu mất việc cần làm.
+check("lý do im: nhóm chưa được bật",
+      chatbot_runtime._ly_do_im(cfg, {"chat_type": "group", "chat_id": "-100000"}) == "nhom_chua_bat")
+check("lý do im: nhóm đã bật nhưng không ai gọi tên",
+      chatbot_runtime._ly_do_im(cfg, {"chat_type": "group", "chat_id": "-100999"}) == "khong_goi_ten")
+check("có lý do trả lời thì lý do im là rỗng",
+      chatbot_runtime._ly_do_im(cfg, {"chat_type": "private", "chat_id": "77"}) == "")
+
+# CANARY - nhóm thường lên SIÊU NHÓM thì Telegram đổi id (thêm tiền tố -100), không báo ai cả.
+# Chủ khai id lúc còn là nhóm thường, hôm sau bot im trong đúng nhóm nó vừa trả lời được hôm
+# qua, và không có manh mối nào để lần. Hai dạng id phải khớp nhau.
+check("id nhóm thường khớp với dạng siêu nhóm của chính nó",
+      chatbot_runtime._khop_nhom(["-5313630519"], "-1005313630519") is True)
+check("và ngược lại", chatbot_runtime._khop_nhom(["-1005313630519"], "-5313630519") is True)
+check("hai nhóm KHÁC nhau vẫn không khớp",
+      chatbot_runtime._khop_nhom(["-100999"], "-100000") is False)
+check("chuẩn hoá không nuốt mất nhóm khác có đuôi trùng",
+      chatbot_runtime._khop_nhom(["-999"], "-1999") is False)
+check("nhóm đã khai dạng cũ, tin đến từ dạng mới -> vẫn trả lời",
+      chatbot_runtime._nen_tra_loi({**cfg, "groups": ["-5313630519"]},
+                                   {"chat_type": "group", "chat_id": "-1005313630519",
+                                    "mentioned": True}) is True)
+
+# ============================================================
+# 7b. Nhóm chưa được bật phải NỔI LÊN, không được im lặng
+# ============================================================
+# Đây là lỗ hổng chủ repo báo (2026-08-06): thả bot vào nhóm, gọi tên nó, không có gì xảy ra.
+# Không câu trả lời, không log, không dòng nào trên trang Chatbot - "hành vi đúng" và "bot
+# hỏng" trông y hệt nhau. Rào giữ nguyên; cách từ chối thì phải nói được.
+chatbot_runtime._NHOM_CHO.clear()
+chatbot_runtime._DA_BAO_NHOM.clear()
+chatbot_store.update_bot(bid, {"groups": [], "reply_when": "mention"})
+_chan = chatbot_runtime._make_precheck_fn(bid)
+
+_r1 = _chan("@bot ơi còn hàng không", {"chat_type": "group", "chat_id": "-4242",
+                                       "chat_title": "Nhóm khách VIP", "mentioned": True})
+check("nhóm chưa bật -> bot nói ĐÚNG MỘT câu chỉ đường", bool((_r1 or {}).get("reply")))
+_r2 = _chan("alo", {"chat_type": "group", "chat_id": "-4242", "mentioned": True})
+check("lần sau ở cùng nhóm thì im, không lải nhải", _r2 == {})
+
+_cho = chatbot_runtime.nhom_cho(bid)
+check("nhóm đó vào hàng đợi để chủ duyệt", len(_cho) == 1 and _cho[0]["chat_id"] == "-4242")
+check("hàng đợi giữ tên nhóm cho chủ nhận ra", _cho[0]["ten"] == "Nhóm khách VIP")
+check("và đếm số lần có người gọi", _cho[0]["lan"] == 2)
+
+check("không ai gọi tên thì KHÔNG vào hàng đợi (im tuyệt đối)",
+      _chan("hai người nói chuyện", {"chat_type": "group", "chat_id": "-777"}) == {}
+      and len(chatbot_runtime.nhom_cho(bid)) == 1)
+
+chatbot_store.update_bot(bid, {"groups": ["-4242"]})
+chatbot_runtime.bo_nhom_cho(bid, "-4242")
+check("cho phép rồi thì ra khỏi hàng đợi", chatbot_runtime.nhom_cho(bid) == [])
+check("và lượt sau đi thẳng vào engine",
+      _chan("còn hàng không", {"chat_type": "group", "chat_id": "-4242",
+                               "mentioned": True}) is None)
+chatbot_store.update_bot(bid, {"groups": []})
+
 
 # ============================================================
 # 8. Rào: giới hạn tần suất theo giờ, riêng từng người
@@ -327,6 +386,36 @@ check("sửa bot: hai trường brain luôn bằng nhau",
       'form["brain"] = form["agent_brain"] = br' in _SRC)
 check("bot dùng prompt riêng chứ không phải build_system_prompt",
       "chatbot_runtime.build_bot_prompt(bot)" in _SRC)
+check("có đường cho phép MỘT nhóm bằng một cú bấm",
+      'async def chatbots_groups(' in _SRC and '"/chatbots/{bot_id}/groups"' in _SRC)
+check("danh sách bot kèm hàng đợi nhóm chờ duyệt",
+      'b["nhom_cho"] = chatbot_runtime.nhom_cho(b["id"])' in _SRC)
+check("khai được nhóm ngay lúc TẠO bot, không chỉ lúc sửa",
+      '"groups": groups, "reply_when": reply_when,' in _SRC)
+check("xoá bot thì dọn luôn vết trong RAM", "chatbot_runtime.quen_bot(bot_id)" in _SRC)
+
+
+# ============================================================
+# 11. Tầng kênh: im lặng phải là im lặng THẬT
+# ============================================================
+# Trước bản này, bot từ chối một tin trong nhóm lạ vẫn đi hết đường: gửi tin "🤔 đang xử lý…",
+# xoá nó, rồi gửi "(không có nội dung)" vào mặt người ngoài. Vừa lộ, vừa che mất lượt hỏng thật
+# (câu trả lời rỗng vì engine gãy cũng ra đúng chuỗi đó).
+_TG = (SERVER / "telegram_bot.py").read_text(encoding="utf-8")
+check("kênh có chốt chặn chạy TRƯỚC khi tốn một lượt", "self.precheck_fn = precheck_fn" in _TG)
+check("chốt chặn đứng trước cả tin trạng thái", "if self.precheck_fn and not text.startswith" in _TG)
+check("lệnh KHÔNG bị chốt chặn (còn /id để lấy id nhóm)",
+      'not text.startswith("/")' in _TG)
+check("im lặng có chủ ý khác câu trả lời rỗng",
+      'im_lang = bool(reply.get("im_lang"))' in _TG and
+      'if im_lang and not str(reply or "").strip() and not files:' in _TG)
+check("bộ giám sát nối chốt chặn vào poller của bot",
+      "precheck_fn=_make_precheck_fn(bot_id)" in
+      (SERVER / "chatbot_runtime.py").read_text(encoding="utf-8"))
+check("kênh nghe tin dịch vụ của nhóm (vào nhóm / bị đá / đổi id)",
+      "async def _bao_su_kien" in _TG and '"migrate_to_chat_id"' in _TG)
+check("đọc được chế độ riêng tư của Telegram từ getMe",
+      'me.get("can_read_all_group_messages")' in _TG)
 
 print()
 if _fails:
