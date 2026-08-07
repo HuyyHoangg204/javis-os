@@ -106,6 +106,15 @@
       + ".tk-muc-do .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px}"
       + ".tk-muc-do .s{font-size:11px;color:var(--text3);margin-top:2px}"
       + ".tk-muc-do .pct .v{color:var(--accent)}"
+      // Khối quy đổi tiền: cùng bộ mặt với khối số đo ngay trên nó (cùng lưới, cùng cỡ chữ)
+      // để đọc như một mạch, chỉ khác con số tiền được tô cho nổi.
+      + ".tk-tien{margin-top:10px;padding:13px 15px;border:1px solid var(--glass-brd);border-radius:12px;background:var(--glass)}"
+      + ".tk-tien-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}"
+      + ".tk-tien .k{font-size:12px;color:var(--text2)}"
+      + ".tk-tien .v{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px}"
+      + ".tk-tien .s{font-size:11px;color:var(--text3);margin-top:2px}"
+      + ".tk-tien .tien .v{color:var(--accent2,var(--accent))}"
+      + ".tk-tien-note{font-size:11.5px;color:var(--text3);line-height:1.65;margin-top:11px}"
       + ".tk-muc-toast{padding:9px 13px;border-radius:10px;font-size:13px;margin-top:10px;border:1px solid var(--glass-brd)}"
       + ".tk-muc-toast.ok{border-color:var(--accent)}"
       + ".tk-muc-toast.err{color:var(--red)}";
@@ -154,6 +163,49 @@
   // thật. Mọi thứ còn lại của trang chẩn đoán cũ (allocation tính bằng phần vạn, tên đường
   // canary, cửa sổ token 60 giây, execution_path từng lượt) là ngôn ngữ của người vận hành
   // máy, không phải của người đang trả tiền token.
+  // Số token ĐÃ tiết kiệm + quy đổi ra tiền.
+  //
+  // Ba mức tin cậy khác nhau, và phải nói rõ cái nào là cái nào, không thì con số to nhất
+  // (tiền mỗi tháng) bị đọc như một hoá đơn:
+  //   - token tiết kiệm trong cửa sổ vừa đo: ĐO ĐƯỢC, chắc nhất
+  //   - token mỗi tháng: PHÉP CHIẾU theo đúng nhịp đó, đúng khi cách dùng không đổi
+  //   - tiền: ƯỚC LƯỢNG, phụ thuộc bảng giá tham khảo và tỉ giá
+  // Người đang dùng GÓI THUÊ BAO còn một lớp nữa: họ trả tiền gói chứ không trả theo token,
+  // nên tiền ở đây là "nếu tính theo giá API" chứ không phải tiền mặt tiết kiệm được. Nói
+  // dối chỗ này thì cả trang mất tin cậy.
+  function tienHtml(dod, d) {
+    var t = dod.tien || {};
+    if (!dod.token_tiet_kiem) return "";
+    var eng = d.engine || {};
+    var thueBao = eng.loai === "Gói thuê bao";
+    var vnd = (t.vnd_thang || 0).toLocaleString("vi-VN");
+    var cachTinh = t.nguon_gia === "tay"
+      ? "theo đơn giá bạn tự đặt"
+      : (t.nguon_gia === "bang"
+        ? "theo giá tham khảo của model đang dùng"
+        : "theo một mức giá phổ biến, vì chưa nhận ra model đang dùng");
+    return '<div class="tk-tien">'
+      + '<div class="tk-tien-row">'
+      + '<div><div class="k">Đã tiết kiệm</div><div class="v">' + fTok(dod.token_tiet_kiem)
+      + '</div><div class="s">token, trong ' + (dod.gio_do || 24) + ' giờ qua</div></div>'
+      + '<div><div class="k">Theo nhịp này</div><div class="v">' + fTok(dod.token_thang)
+      + '</div><div class="s">token mỗi tháng</div></div>'
+      + '<div class="tien"><div class="k">Quy ra tiền</div><div class="v">~' + vnd + 'đ</div>'
+      + '<div class="s">mỗi tháng (~$' + (t.usd_thang || 0) + ')</div></div>'
+      + "</div>"
+      + '<div class="tk-tien-note">Số token là <b>đo được</b>; phần mỗi tháng là phép chiếu'
+      + ' theo đúng nhịp dùng của ' + (dod.gio_do || 24) + ' giờ vừa rồi. Tiền là <b>ước lượng</b> '
+      + esc(cachTinh) + ' (' + (t.gia_1m_usd || 0) + '$ cho 1 triệu token vào, tỉ giá '
+      + (t.ty_gia || 0).toLocaleString("vi-VN") + 'đ/$).'
+      + (thueBao
+        ? ' Bạn đang dùng <b>gói thuê bao</b> nên không trả theo token: con số này là mức tiết kiệm'
+        + ' quy đổi nếu tính theo giá API, và trên thực tế nó thể hiện thành việc lâu chạm trần gói hơn.'
+        : '')
+      + " Muốn con số đúng với hợp đồng của bạn thì đặt <code>gia_input_1m</code> trong"
+      + " <code>settings.json</code> (mục <code>model</code>)."
+      + "</div></div>";
+  }
+
   function mucHtml(d) {
     if (!d || !(d.danh_sach || []).length) return "";
     var uocMuc = ((d.uoc_tinh || {}).muc) || {};
@@ -175,11 +227,15 @@
 
     var doHtml = "";
     if (dod.du_du_lieu) {
+      var gio = dod.gio_do || 24;
       doHtml = '<div class="tk-muc-do">'
         + '<div><div class="k">Chế độ Đầy đủ</div><div class="v">' + fTok(dod.tb_cu) + '</div><div class="s">token mỗi lượt, ' + (dod.so_luot_cu || 0) + " lượt</div></div>"
         + '<div><div class="k">Khi tiết kiệm</div><div class="v">' + fTok(dod.tb_moi) + '</div><div class="s">token mỗi lượt, ' + (dod.so_luot_moi || 0) + " lượt</div></div>"
-        + '<div class="pct"><div class="k">Giảm được</div><div class="v">' + (dod.phan_tram || 0) + '%</div><div class="s">số thật đo trong 24 giờ qua</div></div>'
+        + '<div class="pct"><div class="k">Giảm được</div><div class="v">' + (dod.phan_tram || 0) + '%</div><div class="s">số thật đo trong ' + gio + ' giờ qua</div></div>'
         + "</div>";
+      // Phần trăm một mình không trả lời được câu người dùng thật sự hỏi: "cái công tắc này
+      // đáng bao nhiêu?". Số token thật + quy đổi tiền mới trả lời được.
+      doHtml += tienHtml(dod, d);
     }
 
     var chuaChon = d.tu_chon ? "" : " Mức đang chạy là mặc định của bản này, bạn chưa tự chọn bao giờ."

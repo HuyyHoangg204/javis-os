@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.26.3] - 2026-08-08
+### Thêm mới
+- **Chế độ tiết kiệm nói được nó tiết kiệm BAO NHIÊU, không chỉ bao nhiêu phần trăm.** Trang Mức dùng thêm ba con số: số token thật đã tiết kiệm trong cửa sổ vừa đo, phép chiếu ra một tháng theo đúng nhịp đó, và quy đổi ra tiền. "Giảm 38%" không nói lên điều gì với người đang trả tiền; "khoảng 40 nghìn một tháng" thì có.
+- **Ba mức tin cậy được gọi đúng tên**, vì con số to nhất rất dễ bị đọc như một hoá đơn: token trong cửa sổ vừa đo là **đo được**, token mỗi tháng là **phép chiếu**, tiền là **ước lượng**.
+- **Giá lấy theo đúng model đang chạy** chứ không phải một số cố định (Opus khác Sonnet khác Haiku khác Groq). Bảng giá tham khảo này sẽ cũ đi vì các nhà cung cấp đổi giá vài tháng một lần, nên đặt `gia_input_1m` trong mục `model` của `settings.json` là đè lên được bằng đơn giá thật của bạn.
+- **Nói đúng với người dùng gói thuê bao.** Gói thuê bao không trả theo token, nên với họ con số tiền là mức tiết kiệm quy đổi nếu tính theo giá API, và trên thực tế nó thể hiện thành việc lâu chạm trần gói hơn. Giao diện ghi rõ điều đó khi phát hiện engine là gói thuê bao; nhập nhèm chỗ này thì cả trang mất tin cậy, mà trang này tồn tại chính là để con số đáng tin.
+### Sửa lỗi
+- Ô **URL repo** ở phần Đồng bộ GitHub không còn lấy tài khoản của chủ repo làm ví dụ.
+### Kiểm thử
+- `test_trang_tiet_kiem.py` thêm 20 phép thử cho phần này: cách tính token tiết kiệm, phép chiếu co giãn đúng theo độ dài cửa sổ đo, giá đổi theo model, đơn giá tự đặt đè được lên bảng, đơn giá rác không làm nổ trang, chưa đủ dữ liệu thì không bịa ra tiền, và giao diện phải gọi đúng tên ba mức tin cậy.
+
 ## [0.26.2] - 2026-08-08
 Git chỉ giữ CHỮ, không giữ media. Cỡ chữ khung chat lên 16px.
 ### Thay đổi

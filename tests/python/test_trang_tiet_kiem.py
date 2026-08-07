@@ -150,8 +150,12 @@ check("giao diện đọc đúng trường API trả về", "d.uoc_tinh" in _USA
 # người dùng cuối ("tôi nên bấm mức nào"), mà mỗi thứ đều tốn một lượt đọc runtime.db.
 _muc_api = asyncio.run(main.runtime_muc(brain="brain"))
 check("endpoint gọn trả về dict", isinstance(_muc_api, dict))
-check("có đủ bốn thứ trang cần",
-      set(_muc_api) == {"muc", "danh_sach", "tu_chon", "uoc_tinh", "do_duoc"})
+# `engine` thêm ở 0.26.3: cần để nói ĐÚNG về phần quy đổi tiền. Người dùng gói thuê bao không
+# trả theo token, nên với họ con số tiền là mức quy đổi nếu tính theo giá API chứ không phải
+# tiền mặt tiết kiệm được - không phân biệt là cả trang mất tin cậy. Nó rẻ (chỉ đọc settings),
+# khác hẳn nhóm trường chẩn đoán bị cấm ở phép thử ngay dưới.
+check("trả đúng những thứ trang cần, không hơn",
+      set(_muc_api) == {"muc", "danh_sach", "tu_chon", "uoc_tinh", "do_duoc", "engine"})
 check("CANARY: và KHÔNG kèm số liệu chẩn đoán",
       not ({"canaries", "tpm_window", "quota_presets", "registry", "tasks"} & set(_muc_api)))
 check("danh sách mức khớp bảng mức thật",
@@ -198,6 +202,58 @@ check("phần trăm giảm đúng", _do["phan_tram"] == 92)
 check("CANARY: lượt thiếu số token bị bỏ, không thổi phồng con số",
       _do["so_luot_moi"] == 2 and _do["tb_moi"] > 0)
 check("giao diện có vẽ bảng đo thật", "tk-muc-do" in _USAGE and "d.do_duoc" in _USAGE)
+
+
+# ============================================================
+# 4b. Tiết kiệm được BAO NHIÊU TOKEN, và quy ra tiền
+# ============================================================
+# Yêu cầu chủ repo (2026-08-08): "lôi cho anh thông tin của việc tiết kiệm được bao nhiêu token
+# ra, và quy đổi khoảng thành tiền thì càng tốt". Phần trăm một mình không trả lời được câu
+# người ta thật sự hỏi - "cái công tắc này đáng bao nhiêu?".
+#
+# Ba mức tin cậy phải TÁCH BẠCH, không thì con số to nhất bị đọc như một hoá đơn:
+#   token trong cửa sổ vừa đo = ĐO ĐƯỢC · token mỗi tháng = PHÉP CHIẾU · tiền = ƯỚC LƯỢNG.
+check("đo được số token đã tiết kiệm, không chỉ phần trăm", _do["token_tiet_kiem"] > 0)
+# 2 lượt đường mới, mỗi lượt đáng lẽ tốn 10000 mà chỉ tốn 750 -> (10000-750)*2.
+check("cách tính token tiết kiệm đúng", _do["token_tiet_kiem"] == (10000 - 750) * 2)
+check("khai rõ đo trong cửa sổ bao nhiêu giờ", _do["gio_do"] > 0)
+_thang = main._do_duoc_tiet_kiem(_tasks, 24.0)["token_thang"]
+check("chiếu ra một tháng theo đúng nhịp cửa sổ đã đo", _thang == (10000 - 750) * 2 * 30)
+check("cửa sổ ngắn hơn thì phép chiếu lớn hơn tương ứng",
+      main._do_duoc_tiet_kiem(_tasks, 12.0)["token_thang"] == _thang * 2)
+
+_tien = main._do_duoc_tiet_kiem(_tasks, 24.0, {"model": "claude-opus-5"})["tien"]
+check("có quy đổi ra tiền", _tien.get("vnd_thang", 0) > 0 and _tien.get("usd_thang", 0) > 0)
+check("giá lấy theo ĐÚNG model đang dùng, không phải một số cố định",
+      _tien["gia_1m_usd"] == main._GIA_INPUT_1M["opus"] and _tien["nguon_gia"] == "bang")
+check("model rẻ hơn thì tiền quy đổi nhỏ hơn",
+      main._do_duoc_tiet_kiem(_tasks, 24.0, {"model": "claude-haiku-4-5"})["tien"]["usd_thang"]
+      < _tien["usd_thang"])
+check("model lạ vẫn ra số, rơi về mức phổ biến",
+      main._do_duoc_tiet_kiem(_tasks, 24.0, {"model": "mo-hinh-la"})["tien"]["nguon_gia"]
+      == "mac_dinh")
+check("người dùng đặt được đơn giá của chính mình, đè lên bảng tham khảo",
+      main._gia_input_1m("claude-opus-5", {"gia_input_1m": 0.5}) == (0.5, "tay"))
+check("đơn giá rác trong settings thì bỏ qua, không nổ",
+      main._gia_input_1m("claude-opus-5", {"gia_input_1m": "linh tinh"})[1] == "bang")
+check("chưa đủ dữ liệu thì không bịa ra tiền",
+      main._do_duoc_tiet_kiem([])["tien"] == {} and main._do_duoc_tiet_kiem([])["token_tiet_kiem"] == 0)
+
+# Giao diện phải VẼ RA, và phải nói đúng mức tin cậy của từng con số.
+check("giao diện vẽ khối quy đổi tiền", "tk-tien" in _USAGE and "function tienHtml(" in _USAGE)
+check("giao diện đọc đủ ba trường mới",
+      "token_tiet_kiem" in _USAGE and "token_thang" in _USAGE and "vnd_thang" in _USAGE)
+check("giao diện gọi đúng tên: đo được / phép chiếu / ước lượng",
+      "đo được" in _USAGE and "phép chiếu" in _USAGE and "ước lượng" in _USAGE)
+check("giao diện ghi rõ đơn giá và tỉ giá đang dùng",
+      "1 triệu token vào" in _USAGE and "ty_gia" in _USAGE)
+# Người dùng gói thuê bao KHÔNG trả theo token: với họ đây là mức quy đổi, không phải tiền
+# mặt tiết kiệm được. Nhập nhèm chỗ này là cả trang mất tin cậy.
+check("nói đúng với người dùng gói thuê bao",
+      "gói thuê bao" in _USAGE and "quy đổi" in _USAGE)
+check("endpoint có trả loại engine để giao diện phân biệt được ca đó",
+      _muc_api.get("engine", {}).get("loai") in ("Gói thuê bao", "API key", None)
+      or isinstance(_muc_api.get("engine"), dict))
 check("và nói rõ đây là số THẬT chứ không phải ước lượng", "số thật" in _USAGE)
 
 # ============================================================

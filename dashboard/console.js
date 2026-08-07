@@ -1882,7 +1882,7 @@
           <div style="margin-top:6px">Cần bản sao media thì dùng thứ lưu theo <b>trạng thái hiện tại</b> (Google Drive, ổ cứng ngoài, NAS): xoá là mất thật và đòi lại được dung lượng thật. Hai thứ chia việc cho nhau chứ không thay nhau.</div>
         </div>
         <div class="si-grid">
-          <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="Ví dụ: https://github.com/blogminhquy/javis-brain-backup"></div>
+          <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="Ví dụ: https://github.com/tai-khoan-cua-ban/javis-brain-backup"></div>
           <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="Ví dụ: github_pat_..."></div>
           <div class="si-row" style="gap:14px;flex-wrap:wrap">
             <div class="si-field"><label>Nhánh</label><input id="bkBranch" value="main" style="max-width:120px"></div>

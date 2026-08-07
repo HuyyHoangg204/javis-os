@@ -8027,7 +8027,9 @@ async def runtime_diagnostics(hours: float = Query(24.0), limit: int = Query(200
             # là ba cái tên, người dùng bấm mà không biết đổi được gì.
             "uoc_tinh": await _uoc_tinh_tiet_kiem(brain),
             # Và con số ĐO ĐƯỢC từ chính các lượt đã chạy, đáng tin hơn hẳn ước lượng.
-            "do_duoc": _do_duoc_tiet_kiem(snapshot.get("tasks") or []),
+            "do_duoc": _do_duoc_tiet_kiem(snapshot.get("tasks") or [],
+                                          snapshot.get("window_hours") or 24,
+                                          cfgmod.read_settings().get("model", {}) or {}),
             # Lý do LẶP LẠI nhiều nhất khiến lượt không đi được đường tắt. Đây là câu trả lời
             # cho "sao chưa lần nào thấy chữ Tức thì" - thứ trước đây chỉ đoán được.
             "vi_sao": _vi_sao_chua_di_tat(snapshot.get("tasks") or [])}
@@ -8156,12 +8158,53 @@ async def _uoc_tinh_tiet_kiem(brain: str = "brain") -> dict:
     }
 
 
-def _do_duoc_tiet_kiem(tasks: list) -> dict:
+# Giá THAM KHẢO của 1 TRIỆU token ĐẦU VÀO, đơn vị USD. Chỉ để quy đổi phần token tiết kiệm
+# được ra một con số tiền cho dễ hình dung - "giảm 38%" không nói lên điều gì với người đang
+# trả tiền, còn "khoảng 40 nghìn một tháng" thì có.
+#
+# Đây là con số THAM KHẢO và sẽ cũ đi: giá của các nhà cung cấp đổi vài tháng một lần. Nên
+# giao diện phải nói rõ là ước lượng, và người dùng đặt được số của chính mình qua
+# settings.model.gia_input_1m (USD cho 1 triệu token vào) để đè lên bảng này.
+#
+# Khớp theo CHUỖI CON của tên model, dài trước ngắn sau, nên "claude-opus-5" ăn mục "opus"
+# chứ không rơi về mặc định.
+_GIA_INPUT_1M = {
+    "opus": 15.0, "sonnet": 3.0, "haiku": 1.0,
+    "gpt-5-mini": 0.25, "gpt-5": 1.25, "gpt-4o-mini": 0.15, "gpt-4o": 2.5, "o3": 2.0,
+    "gemini-2.5-pro": 1.25, "gemini-2.5-flash": 0.30, "gemini": 0.30,
+    "deepseek": 0.30, "llama": 0.10, "qwen": 0.20, "mistral": 0.20, "grok": 2.0,
+}
+_GIA_INPUT_MAC_DINH = 3.0     # không đoán được model thì lấy mức phổ biến tầm trung
+VND_MOI_USD = 26_000          # tạm tính; giao diện ghi rõ tỉ giá đang dùng
+
+
+def _gia_input_1m(model: str, settings_model: dict = None) -> tuple:
+    """(giá USD cho 1 triệu token vào, nguồn của con số đó)."""
+    try:
+        tay = float((settings_model or {}).get("gia_input_1m") or 0)
+        if tay > 0:
+            return tay, "tay"
+    except (TypeError, ValueError):
+        pass
+    m = str(model or "").lower()
+    for khoa in sorted(_GIA_INPUT_1M, key=len, reverse=True):
+        if khoa in m:
+            return _GIA_INPUT_1M[khoa], "bang"
+    return _GIA_INPUT_MAC_DINH, "mac_dinh"
+
+
+def _do_duoc_tiet_kiem(tasks: list, window_hours: float = 24.0,
+                       settings_model: dict = None) -> dict:
     """Tiết kiệm ĐO ĐƯỢC từ chính các lượt đã chạy, không phải ước lượng.
 
     Con số này đáng tin hơn hẳn phần ước lượng vì nó là token nhà cung cấp thật sự tính. Đổi
     lại, nó chỉ có khi đã chạy cả hai đường trong cùng cửa sổ thời gian - nên giao diện phải
     chịu được ca "chưa đủ dữ liệu" thay vì hiện 0% một cách vô nghĩa.
+
+    Ngoài phần trăm, trả thêm SỐ TOKEN thật đã tiết kiệm và quy đổi ra tiền. Phần trăm một
+    mình không trả lời được câu người dùng thật sự muốn hỏi: "cái công tắc này đáng bao
+    nhiêu?". Cách tính token tiết kiệm: mỗi lượt đi đường mới đáng lẽ tốn bằng trung bình của
+    đường cũ, nên phần chênh nhân số lượt là phần không phải trả.
     """
     cu, moi = [], []
     for t in tasks or []:
@@ -8176,9 +8219,25 @@ def _do_duoc_tiet_kiem(tasks: list) -> dict:
     out = {"so_luot_cu": len(cu), "so_luot_moi": len(moi),
            "tb_cu": round(sum(cu) / len(cu)) if cu else 0,
            "tb_moi": round(sum(moi) / len(moi)) if moi else 0,
-           "phan_tram": 0, "du_du_lieu": bool(cu and moi)}
-    if out["du_du_lieu"] and out["tb_cu"] > 0:
-        out["phan_tram"] = max(0, min(99, round((1 - out["tb_moi"] / out["tb_cu"]) * 100)))
+           "phan_tram": 0, "du_du_lieu": bool(cu and moi),
+           "token_tiet_kiem": 0, "gio_do": round(float(window_hours or 24), 1),
+           "token_thang": 0, "tien": {}}
+    if not (out["du_du_lieu"] and out["tb_cu"] > 0):
+        return out
+    out["phan_tram"] = max(0, min(99, round((1 - out["tb_moi"] / out["tb_cu"]) * 100)))
+    chenh = max(0, out["tb_cu"] - out["tb_moi"])
+    out["token_tiet_kiem"] = chenh * out["so_luot_moi"]
+    # Chiếu ra một tháng theo đúng nhịp của cửa sổ vừa đo. Là PHÉP CHIẾU chứ không phải số đã
+    # xảy ra, nên giao diện phải gọi nó là "theo nhịp này" chứ đừng ghi như một hoá đơn.
+    gio = max(1.0, float(out["gio_do"]))
+    out["token_thang"] = round(out["token_tiet_kiem"] * (24 * 30 / gio))
+    gia, nguon = _gia_input_1m(str((settings_model or {}).get("model") or ""), settings_model)
+    out["tien"] = {
+        "gia_1m_usd": gia, "nguon_gia": nguon, "ty_gia": VND_MOI_USD,
+        "usd": round(out["token_tiet_kiem"] / 1_000_000 * gia, 4),
+        "usd_thang": round(out["token_thang"] / 1_000_000 * gia, 2),
+        "vnd_thang": round(out["token_thang"] / 1_000_000 * gia * VND_MOI_USD),
+    }
     return out
 
 
@@ -8571,7 +8630,10 @@ async def runtime_muc(brain: str = Query("brain")):
         # hệt nhau trên màn hình mà ý nghĩa ngược nhau: cái sau còn đi lên theo bản cập nhật.
         "tu_chon": str((settings.get("preset_choice") or {}).get("source") or "") == "user",
         "uoc_tinh": await _uoc_tinh_tiet_kiem(brain),
-        "do_duoc": _do_duoc_tiet_kiem(tasks),
+        "do_duoc": _do_duoc_tiet_kiem(tasks, 24.0, cfgmod.read_settings().get("model", {}) or {}),
+        # Cần để nói ĐÚNG về phần quy đổi tiền: người dùng gói thuê bao không trả theo token,
+        # nên con số tiền với họ là mức quy đổi chứ không phải tiền mặt tiết kiệm được.
+        "engine": _engine_runtime_view(settings),
     }
 
 
