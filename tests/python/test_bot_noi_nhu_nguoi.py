@@ -258,7 +258,69 @@ async def t_stop_bo_hang_cho():
 
 
 # ============================================================
-# 6. Bot chuyên trách phải THẬT SỰ được bật chế độ này
+# 6. Không được gọi thì không "đang nhập…", và không tốn lượt engine
+# ============================================================
+# Chủ repo báo 2026-08-07 kèm ảnh nhóm "Cười Sóng AI": "chat bất kỳ điều gì trong nhóm khi add
+# bot vào nó đều typing". Gốc rễ nằm ở `_dispatch`: chốt chặn precheck trả `{}` để nói "chặn,
+# đừng nói gì", mà cổng viết `if chan:` - dict rỗng falsy nên lượt vẫn chạy tiếp. Ngoài cái
+# typing nhìn thấy được, mỗi tin trong nhóm còn tốn một lượt engine thật rồi bị vứt đi.
+async def t_khong_goi_ten_thi_im():
+    goi = []
+
+    async def answer(text, meta, progress):
+        goi.append(text)
+        return "lẽ ra không được chạy"
+
+    tg = FakeTelegram()
+    b = bot_khach(answer, precheck_fn=lambda text, meta: {})     # {} = chặn, không nói gì
+    await b._dispatch(tg, "-100", "hai người trong nhóm nói chuyện với nhau", {})
+    await cho_xong(b, "-100")
+    check("không gọi tên bot: KHÔNG tốn lượt engine", goi == [])
+    check("không gọi tên bot: KHÔNG hiện 'đang nhập…'", "sendChatAction" not in tg.methods())
+    check("không gọi tên bot: không gửi tin nào", tg.texts() == [])
+
+    # Chặn KÈM một câu (nhóm chưa được bật) thì vẫn nói câu đó, nhưng vẫn không tốn lượt.
+    tg2 = FakeTelegram()
+    b2 = bot_khach(answer, precheck_fn=lambda text, meta: {"reply": "Em chưa được bật ạ."})
+    await b2._dispatch(tg2, "-100", "javis ơi", {})
+    await cho_xong(b2, "-100")
+    check("nhóm chưa bật: nói đúng một câu, không gọi engine",
+          goi == [] and tg2.texts() == ["Em chưa được bật ạ."])
+
+    # None = cho chạy. Đây là ca duy nhất được phép hiện "đang nhập…".
+    tg3 = FakeTelegram()
+    b3 = bot_khach(answer, precheck_fn=lambda text, meta: None)
+    await b3._dispatch(tg3, "-100", "@javis giá bao nhiêu", {})
+    await cho_xong(b3, "-100")
+    check("có gọi tên bot: mới chạy lượt và mới hiện 'đang nhập…'",
+          goi == ["@javis giá bao nhiêu"] and "sendChatAction" in tg3.methods())
+
+    # precheck NỔ thì phải chạy tiếp, không được nuốt câu của khách.
+    def _no(text, meta):
+        raise RuntimeError("precheck hỏng")
+
+    tg4 = FakeTelegram()
+    b4 = bot_khach(answer, precheck_fn=_no)
+    await b4._dispatch(tg4, "-100", "câu của khách", {})
+    await cho_xong(b4, "-100")
+    check("precheck hỏng thì vẫn trả lời, không nuốt câu của khách",
+          goi == ["@javis giá bao nhiêu", "câu của khách"])
+
+
+def t_precheck_hop_dong():
+    src = (Path(SERVER) / "telegram_bot.py").read_text(encoding="utf-8")
+    # So trên DÒNG MÃ thật, không so cả file: chuỗi "if chan:" còn nằm trong chú thích kể lại
+    # con bọ, và một test bắt cả chú thích thì cấm luôn việc ghi lại vì sao đã sửa.
+    dong_ma = [d.strip() for d in src.split("\n") if not d.strip().startswith("#")]
+    check("cổng precheck so với None, không so truthy (dict rỗng vẫn phải chặn)",
+          "if chan is not None:" in dong_ma and "if chan:" not in dong_ma)
+    cb = (Path(SERVER) / "chatbot_runtime.py").read_text(encoding="utf-8")
+    check("bot chuyên trách vẫn dùng {} để nói 'chặn mà không nói gì'",
+          "return {}       # không ai gọi tên" in cb)
+
+
+# ============================================================
+# 7. Bot chuyên trách phải THẬT SỰ được bật chế độ này
 # ============================================================
 def t_noi_day():
     src = (Path(SERVER) / "chatbot_runtime.py").read_text(encoding="utf-8")
@@ -277,6 +339,8 @@ async def main():
     await t_luot_gay()
     await t_cau_rong()
     await t_stop_bo_hang_cho()
+    await t_khong_goi_ten_thi_im()
+    t_precheck_hop_dong()
     t_noi_day()
 
 

@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.7] - 2026-08-07
+Chủ repo gửi ảnh nhóm "Cười Sóng AI": *"chat bất kỳ điều gì trong nhóm khi add bot vào nó đều typing, làm sao để chỉ hiện typing khi bot thực sự trả lời."* Hai người trong nhóm nói chuyện với nhau, tin nào bot cũng hiện "đang nhập…" rồi lặng lẽ không nói gì.
+### Sửa lỗi
+- **Chốt chặn `precheck` chưa từng chặn được ca im lặng.** Bot chuyên trách nói "chặn, đừng nói gì" bằng cách trả về `{}`, nhưng cổng ở `_dispatch` viết `if chan:` - dict rỗng là falsy nên nhánh chặn bị bỏ qua và lượt vẫn chạy tiếp. Cái thấy được là chấm "đang nhập…" trên mọi tin trong nhóm. Cái KHÔNG thấy được thì đắt hơn nhiều: **mỗi tin trong nhóm đều tốn một lượt engine thật**, chạy hết rồi mới bị lớp thứ hai trong `answer_fn` trả về `im_lang` và vứt đi. Nhóm đông người thì đó là hoá đơn token cho những câu chẳng ai hỏi bot. Cổng nay so `is not None`, đúng như hợp đồng vẫn ghi trong docstring.
+- Con bọ này nằm im từ lúc có `precheck` và chỉ lộ ra ở 0.25.5, khi chấm "đang nhập…" chuyển từ một nháy 5 giây thành sáng liên tục suốt lượt. Nó biến một lỗi vô hình thành một lỗi nhìn thấy được.
+### Kiểm thử
+- `test_bot_noi_nhu_nguoi.py` thêm 7 phép thử cho cổng precheck: `{}` thì không gọi engine, không "đang nhập…", không gửi gì; `{"reply": ...}` thì nói đúng một câu mà vẫn không gọi engine; `None` mới là ca duy nhất được chạy lượt; và precheck nổ thì vẫn trả lời chứ không nuốt câu của khách.
+
 ## [0.25.6] - 2026-08-07
 Chủ repo bảo Javis *"thiết kế cho anh file .md nhé"*, Javis đáp *"có một chỗ va nhau giữa lựa chọn của anh và tài liệu chiến lược, em xử lý thẳng trong file. Viết file luôn."* rồi lượt chết ở giây thứ 180 với dòng *"Claude đang trả lời rồi im 180s - đã dừng để tránh treo server."* Cái chết oan: engine đang soạn nội dung file để đưa vào tool Write, mọi thứ chạy đúng, chỉ là không có gì để phát ra.
 ### Sửa lỗi

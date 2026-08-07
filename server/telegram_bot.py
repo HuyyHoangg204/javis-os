@@ -165,8 +165,10 @@ class TelegramBot:
         self.answer_fn = answer_fn          # async (text, meta, progress) -> str | {"text":..., "files":[...]}; progress(txt) = báo trạng thái trung gian
         self.command_fn = command_fn        # async (cmd, arg, chat, meta) -> dict|None
         self.callback_fn = callback_fn      # async (data, chat) -> dict|None (bấm nút inline; chat = ai bấm)
-        # Chốt chặn TRƯỚC khi tốn một lượt: sync (text, meta) -> None|dict. None = chạy tiếp;
-        # dict = bỏ lượt, và `reply` trong đó (nếu có) được gửi thẳng như một câu nói thường.
+        # Chốt chặn TRƯỚC khi tốn một lượt: sync (text, meta) -> None|dict. CHỈ `None` là chạy
+        # tiếp; MỌI dict đều bỏ lượt, kể cả `{}` (chặn mà không nói gì). Đừng đổi thành kiểm
+        # tra truthy: `{}` falsy nên lượt sẽ chạy tiếp, và đó đúng là con bọ đã sống ở đây.
+        # `reply` trong dict (nếu có) được gửi thẳng như một câu nói thường.
         #
         # Vì sao chặn ở ĐÂY chứ không để answer_fn trả chuỗi rỗng: `_handle_turn` gửi tin
         # "🤔 đang xử lý…" NGAY trước khi gọi answer_fn, nên bot từ chối một tin trong nhóm lạ
@@ -720,7 +722,14 @@ class TelegramBot:
             except Exception as e:
                 print(f"[telegram precheck] {type(e).__name__}: {e}", file=sys.stderr)
                 chan = None
-            if chan:
+            # `is not None` chứ KHÔNG phải `if chan:` - đây là lỗi đã sống lặng lẽ suốt từ khi
+            # có precheck. Cách chặn IM LẶNG của bot chuyên trách là trả về `{}` (chặn, không
+            # nói gì), mà dict rỗng thì falsy, nên nhánh này bỏ qua và lượt vẫn chạy tiếp. Hệ
+            # quả thấy được: thả bot vào nhóm rồi hai người nói chuyện với nhau, tin nào bot
+            # cũng hiện "đang nhập…" (chủ repo báo 2026-08-07 kèm ảnh). Hệ quả KHÔNG thấy
+            # được, và đắt hơn nhiều: mỗi tin trong nhóm đều tốn một lượt engine thật, chỉ để
+            # lớp thứ hai trong answer_fn trả về im_lang rồi vứt đi.
+            if chan is not None:
                 loi_nhan = str((chan or {}).get("reply") or "")
                 if loi_nhan:
                     await self._send(client, chat, loi_nhan)
