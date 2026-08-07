@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.26.1] - 2026-08-07
+Chủ repo gửi ảnh một câu trả lời dài: *"muốn cải thiện lại cách hiển thị của Javis cho dễ đọc, xuống cách dòng nhiều hơn chứ đọc khó quá."* Ba nguyên nhân khác nhau cùng dồn vào một bức tường chữ, sửa thiếu cái nào cũng vẫn khó đọc.
+### Cải thiện
+- **Giãn dòng 1.6 lên 1.75.** Đây là thứ dễ gọi tên nhất, và với tiếng Việt thì nó còn đáng hơn: dấu chồng lên chữ nên dòng chật thì các dấu gần như chạm nhau.
+- **Khoảng cách giữa hai đoạn từ 6px lên 14px.** Đây là nguyên nhân âm thầm hơn: 6px gần bằng khoảng cách giữa hai DÒNG trong cùng một đoạn, nên mắt không tách được đâu là hết đoạn và cả khối dính thành một mảng. Danh sách, tiêu đề và trích dẫn cũng được nới theo cùng nguyên tắc; riêng danh sách lồng nhau thì siết lại vì nó thuộc về mục cha, giãn bằng đoạn văn là gãy mạch đọc.
+- **Chặn độ dài dòng ở 76 ký tự.** Đây mới là thủ phạm chính trên màn rộng: một dòng chạy quá 120 ký tự thì đọc hết dòng, mắt phải quét ngược cả màn hình để tìm đầu dòng kế tiếp, và cứ vài dòng lại đọc nhầm sang dòng đã đọc rồi. Người ta cảm thấy điều đó là "mỏi" chứ ít khi chỉ ra được, nên nó cũng là thứ dễ bị chỉnh về như cũ nhất. Trần đặt trên cả bong bóng chứ không trên từng đoạn chữ: chặn từng đoạn thì nền bong bóng vẫn rộng nguyên và chừa một mảng trống bên phải trông như lỗi hiển thị. Khối mã và bảng dataview không bị bóp vì chúng vốn đã có cuộn ngang riêng; khung chat hẹp (khoang não, điện thoại) thì trần này không đụng tới gì cả.
+### Kiểm thử
+- Thêm `tests/js/test_de_doc_bong_bong.js`: 15 phép thử khoá các con số theo **quan hệ** chứ không theo giá trị tuyệt đối. Đổi cỡ chữ hay tinh chỉnh vài pixel vẫn xanh; chỉ đỏ khi tương quan hỏng, vd khoảng cách đoạn tụt xuống dưới khoảng cách dòng trong đoạn (đoạn dính vào nhau), trần độ dài dòng bị gỡ, hay tiêu đề dính đoạn phía trước hơn đoạn phía sau nó.
+
 ## [0.26.0] - 2026-08-07
 Nhắc hẹn kiểu "tự làm rồi báo" giờ **làm được đúng việc bạn hẹn**, kể cả việc phải chạm ra ngoài. Trước bản này mức quyền của nó bị ghim cứng ở chỉ-đọc, nên mọi lời hẹn kiểu "10h mai gửi giúp tôi" đều thức dậy đúng giờ, chạy, rồi báo về là không làm được, còn việc thì vẫn chưa ai làm.
 ### Thêm mới
