@@ -696,14 +696,14 @@ class CodexCLI:
             proc = None
             tinfo = {"timed_out": False}
             last = {"t": time.time()}
-            IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
-            # Trần RIÊNG khi codex đang chạy TOOL/lệnh (im lặng lúc đó là bình thường -
-            # render video, build... có thể rất lâu). Cùng logic với engine Claude SDK.
-            TOOL_IDLE = float(os.getenv("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600"))
-            # Trần RIÊNG cho DÒNG ĐẦU TIÊN: hội thoại dài thì lượt đầu phải nạp lại ngữ cảnh
-            # lớn nên lâu, im lặng lúc đó không phải treo. Giữ IDLE ngắn cho các khoảng lặng
-            # SAU khi đã có chữ. Parity với engine Claude SDK.
-            FIRST_IDLE = float(os.getenv("JAVIS_CLAUDE_FIRST_TIMEOUT", "600"))
+            from claude_sdk_engine import tran_watchdog
+            # Ba trần, None = không giới hạn. Parity với engine Claude SDK, kể cả mặc định:
+            # hai trần đo sự IM LẶNG của model đều bỏ trần (im lặng không phải treo - xem
+            # `tran_watchdog`), riêng trần chờ TOOL giữ 1 tiếng vì nó đo một tiến trình con
+            # có thật đang sống ngoài kia.
+            IDLE = tran_watchdog("JAVIS_CLAUDE_IDLE_TIMEOUT", "0")
+            TOOL_IDLE = tran_watchdog("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600")
+            FIRST_IDLE = tran_watchdog("JAVIS_CLAUDE_FIRST_TIMEOUT", "0")
             busy = {"n": 0}   # số item tool/lệnh đã started mà chưa completed
             seen = {"dong_dau": False}   # đã có dòng đầu tiên chưa (quyết định dùng trần nào)
             _TOOL_ITEMS = ("command_execution", "mcp_tool_call", "function_call",
@@ -729,25 +729,28 @@ class CodexCLI:
                 def _watchdog(p):
                     while p.poll() is None:
                         if busy["n"] > 0:
-                            limit = TOOL_IDLE
+                            limit, ly_do = TOOL_IDLE, "tool"
                         elif seen["dong_dau"]:
-                            limit = IDLE
+                            limit, ly_do = IDLE, "im"
                         else:
-                            limit = FIRST_IDLE
-                        if time.time() - last["t"] > limit:
+                            limit, ly_do = FIRST_IDLE, "dau"
+                        # limit None = trần đó bị tắt: cứ để codex chạy, người dùng bấm Dừng
+                        # được và việc nền vẫn có trần wall-clock riêng.
+                        if limit and time.time() - last["t"] > limit:
                             tinfo["timed_out"] = True
                             _kill_tree(p)
-                            if busy["n"] > 0:
+                            if ly_do == "tool":
                                 err = (f"Tool chạy quá {int(TOOL_IDLE)}s chưa xong - đã dừng để tránh treo "
-                                       f"server. (tăng JAVIS_CLAUDE_TOOL_TIMEOUT nếu tác vụ thật sự dài hơn)")
-                            elif not seen["dong_dau"]:
+                                       f"server. (tăng JAVIS_CLAUDE_TOOL_TIMEOUT nếu tác vụ thật sự dài hơn, "
+                                       f"đặt 0 để bỏ hẳn trần)")
+                            elif ly_do == "dau":
                                 err = (f"Codex chưa trả lời gì sau {int(FIRST_IDLE)}s - đã dừng để tránh treo "
                                        f"server. Hay gặp khi hội thoại đã rất dài: lượt đầu phải nạp lại toàn "
                                        f"bộ ngữ cảnh nên lâu. Mở hội thoại mới thường hết ngay. "
-                                       f"(tăng JAVIS_CLAUDE_FIRST_TIMEOUT nếu muốn chờ lâu hơn)")
+                                       f"(JAVIS_CLAUDE_FIRST_TIMEOUT=0 để bỏ hẳn trần này)")
                             else:
                                 err = (f"Codex đang trả lời rồi im {int(IDLE)}s - đã dừng để tránh treo server. "
-                                       f"(tăng JAVIS_CLAUDE_IDLE_TIMEOUT nếu tác vụ thật sự dài)")
+                                       f"(JAVIS_CLAUDE_IDLE_TIMEOUT=0 để bỏ hẳn trần này)")
                             asyncio.run_coroutine_threadsafe(queue.put({"__error__": err}), loop)
                             return
                         time.sleep(5)

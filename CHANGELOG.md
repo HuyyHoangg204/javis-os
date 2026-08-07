@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.6] - 2026-08-07
+Chủ repo bảo Javis *"thiết kế cho anh file .md nhé"*, Javis đáp *"có một chỗ va nhau giữa lựa chọn của anh và tài liệu chiến lược, em xử lý thẳng trong file. Viết file luôn."* rồi lượt chết ở giây thứ 180 với dòng *"Claude đang trả lời rồi im 180s - đã dừng để tránh treo server."* Cái chết oan: engine đang soạn nội dung file để đưa vào tool Write, mọi thứ chạy đúng, chỉ là không có gì để phát ra.
+### Sửa lỗi
+- **Bỏ hẳn trần 180s và trần 600s.** Vấn đề không nằm ở con số mà ở PHÉP ĐO: watchdog đếm "bao lâu rồi chưa nhận được message từ SDK" rồi coi đó là treo, trong khi SDK chỉ phát message khi model kết thúc một khối. Model suy nghĩ ở mức nỗ lực cao, hoặc soạn nội dung một file dài để đưa vào tool ghi, đều làm kênh im hàng phút dù không có gì hỏng. Nay hai trần đo-sự-im-lặng (`JAVIS_CLAUDE_IDLE_TIMEOUT`, `JAVIS_CLAUDE_FIRST_TIMEOUT`) mặc định **không giới hạn**. Cắt một lượt đang chạy tốt là mất trắng cả công lẫn token, tệ hơn hẳn để nó chạy lâu.
+- **Trần chờ TOOL giữ nguyên 1 tiếng.** Trần này đo một thứ có thật: tool đã khởi động mà chưa trả kết quả, tức có một tiến trình con đang sống ngoài kia và nó có thể treo thật (chờ nhập liệu, kẹt khoá file). Đây là khác biệt bản chất với hai trần trên.
+- **Việc nền vẫn không treo vô hạn.** Loop, việc Kanban, nhắc hẹn và tự học đều đã có trần wall-clock riêng (`max_wall_s`, từ 240 tới 600 giây tuỳ loại), nên bỏ trần im lặng không mở đường cho một việc nền chạy mãi. Chat trên dashboard thì luôn bấm Dừng được.
+- **`0` giờ có nghĩa là "không giới hạn" ở cả ba biến**, ở cả engine Claude lẫn engine Codex. Giá trị rác trong biến môi trường thì về mặc định chứ không làm nổ lượt chat.
+- **Thông báo hết giờ không còn suy ngược lý do.** Trần và lý do được chốt cùng lúc lúc chọn trần; suy ngược sau khi hết giờ vừa ra thông báo sai (nói "tool chạy quá" trong khi thật ra là chạm trần wall-clock) vừa có đường dẫn tới `int(None)` nổ giữa lượt chat khi một trần bị tắt.
+### Kiểm thử
+- `test_sdk_engine.py` thêm 4 phép thử chạy THẬT qua engine: `IDLE=0` thì im bao lâu cũng không bị chém, `FIRST=0` cũng vậy, trần chờ tool vẫn ngắt được khi hai trần kia đã tắt, và việc nền vẫn bị trần wall-clock chặn.
+- `test_watchdog_treo.py` khoá hành vi của `tran_watchdog` (0/âm/rác/số dương) và khoá luôn việc chốt trần kèm lý do ở cả hai engine.
+
 ## [0.25.5] - 2026-08-07
 Chủ repo gửi ảnh chụp một nhóm Telegram: bot chuyên trách đang nói chuyện như người, rồi giữa cuộc hiện ra *"⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại."* trước mặt cả nhóm. Một câu như vậy khai ngay đây là máy, và còn dạy người lạ một lệnh quản trị. Yêu cầu: *"các phần trạng thái của Javis anh không muốn để lộ ra như vậy, anh muốn ẩn đi để như cảm giác người thật nói chứ ko phải bot."* Gốc rễ: bot chuyên trách và bot Javis của chủ dùng chung lớp `TelegramBot`, mà lớp đó nói trạng thái ra ngoài như đang nói với người vận hành máy.
 ### Sửa lỗi

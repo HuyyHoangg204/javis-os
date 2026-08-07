@@ -280,6 +280,43 @@ try:
           len(errs) == 1 and "chưa trả lời gì" in errs[0]["content"])
     check("watchdog: thông báo chờ-chữ-đầu mách người dùng mở hội thoại mới",
           errs and "Mở hội thoại mới" in errs[0]["content"])
+
+    # v0.25.6: đặt 0 = BỎ HẲN trần, và đây là MẶC ĐỊNH của hai trần đo sự im lặng của model.
+    # Ca thật của chủ repo: bảo Javis viết một file .md dài, Javis soạn nội dung file để đưa
+    # vào tool Write - suốt lúc đó SDK không phát message nào và lượt bị chém ở giây 180.
+    os.environ["JAVIS_CLAUDE_IDLE_TIMEOUT"] = "0"
+    os.environ["JAVIS_CLAUDE_FIRST_TIMEOUT"] = "0"
+    claude_agent_sdk.ClaudeSDKClient = _fake_client(_gen_treo_giua)
+    evs = asyncio.run(_run_query())
+    check("watchdog: IDLE=0 thì im bao lâu cũng KHÔNG bị chém (soạn file dài)",
+          "error" not in [e["type"] for e in evs] and "final" in [e["type"] for e in evs])
+    claude_agent_sdk.ClaudeSDKClient = _fake_client(_gen_treo_ngay_tu_dau)
+    evs = asyncio.run(_run_query())
+    check("watchdog: FIRST=0 thì chờ chữ đầu bao lâu cũng không bị chém",
+          "error" not in [e["type"] for e in evs] and "final" in [e["type"] for e in evs])
+
+    # Trần chờ TOOL vẫn còn tác dụng khi hai trần kia đã tắt: nó đo một tiến trình con CÓ THẬT
+    # đang sống, không phải đo sự im lặng của model.
+    os.environ["JAVIS_CLAUDE_TOOL_TIMEOUT"] = "0.3"
+    claude_agent_sdk.ClaudeSDKClient = _fake_client(_gen_slow_tool)
+    evs = asyncio.run(_run_query())
+    errs = [e for e in evs if e["type"] == "error"]
+    check("watchdog: trần chờ tool vẫn ngắt được dù IDLE/FIRST đã tắt",
+          len(errs) == 1 and "Tool chạy quá" in errs[0]["content"])
+
+    # Trần wall-clock của việc nền vẫn phải chặn được, không thì loop/Kanban treo vô hạn.
+    os.environ.pop("JAVIS_CLAUDE_TOOL_TIMEOUT", None)
+
+    async def _run_fork():
+        e = ClaudeSDK(tag="wd-fork")
+        e.max_wall_s = 0.3
+        return [ev async for ev in e.query("x")]
+
+    # Generator im 3s; trần wall 0.3s (sàn chờ của watchdog là 1s) nên phải bị cắt ở ~1s.
+    claude_agent_sdk.ClaudeSDKClient = _fake_client(_gen_treo_ngay_tu_dau)
+    errs = [e for e in asyncio.run(_run_fork()) if e["type"] == "error"]
+    check("watchdog: việc nền vẫn có trần wall-clock dù mọi trần im lặng đã tắt",
+          len(errs) == 1 and "wall-clock" in errs[0]["content"])
 finally:
     claude_agent_sdk.ClaudeSDKClient = _orig_client_cls
     ClaudeSDK.is_available = _orig_avail

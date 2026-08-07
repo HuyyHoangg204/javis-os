@@ -72,6 +72,30 @@ def _audit(tag, tool_name, allowed, reason=""):
           + (f" ({reason})" if reason else ""), file=sys.stderr)
 
 
+def tran_watchdog(bien: str, mac_dinh: str):
+    """Đọc một trần watchdog từ biến môi trường. Trả None = KHÔNG GIỚI HẠN.
+
+    Vì sao có "không giới hạn", và vì sao nó là MẶC ĐỊNH của trần im-giữa-chừng: watchdog đo
+    "bao lâu rồi chưa nhận được message từ SDK" rồi coi đó là treo. Phép đo ấy sai ở một ca
+    rất thường gặp - SDK chỉ phát message khi model KẾT THÚC một khối, nên suốt lúc model suy
+    nghĩ ở mức nỗ lực cao, hoặc lúc nó soạn nội dung một file dài để đưa vào tool Write, kênh
+    im hoàn toàn dù mọi thứ đang chạy đúng. Chủ repo dính đúng ca đó (2026-08-07): bảo Javis
+    "thiết kế cho anh file .md", Javis nói "viết file luôn" rồi bị chém ở giây thứ 180 giữa
+    lúc đang soạn file.
+
+    Cắt một lượt đang chạy tốt tệ hơn hẳn để nó chạy lâu: người dùng luôn bấm Dừng được, và
+    việc nền thì đã có trần wall-clock riêng (`max_wall_s`) nên không treo vô hạn.
+
+    0 hoặc số âm = không giới hạn. Chuỗi rác cũng về mặc định chứ không làm nổ lượt chat.
+    """
+    raw = os.getenv(bien, mac_dinh)
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        v = float(mac_dinh)
+    return v if v > 0 else None
+
+
 def map_message(msg):
     """Map 1 message SDK → (list event dict 'hợp đồng ClaudeCLI', session_id|None).
     PURE - test offline được, không cần CLI/auth."""
@@ -337,18 +361,18 @@ class ClaudeSDK:
                                                "+ cài/đăng nhập Claude Code CLI)."}
             return
         from claude_agent_sdk import ClaudeSDKClient, ResultMessage
-        IDLE = float(os.getenv("JAVIS_CLAUDE_IDLE_TIMEOUT", "180"))
-        # Trần RIÊNG khi đang chờ TOOL chạy: SDK im lặng suốt lúc tool chạy là BÌNH THƯỜNG
-        # (render video, tách nền, build... có thể cả tiếng) - không phải Claude treo.
-        # Trước đây dùng chung IDLE 180s nên tác vụ dài bị chém oan giữa chừng.
-        TOOL_IDLE = float(os.getenv("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600"))
-        # Trần RIÊNG cho SỰ KIỆN ĐẦU TIÊN. Cùng một họ lỗi với TOOL_IDLE ở trên: im lặng
-        # trước khi có chữ đầu tiên KHÔNG đồng nghĩa với treo. Hội thoại càng dài thì lượt
-        # đầu càng lâu (nạp lại ngữ cảnh lớn, model suy nghĩ trước khi phát chữ, đôi khi SDK
-        # còn tự nén lịch sử) - báo lỗi thật của người dùng: "chat dài là dính".
-        # Khi đã có chữ rồi thì im 180s mới thật sự đáng ngờ, nên giữ nguyên IDLE cho các
-        # khoảng lặng SAU đó.
-        FIRST_IDLE = float(os.getenv("JAVIS_CLAUDE_FIRST_TIMEOUT", "600"))
+        # Ba trần watchdog, None = không giới hạn. Xem `tran_watchdog` để biết vì sao hai trần
+        # đo-sự-im-lặng-của-model mặc định là KHÔNG GIỚI HẠN: im lặng không đồng nghĩa với treo,
+        # và chém oan một lượt đang chạy tốt là mất trắng cả công lẫn token.
+        IDLE = tran_watchdog("JAVIS_CLAUDE_IDLE_TIMEOUT", "0")
+        # Trần RIÊNG khi đang chờ TOOL chạy. Cái này đo một thứ CÓ THẬT: tool đã khởi động mà
+        # chưa trả kết quả, tức có một tiến trình con đang sống ngoài kia. Giữ trần 1 tiếng để
+        # một lệnh treo (chờ nhập liệu, khoá file...) không giữ phiên mãi mãi.
+        TOOL_IDLE = tran_watchdog("JAVIS_CLAUDE_TOOL_TIMEOUT", "3600")
+        # Trần RIÊNG cho SỰ KIỆN ĐẦU TIÊN. Cùng họ với IDLE: hội thoại càng dài thì lượt đầu
+        # càng lâu (nạp lại ngữ cảnh lớn, model suy nghĩ trước khi phát chữ, đôi khi SDK còn tự
+        # nén lịch sử), nên cũng để không giới hạn.
+        FIRST_IDLE = tran_watchdog("JAVIS_CLAUDE_FIRST_TIMEOUT", "0")
         self._sweep_stale_tmp()   # dọn file prompt tạm sót từ lượt trước bị crash/kill
         loop = asyncio.get_running_loop()
         client = ClaudeSDKClient(options=self._options())
@@ -363,29 +387,39 @@ class ClaudeSDK:
             agen = client.receive_response().__aiter__()
             while True:
                 # Watchdog parity với CLI: idle-timeout + trần wall-clock cho fork nền.
-                # Đang chờ tool → trần dài (TOOL_IDLE); Claude "suy nghĩ" im lặng → trần ngắn (IDLE).
+                # Chốt trần VÀ lý do cùng lúc: trần nào cũng có thể bị đặt "không giới hạn",
+                # nên suy ngược lý do lúc hết giờ là đường dẫn tới thông báo sai (và tới
+                # int(None) nổ giữa lượt chat).
                 waiting_tool = tools_running > 0
-                timeout = TOOL_IDLE if waiting_tool else (IDLE if da_co_chu else FIRST_IDLE)
+                if waiting_tool:
+                    tran, ly_do = TOOL_IDLE, "tool"
+                elif da_co_chu:
+                    tran, ly_do = IDLE, "im"
+                else:
+                    tran, ly_do = FIRST_IDLE, "dau"
                 if self.max_wall_s:
-                    timeout = min(timeout, max(1.0, self.max_wall_s - (time.time() - started)))
+                    con_lai = max(1.0, self.max_wall_s - (time.time() - started))
+                    if tran is None or con_lai < tran:
+                        tran, ly_do = con_lai, "wall"
                 try:
-                    msg = await asyncio.wait_for(agen.__anext__(), timeout=timeout)
+                    msg = await asyncio.wait_for(agen.__anext__(), timeout=tran)
                 except StopAsyncIteration:
                     break
                 except asyncio.TimeoutError:
-                    if self.max_wall_s and time.time() - started >= self.max_wall_s:
+                    if ly_do == "wall":
                         err = f"Fork vượt trần {int(self.max_wall_s)}s - đã dừng (cap wall-clock nền)."
-                    elif waiting_tool:
+                    elif ly_do == "tool":
                         err = (f"Tool chạy quá {int(TOOL_IDLE)}s chưa xong - đã dừng để tránh treo server. "
-                               f"(tăng JAVIS_CLAUDE_TOOL_TIMEOUT nếu tác vụ thật sự dài hơn)")
-                    elif not da_co_chu:
+                               f"(tăng JAVIS_CLAUDE_TOOL_TIMEOUT nếu tác vụ thật sự dài hơn, "
+                               f"đặt 0 để bỏ hẳn trần)")
+                    elif ly_do == "dau":
                         err = (f"Claude chưa trả lời gì sau {int(FIRST_IDLE)}s - đã dừng để tránh treo "
                                f"server. Hay gặp khi hội thoại đã rất dài: lượt đầu phải nạp lại toàn bộ "
                                f"ngữ cảnh nên lâu. Mở hội thoại mới thường hết ngay. "
-                               f"(tăng JAVIS_CLAUDE_FIRST_TIMEOUT nếu muốn chờ lâu hơn)")
+                               f"(JAVIS_CLAUDE_FIRST_TIMEOUT=0 để bỏ hẳn trần này)")
                     else:
                         err = (f"Claude đang trả lời rồi im {int(IDLE)}s - đã dừng để tránh treo server. "
-                               f"(tăng JAVIS_CLAUDE_IDLE_TIMEOUT nếu tác vụ thật sự dài)")
+                               f"(JAVIS_CLAUDE_IDLE_TIMEOUT=0 để bỏ hẳn trần này)")
                     try:
                         await client.interrupt()
                     except Exception:
