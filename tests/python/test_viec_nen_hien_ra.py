@@ -126,6 +126,37 @@ v_tron = bg.active_view([TASK_CHO, TASK_CHAY], [LOOP], [REM],
 check("việc của hội thoại này xếp trước, đang chạy trước việc chờ",
       v_tron["items"][0]["status"] == "running")
 
+
+# ─────────── 2b. Mức của dải: chỉ CẮT NGANG khung chat khi đáng ───────────
+# Chủ repo báo tiếp 2026-08-07 (kèm ảnh): "sao lại hiển thị 9 việc nền như này? anh không muốn
+# vào chat mà hiện ra như này đâu." Chín cái đó là chín NHẮC HẸN đang đợi tới giờ - không chạy,
+# không hỏng, không cần ai làm gì. Dải sinh ra để trả lời "ngay lúc này có gì đang chạy cho tôi
+# không"; nhắc hẹn chờ tới giờ trả lời "không", và "không" thì phải im lặng.
+CHIN_NHAC = [{"id": f"r_{i}", "label": f"Nhắc {i}", "chat_id": "web:s1", "due_at": 1e9}
+             for i in range(9)]
+v_nhac = bg.active_view([], [], CHIN_NHAC, chat_id="web:s1", orchestration="off")
+check("9 nhắc hẹn chờ tới giờ → mức idle (dải ẩn hẳn)", v_nhac["level"] == "idle")
+check("9 nhắc hẹn vẫn được đếm, chỉ là không hiện", v_nhac["count"] == 9)
+check("loop đang bật mà chưa tới giờ cũng là idle",
+      bg.active_view([], [LOOP], [], chat_id="web:s1", orchestration="off")["level"] == "idle")
+check("có việc đang chạy → mức run", v_chay["level"] == "run")
+check("việc vừa giao mà điều phối tắt → mức stall", v_ket["level"] == "stall")
+check("điều phối auto thì việc xếp hàng không còn là stall", v_auto["level"] == "idle")
+
+# Backlog cũ KHÔNG được sơn vàng khung chat mãi mãi: dải nào hiện suốt thì thành dải không ai
+# đọc, và lúc có việc hỏng thật cũng chẳng ai nhìn.
+CU = {"id": "t_cu", "title": "Việc để quên", "status": "todo", "chat_id": "web:s1",
+      "created_at": 1_000.0, "updated_at": 1_000.0}
+v_cu = bg.active_view([CU], [], [], chat_id="web:s1", orchestration="off", now=1_000_000.0)
+check("việc xếp hàng từ lâu không còn tính là đứng im", v_cu["stalled_count"] == 0)
+check("việc xếp hàng từ lâu → dải ẩn", v_cu["level"] == "idle")
+MOI = {**CU, "created_at": 999_000.0, "updated_at": 999_000.0}
+v_moi = bg.active_view([MOI], [], [], chat_id="web:s1", orchestration="off", now=1_000_000.0)
+check("việc vừa giao trong ngày thì vẫn báo là đứng im", v_moi["stalled_count"] == 1
+      and v_moi["level"] == "stall")
+check("mục đứng im được đánh dấu sẵn để dải khỏi đoán lại luật",
+      v_moi["items"][0]["stalled"] is True and v_nhac["items"][0]["stalled"] is False)
+
 note = bg.promise_note("off")
 check("dòng đính chính nói rõ KHÔNG có việc nền nào", "KHÔNG tạo việc nền nào" in note)
 check("dòng đính chính nêu luôn chuyện điều phối tắt", "trang Việc" in note)
@@ -192,6 +223,13 @@ check("dải hỏi /background kèm brain + chat_id", '"/background?brain="' in 
       and 'chat_id=' in STRIP)
 check("dải dùng tiền tố web: đúng như _notify_owner mong đợi", '"web:" + s' in STRIP)
 check("dải ẩn hẳn khi không có việc nào", "hide();" in STRIP and "e.hidden = true" in STRIP)
+check("dải ẩn luôn khi chỉ còn việc chờ tới giờ (mức idle)",
+      'muc !== "run" && muc !== "stall"' in STRIP)
+check("dải chỉ vẽ đúng việc gây ra mức đó, không đổ cả hàng đợi",
+      'x.status === "running" : !!x.stalled' in STRIP)
+check("dải có trần số chip", "MAX_CHIP" in STRIP)
+check("phần quyết định là hàm thuần, test bằng node được (tests/js/test_dai_viec_nen.js)",
+      "module.exports = { quyetDinh: quyetDinh }" in STRIP)
 check("dải nói thẳng khi việc KHÔNG tự chạy",
       "KHÔNG tự chạy" in STRIP and "AI tự vận hành" in STRIP)
 check("dải không vẽ lại DOM khi trạng thái không đổi (đỡ nháy)",
@@ -200,7 +238,7 @@ check("app.js làm tươi dải khi lượt xong và khi việc nền báo về"
       APPJS.count("window.JavisBackground.refresh()") >= 2)
 check("app.js dọn dải khi đổi/mở hội thoại khác",
       APPJS.count("window.JavisBackground.reset()") >= 2)
-check("CSS có ba tông run/stall/idle", ".bg-run" in CSS and ".bg-stall" in CSS)
+check("CSS có hai tông run/stall", ".bg-run" in CSS and ".bg-stall" in CSS)
 
 
 if fails:

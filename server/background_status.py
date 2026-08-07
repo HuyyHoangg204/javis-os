@@ -27,14 +27,23 @@ Nguyên tắc: file này KHÔNG chặn, KHÔNG sửa câu trả lời của mode
 from __future__ import annotations
 
 import re
+import time
 import unicodedata
 
 # Việc Kanban còn "sống" - tức là còn có ngày nó chạy rồi báo về. Khớp với
 # task_store.ACTIVE_STATUS, chép lại ở đây để module này không phải nạp cả tầng task.
 ACTIVE_TASK_STATUS = ("triage", "todo", "ready", "running", "review", "blocked")
 
+# Việc đã nhận nhưng chưa ai nhấc lên chạy.
+QUEUED_TASK_STATUS = ("triage", "todo", "ready")
+
 # Trần số mục trả về cho dải trạng thái. Dải chat là chỗ liếc mắt, không phải trang Việc.
 MAX_ITEMS = 12
+
+# Việc xếp hàng mà điều phối tắt chỉ đáng báo khi nó VỪA được giao. Một backlog nằm từ tuần
+# trước không phải tin tức: sơn vàng khung chat mãi mãi thì người dùng học cách nhìn xuyên qua
+# nó, và lúc có việc hỏng thật thì dải cũng không còn ai đọc.
+STALLED_FRESH_SEC = 24 * 3600
 
 
 def _norm(value: str) -> str:
@@ -179,7 +188,8 @@ def _reminder_item(rem: dict, chat_id: str) -> dict:
 
 
 def active_view(tasks: list, loops: list, reminders: list, chat_id: str = "",
-                orchestration: str = "off", running_loop: str = "") -> dict:
+                orchestration: str = "off", running_loop: str = "",
+                now: float = 0.0) -> dict:
     """Gom việc nền còn sống thành một khung nhìn cho dải trạng thái của khung chat.
 
     Nhận dữ liệu THÔ đã đọc sẵn (không tự đi đọc kho) để test được mà không cần dựng cả server.
@@ -187,8 +197,20 @@ def active_view(tasks: list, loops: list, reminders: list, chat_id: str = "",
     `mine` = việc gắn đúng khung chat này (`chat_id` / `owner_chat` khớp). Việc của người khác
     vẫn hiện, nhưng đếm riêng: người dùng cần phân biệt "máy đang bận" với "việc CỦA TÔI đang
     chạy" - gộp một cục là quay lại đúng chỗ mù mà bản này đang đi sửa.
+
+    `level` quyết định dải có ĐƯỢC HIỆN hay không, và đây là chỗ bản đầu làm sai. Chủ repo báo
+    ngay hôm sau (2026-08-07, kèm ảnh): mở chat ra là một khối "9 việc nền đang chờ tới giờ"
+    liệt kê đủ 9 cái nhắc hẹn. Chín cái đó không chạy, không hỏng, không cần ai làm gì - chúng
+    chỉ đang đợi tới giờ, và trang Việc định kỳ đã liệt kê sẵn. Dải sinh ra để trả lời "ngay
+    lúc này có cái gì đang chạy cho tôi không"; nhắc hẹn chờ tới giờ trả lời "không", mà câu
+    trả lời "không" thì đúng nghĩa là ẩn đi. Chỉ hai mức đáng cắt ngang khung chat:
+
+      - "run"   có việc đang chạy THẬT
+      - "stall" vừa giao mà điều phối tắt nên nó KHÔNG chạy (người dùng phải bật mới xong)
+      - "idle"  còn lại - dải ẩn hẳn
     """
     cid = str(chat_id or "").strip()
+    moc = float(now) or time.time()
     items = []
     for t in tasks or []:
         if str(t.get("status") or "") in ACTIVE_TASK_STATUS:
@@ -204,17 +226,25 @@ def active_view(tasks: list, loops: list, reminders: list, chat_id: str = "",
              "todo": 4, "triage": 5, "enabled": 6, "pending": 7}
     items.sort(key=lambda x: (0 if x["mine"] else 1, order.get(x["status"], 9), x["title"]))
 
+    # Việc đã giao nhưng đứng im vì điều phối chưa bật. Đây là dòng người dùng cần thấy nhất:
+    # "đã giao" và "đang chạy" là hai chuyện khác nhau. Đánh dấu ngay trên từng mục để dải chỉ
+    # vẽ đúng mấy cái này, khỏi phải tự đoán lại luật cũ ở phía trình duyệt.
+    tat_dieu_phoi = str(orchestration or "off") != "auto"
+    for x in items:
+        moi = (not x["at"]) or (moc - x["at"]) <= STALLED_FRESH_SEC
+        x["stalled"] = bool(tat_dieu_phoi and x["kind"] == "task"
+                            and x["status"] in QUEUED_TASK_STATUS and moi)
+
     mine = [x for x in items if x["mine"]]
     running = [x for x in items if x["status"] == "running"]
-    # Việc đã giao nhưng đứng im vì điều phối chưa bật. Đây là dòng người dùng cần thấy nhất:
-    # "đã giao" và "đang chạy" là hai chuyện khác nhau.
-    stalled = [x for x in items
-               if x["kind"] == "task" and x["status"] in ("triage", "todo", "ready")]
+    stalled = [x for x in items if x["stalled"]]
+    level = "run" if running else ("stall" if stalled else "idle")
     return {
         "count": len(items),
         "mine_count": len(mine),
         "running_count": len(running),
-        "stalled_count": len(stalled) if str(orchestration or "off") != "auto" else 0,
+        "stalled_count": len(stalled),
+        "level": level,
         "orchestration": str(orchestration or "off"),
         "items": items[:MAX_ITEMS],
         "truncated": max(0, len(items) - MAX_ITEMS),

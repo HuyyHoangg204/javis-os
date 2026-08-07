@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.4] - 2026-08-07
+Chủ repo gửi ảnh chụp khung chat kèm câu: *"sao lại hiển thị 9 việc nền như này? anh không muốn vào chat mà hiện ra như này đâu."* Trong ảnh là một khối chữ chắn ngang khung chat, liệt kê đủ 9 nhắc hẹn. Chín cái đó không chạy, không hỏng, không cần ai làm gì: chúng chỉ đang đợi tới giờ, và trang Việc định kỳ đã liệt kê sẵn. Dải việc nền thêm ở 0.25.2 sinh ra để trả lời đúng một câu hỏi *"ngay lúc này có cái gì đang chạy cho tôi không"*, mà nhắc hẹn chờ tới giờ trả lời là "không". Câu trả lời "không" thì phải im lặng, chứ không phải dựng một bức tường chữ.
+### Sửa lỗi
+- **Bỏ hẳn mức xám "đang chờ tới giờ".** Dải chỉ còn hai mức, cả hai đều là thứ phải biết ngay: xanh khi có việc đang chạy THẬT, vàng khi vừa giao mà điều phối tắt nên nó không tự chạy. Mọi trạng thái khác thì dải ẩn hoàn toàn, không chiếm một pixel nào. Quyết định này nằm ở trường `level` do máy chủ tính (`background_status.active_view`) nên test được bằng Python, không phải luật rải rác trong lúc dựng HTML.
+- **Dải chỉ vẽ đúng việc gây ra mức đó.** Trước đây dù chỉ có 1 việc đang chạy thì nó vẫn đổ cả hàng đợi ra thành chip, kể cả 9 nhắc hẹn không liên quan. Nay mức xanh chỉ vẽ việc đang chạy, mức vàng chỉ vẽ việc đang kẹt, tối đa 4 chip rồi gộp phần dư thành "+N nữa". Máy chủ đánh dấu sẵn `stalled` trên từng mục để trình duyệt khỏi đoán lại luật.
+- **Backlog cũ thôi sơn vàng khung chat vĩnh viễn.** Việc xếp hàng chỉ tính là "đứng im" khi nó vừa được giao trong vòng 24 giờ. Một việc để quên từ tuần trước không phải tin tức, mà dải nào hiện suốt thì thành dải không ai đọc, tới lúc hỏng thật cũng chẳng ai nhìn.
+### Cải thiện
+- **Nhịp hỏi máy chủ co giãn theo việc thật:** 6 giây khi dải đang hiện việc, 20 giây khi không có gì để hiện, 60 giây khi tab bị ẩn. Trước đây cứ 6 giây một nhát suốt cả ngày để hỏi một thứ hầu như luôn rỗng. Nhịp kế tiếp được hẹn SAU khi câu trả lời về, nên lúc chuyển từ rỗng sang có việc là bám sát ngay chứ không phải đợi hết một nhịp thưa.
+### Kiểm thử
+- Thêm `tests/js/test_dai_viec_nen.js`: phần quyết định của dải tách thành hàm thuần nên chạy được bằng node, 21 phép thử gồm đúng ca 9 nhắc hẹn trong ảnh, ca có việc chạy lẫn giữa 9 nhắc hẹn, trần 4 chip, và ca máy chủ đời trước không gửi `level`.
+- `tests/python/test_viec_nen_hien_ra.py` khoá thêm mức `level` cho từng ca và luật 24 giờ của việc kẹt.
+
 ## [0.25.3] - 2026-08-06
 Chủ repo gửi ảnh chụp iPhone kèm câu: *"Ở điện thoại khi não thu nhỏ thì nó quá bé ko thấy gì cả."* Đúng. Đo lại bằng Chromium 390x844 thì khoang não cao 228px, mà lệnh canh khung chừa cứng 70px mỗi bên - còn đúng 88px cho TOÀN BỘ đồ thị. Cụm node ra 87x88 giữa một khung 390x228, chiếm 22% bề ngang. Ba thứ khác cộng dồn vào cùng chỗ đó: 8 nhãn thư mục rải kín khung (tên dài tràn hẳn ra ngoài mép phải), dải Agents/Skills/Workflows xếp chồng cao ~56px, và sàn lưới phối cảnh ăn 28% cuối.
 ### Sửa lỗi
