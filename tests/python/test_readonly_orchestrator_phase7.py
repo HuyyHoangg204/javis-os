@@ -101,7 +101,14 @@ def _stack(tmp_path, settings=None, route_call=None, crypto=None):
     registry.refresh_tools(brain, tools, routes)
     runtime = ObserveRuntime(tmp_path / "runtime", settings_reader=lambda: settings)
     trace = runtime.start_turn("phase7-session", str(brain), "dashboard")
+    # `start_turn` ghim revision từ registry TOÀN CỤC (`get_registry()`), không phải registry
+    # dựng riêng cho test ở `tmp_path`. Phải ghim đè cả HAI, không chỉ registry_revision:
+    # `resume` đối chiếu `model_profile_revision` với registry của chính nó, nên trên máy đã
+    # chạy app thật (bảng model_profiles có dữ liệu) thì hai bên lệch và test đỏ, còn trên CI
+    # (state dir sạch, bảng rỗng) thì tình cờ bằng nhau và test xanh. Đúng kiểu "đỏ trên máy
+    # tôi" khó lần nhất: sai ở dữ liệu ngoài repo chứ không ở mã.
     trace.registry_revision = registry.revision(brain)
+    trace.model_profile_revision = registry.model_revision()
     encrypt, decrypt = crypto or _crypto()
     store = EvidenceStore(
         runtime, tmp_path / "runtime", encryptor=encrypt, decryptor=decrypt,

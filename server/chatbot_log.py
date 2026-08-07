@@ -154,7 +154,11 @@ def lo_hong(bot_id: str, limit: int = 30) -> List[dict]:
         g = gom.setdefault(k, {"hoi": r.get("hoi") or "", "lan": 0, "lan_cuoi": 0.0,
                                "chuyen_nguoi": 0})
         g["lan"] += 1
-        if (r.get("ts") or 0) > g["lan_cuoi"]:
+        # `>=` chứ không phải `>`: đồng hồ hệ thống trên Windows nhảy theo bước ~15ms, nên hai
+        # lượt sát nhau rất hay có ts BẰNG NHAU và lúc đó `>` giữ lại bản CŨ. Bản ghi nằm sau
+        # trong file thì mới hơn - `_nap` đọc theo đúng thứ tự ghi vào - nên khi ts hoà thì lấy
+        # bản sau. Không sửa chỗ này thì "giữ bản gần nhất" đúng hay sai tuỳ may rủi từng lần.
+        if (r.get("ts") or 0) >= g["lan_cuoi"]:
             g["lan_cuoi"] = r.get("ts") or 0
             g["hoi"] = r.get("hoi") or g["hoi"]      # giữ bản gần nhất, có dấu đầy đủ hơn
         if r.get("chuyen_nguoi"):

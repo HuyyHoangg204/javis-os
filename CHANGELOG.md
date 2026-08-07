@@ -4,6 +4,14 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.8] - 2026-08-07
+Hai test đỏ lai rai làm nền cho mọi lần chạy đều phải đoán "cái này có phải lỗi mình vừa gây ra không". Sửa dứt cả hai, và một trong hai hoá ra là lỗi thật của sản phẩm chứ không phải lỗi test.
+### Sửa lỗi
+- **Câu đại diện trong danh sách "chỗ tài liệu đang thiếu" chọn sai khi hai lượt trùng dấu thời gian.** `chatbot_log.lo_hong` gom các câu hỏi trùng nhau rồi giữ bản MỚI NHẤT làm đại diện, nhưng so bằng `>` nên khi hai lượt có `ts` bằng nhau thì nó giữ bản CŨ. Đồng hồ hệ thống trên Windows nhảy theo bước ~15ms nên hai khách hỏi sát nhau trùng `ts` là chuyện thường. Nay so `>=`: `_nap` đọc theo đúng thứ tự ghi vào nên bản nằm sau trong file chính là bản mới hơn. Đây là lỗi sản phẩm, chỉ tình cờ lộ ra qua một test đỏ ngẫu nhiên khoảng 1/6 số lần chạy.
+### Kiểm thử
+- `test_chatbot_grounding.py` khoá ca trùng `ts` bằng đồng hồ ĐỨNG YÊN thay vì trông vào may rủi: đổi `>=` về `>` là test đỏ chắc chắn. Chạy 25 lần liên tiếp, xanh cả 25.
+- **`test_readonly_orchestrator_phase7.py` đỏ trên máy đã chạy app thật, xanh trên CI** - loại "đỏ trên máy tôi" khó lần nhất vì sai nằm ở dữ liệu ngoài repo. `ObserveRuntime.start_turn` ghim revision từ registry TOÀN CỤC, trong khi `resume` đối chiếu với registry dựng riêng cho test. Fixture đã ghim đè `registry_revision` nhưng bỏ sót `model_profile_revision`, nên máy nào có bảng `model_profiles` chứa dữ liệu là 3 phép thử resume đỏ. Nay ghim đủ cả hai, test hết phụ thuộc vào state dir của người chạy.
+
 ## [0.25.7] - 2026-08-07
 Chủ repo gửi ảnh nhóm "Cười Sóng AI": *"chat bất kỳ điều gì trong nhóm khi add bot vào nó đều typing, làm sao để chỉ hiện typing khi bot thực sự trả lời."* Hai người trong nhóm nói chuyện với nhau, tin nào bot cũng hiện "đang nhập…" rồi lặng lẽ không nói gì.
 ### Sửa lỗi

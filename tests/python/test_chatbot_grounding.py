@@ -374,6 +374,24 @@ check("gom trùng có dấu / không dấu thành MỘT câu", g[0]["lan"] == 2)
 check("giữ bản gần nhất làm đại diện", "da nang" in g[0]["hoi"].lower())
 check("đếm được số lần phải gọi người thật", g[0]["chuyen_nguoi"] == 1)
 
+# Cùng một phép thử nhưng ÉP hai lượt có ts BẰNG NHAU. Đồng hồ Windows nhảy theo bước ~15ms
+# nên ngoài đời hai lượt sát nhau rất hay trùng ts, và trước bản vá thì `>` giữ lại bản CŨ -
+# phép thử ngay trên đỏ ngẫu nhiên khoảng 1/6 số lần chạy. Ở đây khoá lại bằng đồng hồ đứng
+# yên, để nếu ai đó đổi `>=` về `>` thì test đỏ CHẮC CHẮN chứ không phải tuỳ may rủi.
+BID_HOA = "bot_ts_hoa"
+_gio_that = chatbot_log.time.time
+chatbot_log.time.time = lambda: 1_700_000_000.0
+try:
+    chatbot_log.ghi(BID_HOA, {"chat_id": "1", "hoi": "Có ship Đà Nẵng không?", "bi": True})
+    chatbot_log.ghi(BID_HOA, {"chat_id": "2", "hoi": "co ship da nang khong", "bi": True})
+finally:
+    chatbot_log.time.time = _gio_that
+gh = chatbot_log.lo_hong(BID_HOA)
+check("hai lượt trùng ts vẫn gom thành một câu", len(gh) == 1 and gh[0]["lan"] == 2)
+check("trùng ts thì lấy bản ghi SAU trong file làm đại diện (không tuỳ may rủi)",
+      gh[0]["hoi"] == "co ship da nang khong")
+chatbot_log.xoa(BID_HOA)
+
 tt = chatbot_log.tom_tat(BID)
 check("tóm tắt đếm đúng tổng lượt", tt["luot"] == 3)
 check("tóm tắt đếm đúng lượt bí", tt["bi"] == 2)
