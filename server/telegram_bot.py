@@ -63,6 +63,26 @@ MAX_DOC_MB = 50     # trần sendDocument của bot API
 MAX_PHOTO_MB = 10   # trần sendPhoto
 MAX_DOWNLOAD_MB = 20  # bot API chỉ cho TẢI VỀ file ≤ 20MB
 
+# ---- Chế độ "nói như người thật" (giau_trang_thai=True) ----
+# Chủ repo gửi ảnh chụp một nhóm Telegram (2026-08-07): bot chuyên trách đang nói chuyện như
+# một người, rồi giữa cuộc nói chuyện hiện ra "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi
+# hỏi lại." trước mặt cả nhóm. Một câu như vậy là khai ngay đây là máy, và còn dạy người lạ
+# một lệnh quản trị. Yêu cầu: "các phần trạng thái của Javis anh không muốn để lộ ra như vậy,
+# anh muốn ẩn đi để như cảm giác người thật nói chứ ko phải bot."
+#
+# Ở chế độ này, thứ THAY THẾ tin trạng thái là chấm "đang nhập…" của chính Telegram - đúng thứ
+# một người thật để lại khi họ đang gõ. Và tin nhắn tới lúc bot đang bận thì XẾP HÀNG rồi trả
+# lời một thể, chứ không bị chặn: im lặng mà đánh rơi câu hỏi của khách còn tệ hơn cả tin
+# trạng thái.
+TYPING_MOI_GIAY = 4.0   # Telegram tắt chấm "đang nhập" sau ~5 giây, phải nhắc lại trước đó
+MAX_CHO_TIN = 5         # trần số tin gom lại khi bot đang bận (chống spam làm phình bộ nhớ)
+MAX_CHO_KY_TU = 4000
+
+# Câu duy nhất được nói ra khi một lượt gãy ở chế độ người thật. Không mã lỗi, không tên lớp
+# ngoại lệ - người thật không đọc traceback ra miệng. Chi tiết vẫn vào stderr + log bot.
+CAU_LOI_NGUOI_THAT = ("Dạ em xin lỗi, chỗ này em đang trục trặc nên chưa trả lời ngay được ạ. "
+                      "Anh chị nhắn lại giúp em một chút nữa nhé.")
+
 
 def _caption_command_text(ingested, caption):
     """Text cuối cho tin CHỈ có đính kèm (ảnh/file). Nếu caption là LỆNH ('/...', vd '/notes ...')
@@ -128,8 +148,13 @@ def md_to_mdv2(text: str) -> str:
 
 class TelegramBot:
     def __init__(self, token, chat_id, answer_fn, command_fn=None, callback_fn=None,
-                 download_dir=None, commands=None, precheck_fn=None, event_fn=None):
+                 download_dir=None, commands=None, precheck_fn=None, event_fn=None,
+                 giau_trang_thai=False):
         self.token = token
+        # Giấu MỌI tin trạng thái/kỹ thuật của Javis, để cuộc trò chuyện đọc như người thật.
+        # Bot của CHỦ để False (chủ cần thấy "đang gọi công cụ…", cần lệnh /stop); bot chuyên
+        # trách nói với khách thì True. Xem khối chú thích ở đầu file.
+        self.giau_trang_thai = bool(giau_trang_thai)
         # chat_id nhận chuỗi "id1,id2" hoặc list → whitelist NHIỀU người dùng chung 1 bot.
         self.chat_ids = parse_chat_ids(chat_id)
         # Menu lệnh đẩy lên Telegram. Mặc định là menu của CHỦ; bot chuyên trách truyền menu
@@ -155,6 +180,10 @@ class TelegramBot:
         # ĐA PHIÊN: mỗi chat_id có lượt trả lời RIÊNG → các tài khoản chạy song song,
         # cùng 1 tài khoản vẫn tuần tự (1 lượt/lúc). Map chat_id(str) -> asyncio.Task.
         self._current = {}
+        # Tin đến trong lúc chat đó đang bận, chờ trả lời xong lượt trước rồi gộp làm một lượt.
+        # Chỉ dùng ở chế độ người thật; chế độ chủ vẫn báo "đang xử lý câu trước" như cũ.
+        # chat_id(str) -> {"texts": [str], "meta": dict}
+        self._cho = {}
         self._stop = False
         self.offset = 0
         self.status = "off"      # off | starting | polling | conflict | error | stopped
@@ -183,6 +212,10 @@ class TelegramBot:
         return TG_API.format(token=self.token, method=method)
 
     async def _send(self, client, chat, text, reply_markup=None):
+        # "(không có nội dung)" là một dòng gỡ lỗi. Ở chế độ người thật thì thà không nói gì
+        # còn hơn nói ra một câu chỉ có nghĩa với người viết code.
+        if not str(text or "").strip() and self.giau_trang_thai:
+            return
         text = text or "(không có nội dung)"
         # 3500 (không phải 4096) để chừa chỗ cho ký tự escape MarkdownV2
         chunks = [text[i:i + 3500] for i in range(0, len(text), 3500)] or [text]
@@ -262,6 +295,17 @@ class TelegramBot:
             await client.post(self._url("sendChatAction"), json={"chat_id": chat, "action": "typing"})
         except Exception:
             pass
+
+    async def _giu_typing(self, client, chat):
+        """Giữ chấm "đang nhập…" sáng suốt cả lượt trả lời (chế độ người thật).
+
+        Đây là thứ THAY THẾ tin "🤔 Javis đang xử lý…": người đang chờ vẫn thấy đầu kia có
+        động tĩnh, nhưng thấy đúng cái một người thật để lại chứ không phải một tin nhắn máy.
+        Telegram tự tắt chấm sau ~5 giây nên phải nhắc lại đều.
+        """
+        while True:
+            await self._typing(client, chat)
+            await asyncio.sleep(TYPING_MOI_GIAY)
 
     # ---- Tin TRẠNG THÁI tạm: cho user đỡ lo khi chờ (gửi → cập nhật theo tiến trình → xoá) ----
     async def _send_status(self, client, chat, text):
@@ -499,12 +543,21 @@ class TelegramBot:
     async def _handle_turn(self, client, chat, text, meta=None):
         await self._typing(client, chat)
         files = []
-        # Tin trạng thái tạm để user Telegram thấy Javis đang chạy (đang gọi công cụ / nhận data /
-        # soạn trả lời) thay vì im lặng chờ dài. Xong thì xoá tin này và gửi câu trả lời thật.
-        status_mid = await self._send_status(client, chat, "🤔 Javis đang xử lý…")
+        # Chờ dài mà đầu kia im hẳn thì người ta tưởng hỏng. Hai cách nói điều đó:
+        #   - bot của CHỦ: một tin trạng thái tạm, cập nhật theo tiến trình (đang gọi công cụ /
+        #     nhận data / soạn trả lời), xong thì xoá và thay bằng câu trả lời thật;
+        #   - chế độ NGƯỜI THẬT: không tin nào cả, chỉ giữ chấm "đang nhập…" của Telegram.
+        status_mid = None
+        giu = None
+        if self.giau_trang_thai:
+            giu = asyncio.create_task(self._giu_typing(client, chat))
+        else:
+            status_mid = await self._send_status(client, chat, "🤔 Javis đang xử lý…")
         _last = [0.0]
 
         async def progress(txt):
+            if self.giau_trang_thai:
+                return              # đã có chấm "đang nhập…" chạy đều, không cần tin nào
             now = time.monotonic()
             if now - _last[0] < 2.5:      # throttle ~2.5s → không spam / dính rate-limit Telegram
                 return
@@ -513,33 +566,43 @@ class TelegramBot:
             await self._edit_status(client, chat, status_mid, "⏳ " + (txt or "Đang xử lý…"))
 
         try:
-            reply = await self.answer_fn(text, meta, progress)
-        except asyncio.CancelledError:
-            await self._del_msg(client, chat, status_mid)
-            return   # /stop sẽ tự báo, không gửi trùng
-        except Exception as e:
-            reply = f"⚠ Lỗi: {type(e).__name__}: {e}"
-        im_lang = False
-        if isinstance(reply, dict):
-            files = reply.get("files") or []
-            # Im lặng CÓ CHỦ Ý (bot không được phép mở miệng ở nhóm này) khác hẳn câu trả lời
-            # rỗng vì hỏng. Không phân biệt thì cả hai cùng ra "(không có nội dung)" - vừa lộ
-            # với người ngoài, vừa che mất lượt hỏng thật.
-            im_lang = bool(reply.get("im_lang"))
-            reply = reply.get("text") or ""
-        await self._del_msg(client, chat, status_mid)   # bỏ tin trạng thái, thay bằng câu trả lời
-        if im_lang and not str(reply or "").strip() and not files:
-            return
-        # Nếu câu trả lời chỉ là ![](local-path) và file đã được tách để gửi riêng, không gửi
-        # thêm tin "(không có nội dung)" trước ảnh.
-        if str(reply or "").strip() or not files:
-            await self._send(client, chat, reply)
-        # Gửi file SAU câu trả lời để thứ tự đọc tự nhiên (text trước, đính kèm sau)
-        for f in files:
-            fpath, fcap = (f.get("path"), f.get("caption", "")) if isinstance(f, dict) else (f, "")
-            ok, err = await self.send_file(fpath, fcap, chat=chat)
-            if not ok:
-                await self._send(client, chat, f"⚠ Không gửi được file {Path(str(fpath)).name}: {err}")
+            try:
+                reply = await self.answer_fn(text, meta, progress)
+            except asyncio.CancelledError:
+                await self._del_msg(client, chat, status_mid)
+                return   # /stop sẽ tự báo, không gửi trùng
+            except Exception as e:
+                print(f"[telegram lượt hỏng] {type(e).__name__}: {e}", file=sys.stderr)
+                # Người thật không đọc tên lớp ngoại lệ ra miệng.
+                reply = (CAU_LOI_NGUOI_THAT if self.giau_trang_thai
+                         else f"⚠ Lỗi: {type(e).__name__}: {e}")
+            im_lang = False
+            if isinstance(reply, dict):
+                files = reply.get("files") or []
+                # Im lặng CÓ CHỦ Ý (bot không được phép mở miệng ở nhóm này) khác hẳn câu trả lời
+                # rỗng vì hỏng. Không phân biệt thì cả hai cùng ra "(không có nội dung)" - vừa lộ
+                # với người ngoài, vừa che mất lượt hỏng thật.
+                im_lang = bool(reply.get("im_lang"))
+                reply = reply.get("text") or ""
+            await self._del_msg(client, chat, status_mid)   # bỏ tin trạng thái, thay bằng câu trả lời
+            if im_lang and not str(reply or "").strip() and not files:
+                return
+            # Nếu câu trả lời chỉ là ![](local-path) và file đã được tách để gửi riêng, không gửi
+            # thêm tin "(không có nội dung)" trước ảnh.
+            if str(reply or "").strip() or not files:
+                await self._send(client, chat, reply)
+            # Gửi file SAU câu trả lời để thứ tự đọc tự nhiên (text trước, đính kèm sau)
+            for f in files:
+                fpath, fcap = (f.get("path"), f.get("caption", "")) if isinstance(f, dict) else (f, "")
+                ok, err = await self.send_file(fpath, fcap, chat=chat)
+                if not ok:
+                    print(f"[telegram gửi file] {fpath}: {err}", file=sys.stderr)
+                    if not self.giau_trang_thai:
+                        await self._send(client, chat,
+                                         f"⚠ Không gửi được file {Path(str(fpath)).name}: {err}")
+        finally:
+            if giu:
+                giu.cancel()
 
     async def _loop(self):
         async with httpx.AsyncClient(timeout=httpx.Timeout(40.0)) as client:
@@ -630,8 +693,16 @@ class TelegramBot:
                 t = self._current.get(chat)
                 if t and not t.done():
                     t.cancel()
+                # Bảo dừng là dừng hẳn: bỏ luôn phần đang xếp hàng. Không xoá ở đây thì lượt
+                # bị huỷ vẫn chạy tiếp mấy câu chờ - `_handle_turn` NUỐT CancelledError (nó
+                # cần nuốt để khỏi gửi trùng câu báo dừng) nên task kết thúc "bình thường" và
+                # `task.cancelled()` ở `_xong_luot` không bao giờ True.
+                self._cho.pop(chat, None)
                 res = await self.command_fn("stop", "", chat, meta) if self.command_fn else None
-                await self._send(client, chat, (res or {}).get("reply", "⏹ Đã dừng."))
+                # Chế độ người thật không có câu mặc định: "⏹ Đã dừng." là tiếng của máy. Bot
+                # chuyên trách vẫn nói được, nhưng bằng câu do command_fn của nó soạn.
+                mac_dinh = "" if self.giau_trang_thai else "⏹ Đã dừng."
+                await self._send(client, chat, (res or {}).get("reply", mac_dinh))
                 return
             if self.command_fn:
                 res = await self.command_fn(cmd, arg, chat, meta)
@@ -656,13 +727,45 @@ class TelegramBot:
                 return
         # Tin thường → chạy nền. Tuần tự THEO CHAT: chỉ chặn nếu chính chat này đang bận.
         if self._busy(chat):
-            await self._send(client, chat, "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại.")
+            if self.giau_trang_thai:
+                # Người thật đang gõ dở mà nghe thêm một câu thì đọc nốt rồi trả lời một thể,
+                # chứ không quay ra nói "đang xử lý câu trước". Gộp vào lượt kế tiếp.
+                self._xep_hang(chat, text, meta)
+            else:
+                await self._send(client, chat,
+                                 "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại.")
             return
+        self._chay_luot(client, chat, text, meta)
+
+    def _xep_hang(self, chat, text, meta=None):
+        """Gom tin đến trong lúc bận, trả lời một thể khi lượt hiện tại xong.
+
+        Có trần vì đây là hộp thư mở cho người lạ: ai đó dán 200 dòng lúc bot đang bận thì
+        hàng chờ không được phình theo. Quá trần thì giữ mấy câu ĐẦU - câu hỏi thật gần như
+        luôn nằm ở đó, phần đuôi thường là sốt ruột nhắn thêm.
+        """
+        o = self._cho.setdefault(chat, {"texts": [], "meta": meta})
+        o["meta"] = meta or o.get("meta")
+        if len(o["texts"]) >= MAX_CHO_TIN:
+            return
+        if sum(len(x) for x in o["texts"]) + len(text or "") > MAX_CHO_KY_TU:
+            return
+        o["texts"].append(str(text or ""))
+
+    def _chay_luot(self, client, chat, text, meta=None):
         task = asyncio.create_task(self._handle_turn(client, chat, text, meta))
         self._current[chat] = task
-        # Dọn task đã xong khỏi map (tránh phình theo thời gian); chỉ xoá nếu vẫn là task này.
-        task.add_done_callback(
-            lambda _t, c=chat: self._current.pop(c, None) if self._current.get(c) is _t else None)
+        task.add_done_callback(lambda t, c=chat: self._xong_luot(client, c, t))
+
+    def _xong_luot(self, client, chat, task):
+        """Dọn task đã xong (tránh phình theo thời gian) rồi chạy nốt phần đang xếp hàng."""
+        if self._current.get(chat) is task:
+            self._current.pop(chat, None)
+        cho = self._cho.pop(chat, None)
+        # Bị /stop cắt ngang thì bỏ luôn hàng chờ: người ta bảo dừng chứ không bảo trả lời tiếp.
+        if not cho or not cho.get("texts") or task.cancelled() or self._stop:
+            return
+        self._chay_luot(client, chat, "\n".join(cho["texts"]), cho.get("meta"))
 
     async def _handle_callback(self, client, cq):
         """Xử lý bấm nút inline: trả lời callback (tắt spinner) + sửa tin để hiện bước kế."""
@@ -709,6 +812,7 @@ class TelegramBot:
             if t and not t.done():
                 t.cancel()
         self._current.clear()
+        self._cho.clear()
         if self._task:
             self._task.cancel()
             self._task = None

@@ -4,6 +4,17 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.5] - 2026-08-07
+Chủ repo gửi ảnh chụp một nhóm Telegram: bot chuyên trách đang nói chuyện như người, rồi giữa cuộc hiện ra *"⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại."* trước mặt cả nhóm. Một câu như vậy khai ngay đây là máy, và còn dạy người lạ một lệnh quản trị. Yêu cầu: *"các phần trạng thái của Javis anh không muốn để lộ ra như vậy, anh muốn ẩn đi để như cảm giác người thật nói chứ ko phải bot."* Gốc rễ: bot chuyên trách và bot Javis của chủ dùng chung lớp `TelegramBot`, mà lớp đó nói trạng thái ra ngoài như đang nói với người vận hành máy.
+### Sửa lỗi
+- **Bot chuyên trách không còn để lộ một dòng trạng thái nào.** Thêm cờ `giau_trang_thai` cho `TelegramBot`, bật sẵn cho mọi bot khách. Bốn chỗ rò bị bịt: tin "🤔 Javis đang xử lý…" cùng các bản cập nhật "⏳ ⚙ Đang gọi công cụ…" của nó, câu "Đang xử lý câu trước, gửi /stop", dòng "⚠ Lỗi: TênLớpNgoạiLệ: …" khi một lượt gãy, và chữ "(không có nội dung)" khi lượt trả về rỗng. Bot Javis của CHỦ giữ nguyên tất cả: người vận hành máy thì cần nhìn thấy Javis đang chạy tới đâu.
+- **Thay tin trạng thái bằng chấm "đang nhập…" của chính Telegram**, giữ sáng đều suốt lượt trả lời. Đây đúng là thứ một người thật để lại khi họ đang gõ, và nó không phải một tin nhắn nên không nằm lại trong lịch sử nhóm.
+- **Lượt gãy thì xin lỗi bằng một câu bình thường** rồi mời nhắn lại, thay vì đọc tên lớp ngoại lệ ra miệng. Lý do kỹ thuật vẫn vào stderr, vẫn vào nhật ký bot, vẫn báo người trực nếu chủ có đặt.
+### Cải thiện
+- **Nhắn thêm lúc bot đang trả lời thì không bị chặn nữa, mà được xếp hàng.** Giấu câu báo bận mà vẫn bỏ tin đi thì tệ hơn cả để lộ: khách hỏi mà không ai đáp. Nay bot gom mấy câu tới trong lúc bận, trả lời xong câu trước là trả lời tiếp một thể, đúng như một người đọc nốt tin rồi mới đáp. Trần 5 tin hoặc 4000 ký tự mỗi cuộc trò chuyện để người lạ spam không làm phình bộ nhớ; gõ `/stop` thì bỏ luôn phần đang chờ.
+### Kiểm thử
+- Thêm `tests/python/test_bot_noi_nhu_nguoi.py`: dựng Telegram giả lập rồi soi đúng những gì bot ĐỊNH gửi đi. 24 phép thử phủ cả bốn chỗ rò, luật xếp hàng và trần của nó, ca `/stop` cắt ngang, và đối chứng rằng bot của chủ vẫn giữ nguyên hành vi cũ ở từng ca một.
+
 ## [0.25.4] - 2026-08-07
 Chủ repo gửi ảnh chụp khung chat kèm câu: *"sao lại hiển thị 9 việc nền như này? anh không muốn vào chat mà hiện ra như này đâu."* Trong ảnh là một khối chữ chắn ngang khung chat, liệt kê đủ 9 nhắc hẹn. Chín cái đó không chạy, không hỏng, không cần ai làm gì: chúng chỉ đang đợi tới giờ, và trang Việc định kỳ đã liệt kê sẵn. Dải việc nền thêm ở 0.25.2 sinh ra để trả lời đúng một câu hỏi *"ngay lúc này có cái gì đang chạy cho tôi không"*, mà nhắc hẹn chờ tới giờ trả lời là "không". Câu trả lời "không" thì phải im lặng, chứ không phải dựng một bức tường chữ.
 ### Sửa lỗi

@@ -635,6 +635,9 @@ def start_bot(bot_id: str) -> tuple[bool, str]:
         commands=LENH_KHACH,      # menu Telegram của khách, KHÔNG phải menu quản trị của chủ
         precheck_fn=_make_precheck_fn(bot_id),   # nhóm chưa được bật: im, nhưng KHÔNG im lặng
         event_fn=_make_event_fn(bot_id),         # vào nhóm / bị đá / nhóm đổi id khi nâng cấp
+        # Bot này nói chuyện với KHÁCH, nên không được để lộ một dòng trạng thái nào của Javis.
+        # Xem khối chú thích "nói như người thật" ở đầu telegram_bot.py.
+        giau_trang_thai=True,
     )
     tb.start()
     _RUNNING[bot_id] = {"bot": tb, "cfg": cfg, "started": time.time(), "answered": 0}

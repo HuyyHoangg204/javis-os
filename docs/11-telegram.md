@@ -100,6 +100,7 @@ Vài điểm cần biết:
 - Xong việc, bot **xoá hẳn tin trạng thái** rồi mới gửi câu trả lời thật. Tin biến mất là bình thường, không phải lỗi và cũng không phải bị thu hồi.
 - Gõ `/stop` giữa chừng: tin trạng thái cũng bị xoá và bot không gửi thêm câu trả lời nào cho lượt đó.
 - Dòng "⚙ Đang gọi..." chính là bằng chứng Javis đang chạm vào MCP thật (POS, quảng cáo, lịch, file...) chứ không phải trả lời chay.
+- Mấy tin trạng thái này chỉ có ở **bot Javis của bạn**. [Bot chuyên trách](25-chatbot.md) nói chuyện với khách thì giấu sạch, chỉ để lại chấm "đang nhập…" cho giống người thật.
 
 ## Gửi file cho bot, nhận file từ bot
 

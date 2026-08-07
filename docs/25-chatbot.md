@@ -317,6 +317,23 @@ Còn **cách nó nói năng, phạm vi nó nhận trả lời, thứ nó từ ch
 
 Lưu ý cách hiểu đúng: những giới hạn trên nằm ở **mức quyền trong mã nguồn**, không phải ở câu dặn trong prompt. Câu dặn có thể bị lời lẽ khôn khéo lách qua; mức quyền thì không, vì công cụ đơn giản là không được cấp cho lượt chạy đó. Mặt trái của cùng một sự thật: khi bạn **cấp** công cụ cho lượt đó, câu dặn trong Agent cũng không giữ nổi nó nữa.
 
+## Bot nói như người, không lộ trạng thái máy
+
+Bot chuyên trách **không hiện một dòng trạng thái nào của Javis** cho người đang nhắn với nó. Đây là điểm khác hẳn bot Javis chính của bạn (bot đó vẫn hiện đầy đủ, xem [Telegram](11-telegram.md) - chủ máy thì cần nhìn thấy Javis đang chạy tới đâu).
+
+Cụ thể, người nhắn với bot chuyên trách sẽ KHÔNG bao giờ thấy:
+
+- tin "🤔 Javis đang xử lý…" và các bản cập nhật "⏳ ⚙ Đang gọi công cụ…" của nó
+- câu "⏳ Đang xử lý câu trước. Gửi /stop để dừng rồi hỏi lại."
+- dòng lỗi kỹ thuật kiểu "⚠ Lỗi: TimeoutError: ..."
+- chữ "(không có nội dung)" khi một lượt trả về rỗng
+
+Thay vào đó, trong lúc bot suy nghĩ thì Telegram hiện chấm **"đang nhập…"** ở đầu cuộc trò chuyện, đúng thứ một người thật để lại khi họ đang gõ. Lượt nào gãy thì bot xin lỗi bằng một câu bình thường và mời nhắn lại; lý do kỹ thuật vẫn được ghi đủ vào nhật ký bot và vẫn báo cho người trực nếu bạn có đặt.
+
+**Nhắn thêm lúc bot đang trả lời thì không bị chặn.** Bot gom mấy câu đó lại, trả lời xong câu trước là trả lời tiếp một thể, giống hệt một người đọc nốt tin rồi mới đáp. Gom tối đa 5 tin cho mỗi cuộc trò chuyện để người lạ không spam làm phình bộ nhớ.
+
+Một chỗ vẫn cố ý nói thẳng: khi có người gọi bot trong **nhóm bạn chưa cho phép**, bot nói đúng một câu một lần rằng nó chưa được bật cho nhóm này. Im hẳn ở đó thì bot trông như hỏng và bạn không có cách nào biết để đi bấm **Cho phép**.
+
 ## Giới hạn tần suất
 
 Mỗi người bị giới hạn số lượt hỏi trong một giờ (mặc định 20, sửa được khi Sửa bot). Vượt thì bot lịch sự xin trả lời lại sau.
