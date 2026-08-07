@@ -852,7 +852,7 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 .msg-user .bubble {
   background: var(--accent-wash-2); border: 1px solid var(--accent-line);
   padding: 8px 12px; border-radius: 12px 12px 3px 12px; max-width: 90%;
-  line-height: 1.55; font-size: 15px;
+  line-height: 1.55; font-size: 16px;
 }
 /* ===== Bong bóng Javis: đây là chỗ người dùng ĐỌC, không phải chỗ nhét chữ =====
    Chủ repo gửi ảnh một câu trả lời dài (2026-08-07): "muốn cải thiện lại cách hiển thị của
@@ -871,7 +871,7 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 .msg-javis .bubble {
   background: var(--bg3); border: 1px solid var(--border);
   padding: 12px 14px; border-radius: 3px 12px 12px 12px;
-  line-height: 1.75; font-size: 15px; max-width: 76ch;
+  line-height: 1.75; font-size: 16px; max-width: 76ch;
 }
 .msg-javis .bubble strong { color: var(--accent); }
 .msg-javis .bubble ul { padding-left: 18px; margin: 10px 0; }

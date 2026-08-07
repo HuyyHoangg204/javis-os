@@ -61,54 +61,157 @@ def is_git_checkout(root: str) -> bool:
         return False
 
 
-_GITIGNORE = (
-    "# Javis brain - KHÔNG commit: khoá, log thô (có thể chứa secret), nhật ký nền.\n"
-    "# Git chỉ version TRI THỨC ĐÃ CHƯNG CẤT (facts/wiki/skills/MEMORY.md) → undo sạch, an toàn.\n"
-    ".javis-learn.lock\n"
-    "Javis/learn-staging/\n"
-    "Javis/learn-log/\n"
-    "Javis/loop-log/\n"
-    "Javis/skill-usage.json\n"
-    "memory/conversations/\n"
-    "Memory/conversations/\n"
-    "*.tmp\n"
-    "# Vùng cache media: ảnh sinh ra + file user gửi lên. Là NGUYÊN LIỆU đi qua, không phải\n"
-    "# tri thức, và media_gc.py tự dọn theo hạn. Nếu commit thì mỗi tấm ảnh là một blob nằm\n"
-    "# vĩnh viễn trong lịch sử git - xoá file về sau cũng không lấy lại được dung lượng.\n"
-    "# Bốn dòng attachments vì tên thư mục có thể là attachments / Attachments / 05 - attachments\n"
-    "# (git phân biệt hoa thường trên Linux, còn dấu * phủ mọi tiền tố số thứ tự).\n"
-    "attachments/\n"
-    "Attachments/\n"
-    "*attachments/\n"
-    "*Attachments/\n"
-    "inbox/\n"
+# ============================================================
+# GIT CHỈ GIỮ CHỮ, KHÔNG GIỮ MEDIA
+#
+# Vì sao đây là luật cứng chứ không phải một tuỳ chọn: git được thiết kế để NHỚ MÃI MÃI. Mỗi
+# lần commit, nội dung file thành một blob nằm vĩnh viễn trong `.git/objects`; xoá file về sau
+# chỉ ghi thêm một dòng "từ đây không còn file này", còn blob vẫn phải giữ để quay ngược về
+# commit cũ được. `git gc` cũng không đòi lại được, vì blob đó vẫn có chủ là commit cũ.
+#
+# Với CHỮ thì tính chất đó là ưu điểm: git nén và lưu chênh lệch giữa các phiên bản, nên một
+# file .md sửa nhiều lượt gộp lại còn nhẹ hơn cả bản gốc. Với MEDIA thì ngược hẳn: mp4/jpg đã
+# nén sẵn bằng codec nên git không nén thêm được và cũng không tìm ra điểm giống nhau giữa hai
+# bản render, mỗi lượt xuất lại là thêm nguyên một cục vào kho, vĩnh viễn. Một brain có vài
+# trăm MB media và thói quen render vài lượt mỗi clip sẽ đẩy repo lên nhiều GB trong ít tháng,
+# clone về máy mới phải tải cả những bản render đã bỏ từ lâu, và cách duy nhất rút xuống là
+# viết lại toàn bộ lịch sử - việc đó đổi mã băm mọi commit nên mọi bản sao ở máy khác thành
+# không tương thích. Với Javis đang đồng bộ hai chiều nhiều máy thì đó là thảm hoạ chứ không
+# phải thao tác bảo trì. Nên cách đúng là ngay từ đầu đừng cho media vào git.
+#
+# Media vẫn nằm nguyên trên đĩa và vẫn dùng được bình thường; chỉ là nó không đi vào lịch sử
+# git. Muốn có bản sao media thì dùng thứ lưu theo TRẠNG THÁI HIỆN TẠI (Drive, ổ ngoài) - xoá
+# là mất thật và đòi lại được dung lượng thật.
+# ============================================================
+
+# Đuôi file được phép đi vào git: chữ, và chỉ chữ. Danh sách CHO PHÉP chứ không phải danh sách
+# cấm - định dạng media mới ra đời thì tự động nằm ngoài, khỏi phải chạy theo vá.
+TEXT_EXTS = {
+    # tri thức
+    ".md", ".markdown", ".txt", ".rst", ".org",
+    # trang và dữ liệu có cấu trúc
+    ".html", ".htm", ".css", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml",
+    ".xml", ".ini", ".cfg", ".env-example",
+    # Obsidian
+    ".canvas", ".base",
+    # script trong Javis/scripts + plugin
+    ".py", ".js", ".mjs", ".cjs", ".ts", ".sh", ".bat", ".ps1", ".sql",
+    # ảnh vector: là CHỮ, git nén và so sánh được, dung lượng cỡ một trang văn bản
+    ".svg",
+}
+
+# File không có đuôi nhưng vẫn là chữ và vẫn cần giữ.
+TEXT_NAMES = {".gitignore", ".gitattributes", "LICENSE", "README", "CNAME", "Makefile"}
+
+
+def la_file_chu(rel_or_name: str) -> bool:
+    """File này có được vào git không. Dùng chung cho .gitignore lẫn bước chụp sang mirror,
+    để hai đường KHÔNG BAO GIỜ nói khác nhau về cùng một file."""
+    name = str(rel_or_name or "").replace("\\", "/").rsplit("/", 1)[-1]
+    if name in TEXT_NAMES:
+        return True
+    i = name.rfind(".")
+    return i > 0 and name[i:].lower() in TEXT_EXTS
+
+
+_GI_MO = "# >>> javis giữ khối này, đừng sửa bên trong"
+_GI_DONG = "# <<< hết khối của javis - viết luật riêng của bạn ở DƯỚI dòng này"
+
+# Thứ tự trong khối là thứ tự CÓ NGHĨA với git: luật đứng sau thắng luật đứng trước. Chặn hết
+# trước, mở lại cho chữ, rồi mới chặn lần nữa mấy thư mục không được vào kể cả khi là chữ.
+# Đảo thứ tự này là log thô (có thể chứa secret) lọt vào git dưới dạng .json.
+_GITIGNORE_BODY = (
+    ["# Javis chỉ đưa CHỮ vào git, không đưa media. Lý do dài nằm ở server/git_brain.py;",
+     "# nói gọn: git nhớ mãi mãi, nên một file video commit vào là nằm đó vĩnh viễn, xoá về",
+     "# sau cũng không đòi lại được dung lượng. Media vẫn nằm nguyên trên đĩa, chỉ là không",
+     "# đi vào lịch sử git.",
+     "",
+     "# 1. Chặn tất cả...",
+     "*",
+     "# 2. ...trừ thư mục (để git còn đi vào được) và các đuôi file là CHỮ:",
+     "!*/"]
+    + [f"!*{e}" for e in sorted(TEXT_EXTS)]
+    + [f"!{n}" for n in sorted(TEXT_NAMES)]
+    + ["",
+       "# 3. Và chặn lần nữa những thứ không được vào kể cả khi là chữ: khoá, log thô (có thể",
+       "#    chứa secret), nhật ký nền, hội thoại chưa chưng cất.",
+       ".javis-learn.lock",
+       "Javis/learn-staging/",
+       "Javis/learn-log/",
+       "Javis/loop-log/",
+       "Javis/skill-usage.json",
+       "memory/conversations/",
+       "Memory/conversations/",
+       "*.tmp",
+       "# Vùng cache media: ảnh sinh ra + file user gửi lên. Là NGUYÊN LIỆU đi qua, không phải",
+       "# tri thức, và media_gc.py tự dọn theo hạn. Bốn dòng attachments vì tên thư mục có thể",
+       "# là attachments / Attachments / 05 - attachments (git phân biệt hoa thường trên Linux,",
+       "# còn dấu * phủ mọi tiền tố số thứ tự).",
+       "attachments/",
+       "Attachments/",
+       "*attachments/",
+       "*Attachments/",
+       "inbox/"]
 )
+
+_GITIGNORE = "\n".join([_GI_MO] + _GITIGNORE_BODY + [_GI_DONG]) + "\n"
+
+# Mọi dòng mà các bản template TRƯỚC ĐÂY từng ghi ra. Dọn đúng những dòng này khi nâng cấp một
+# brain cũ, để chúng không nằm lẫn ngoài khối rồi phá thứ tự luật ở trên.
+_GITIGNORE_CU = {
+    "# Javis brain - KHÔNG commit: khoá, log thô (có thể chứa secret), nhật ký nền.",
+    "# Git chỉ version TRI THỨC ĐÃ CHƯNG CẤT (facts/wiki/skills/MEMORY.md) → undo sạch, an toàn.",
+    ".javis-learn.lock", "Javis/learn-staging/", "Javis/learn-log/", "Javis/loop-log/",
+    "Javis/skill-usage.json", "memory/conversations/", "Memory/conversations/", "*.tmp",
+    "# Vùng cache media: ảnh sinh ra + file user gửi lên. Là NGUYÊN LIỆU đi qua, không phải",
+    "# tri thức, và media_gc.py tự dọn theo hạn. Nếu commit thì mỗi tấm ảnh là một blob nằm",
+    "# vĩnh viễn trong lịch sử git - xoá file về sau cũng không lấy lại được dung lượng.",
+    "# Bốn dòng attachments vì tên thư mục có thể là attachments / Attachments / 05 - attachments",
+    "# (git phân biệt hoa thường trên Linux, còn dấu * phủ mọi tiền tố số thứ tự).",
+    "attachments/", "Attachments/", "*attachments/", "*Attachments/", "inbox/",
+}
 
 
 def _ensure_gitignore_lines(root) -> bool:
-    """Merge các dòng của _GITIGNORE vào <root>/.gitignore, CHỈ THÊM dòng còn thiếu.
-    Trả True nếu có thay đổi. TUYỆT ĐỐI không ghi đè: brain cũ có thể đã có dòng user tự
-    thêm. Cần thiết vì ensure_git_repo return sớm ở nhánh brain-đã-là-repo → brain cũ sẽ
-    đông cứng mãi ở template lúc nó ra đời."""
+    """Ghi lại KHỐI CỦA JAVIS trong <root>/.gitignore, giữ nguyên mọi dòng user tự thêm.
+
+    Vì sao phải ghi cả khối chứ không chỉ thêm dòng thiếu như bản trước: luật allowlist chỉ
+    đúng khi ĐÚNG THỨ TỰ (chặn hết → mở cho chữ → chặn lại mấy thư mục cấm). Bản trước nối
+    thêm vào cuối file, nên với một brain cũ thì mấy dòng "chặn lại" nằm TRƯỚC dòng "mở cho
+    chữ" và git sẽ hiểu ngược: `Javis/learn-log/*.json` được mở lại. Log thô có thể chứa
+    secret, nên đó không phải lỗi thẩm mỹ.
+
+    Khối của Javis đứng TRƯỚC phần của user để user còn viết ngoại lệ đè lên được.
+    Trả True nếu file có thay đổi.
+    """
     try:
         gi = Path(root) / ".gitignore"
         cur = gi.read_text(encoding="utf-8") if gi.exists() else ""
-        have = {l.strip() for l in cur.splitlines() if l.strip()}
-        missing = [l for l in _GITIGNORE.splitlines()
-                   if l.strip() and not l.strip().startswith("#") and l.strip() not in have]
-        if not missing:
+        rieng = []
+        trong_khoi = False
+        for dong in cur.splitlines():
+            s = dong.strip()
+            if s == _GI_MO:
+                trong_khoi = True
+                continue
+            if s == _GI_DONG:
+                trong_khoi = False
+                continue
+            if trong_khoi or s in _GITIGNORE_CU:
+                continue          # khối cũ của Javis: bỏ đi, lát nữa ghi lại bản mới
+            rieng.append(dong)
+        # Bỏ dòng trống thừa ở đầu/cuối phần của user cho file khỏi loang ra sau mỗi lần ghi.
+        while rieng and not rieng[0].strip():
+            rieng.pop(0)
+        while rieng and not rieng[-1].strip():
+            rieng.pop()
+        moi = _GITIGNORE + (("\n" + "\n".join(rieng) + "\n") if rieng else "")
+        if moi == cur:
             return False
-        if cur.strip():
-            text = cur.rstrip("\n") + "\n"
-        else:
-            # File chưa có/rỗng: dựng lại đúng phần header comment của template (không phụ
-            # thuộc vị trí 1 dòng cụ thể trong _GITIGNORE - tránh vỡ nếu template đổi thứ tự).
-            comment_lines = [l for l in _GITIGNORE.splitlines() if l.strip().startswith("#")]
-            text = ("\n".join(comment_lines) + "\n") if comment_lines else ""
-        # newline="\n": KHÔNG để Python dịch \n -> os.linesep (CRLF trên Windows). Hiện chỉ vô
-        # hại nhờ core.autocrlf=true của máy; nếu deploy chạy autocrlf=false thì merge lên một
-        # .gitignore đã commit dạng LF sẽ đẻ diff đổi line-ending TOÀN FILE thay vì thêm 1 dòng.
-        gi.write_text(text + "\n".join(missing) + "\n", encoding="utf-8", newline="\n")
+        # newline="\n": KHÔNG để Python dịch \n -> os.linesep (CRLF trên Windows). Máy nào chạy
+        # core.autocrlf=false thì ghi CRLF lên một file đã commit dạng LF sẽ đẻ diff đổi
+        # line-ending TOÀN FILE thay vì đúng phần vừa sửa.
+        gi.write_text(moi, encoding="utf-8", newline="\n")
         return True
     except Exception as e:
         print(f"[gitignore] {root}: {type(e).__name__}: {e}", file=__import__('sys').stderr)
@@ -392,20 +495,36 @@ def _backup_skip(rel: str) -> bool:
     if any(s in r for s in _BACKUP_SKIP_SUBSTR):
         return True
     name = rel.replace("\\", "/").rsplit("/", 1)[-1]
-    return name == ".javis-learn.lock" or name.endswith(".tmp")
+    if name == ".javis-learn.lock" or name.endswith(".tmp"):
+        return True
+    # CHỈ CHỮ mới được sang mirror. Chặn ở đây chứ không trông cả vào .gitignore vì hai việc
+    # khác nhau: .gitignore quyết định git COMMIT gì, còn chỗ này quyết định có CHÉP file sang
+    # thư mục mirror hay không. Không chặn thì mỗi lượt đồng bộ nhân đôi vài trăm MB media trên
+    # đĩa để rồi git bỏ qua hết - tốn chỗ, tốn thời gian chụp, không được gì.
+    return not la_file_chu(name)
 
 
-def _sync_mirror(src: str, mirror: str) -> None:
+def _sync_mirror(src: str, mirror: str) -> dict:
     """Đồng bộ src -> mirror: chép file mới/đổi (bỏ .git nested + file nhạy cảm/tạm), xoá file
-    thừa trong mirror. Mirror KHÔNG có .git nested nào -> git add -A ở mirror chạy sạch."""
+    thừa trong mirror. Mirror KHÔNG có .git nested nào -> git add -A ở mirror chạy sạch.
+
+    Trả về số file media đã bỏ qua + tổng dung lượng, để chỗ gọi NÓI RA cho người dùng. Bỏ qua
+    lặng lẽ thì có ngày ai đó tưởng ảnh của mình đã được sao lưu."""
     src, mirror = Path(src), Path(mirror)
     keep = set()
+    bo_qua, bo_qua_bytes = 0, 0
     for dirpath, dirnames, filenames in os.walk(src):
         dirnames[:] = [d for d in dirnames if d not in _BACKUP_SKIP_DIRS]
         for fn in filenames:
             full = Path(dirpath) / fn
             rel = str(full.relative_to(src))
             if _backup_skip(rel):
+                if not la_file_chu(fn):
+                    bo_qua += 1
+                    try:
+                        bo_qua_bytes += full.stat().st_size
+                    except OSError:
+                        pass
                 continue
             keep.add(rel.replace("\\", "/"))
             dst = mirror / rel
@@ -429,6 +548,7 @@ def _sync_mirror(src: str, mirror: str) -> None:
                     full.unlink()
                 except Exception:
                     pass
+    return {"media_bo_qua": bo_qua, "media_bytes": bo_qua_bytes}
 
 
 # ============================================================
@@ -773,7 +893,11 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
                         trash_dir: Optional[str] = None, protected_names=None) -> dict:
     rep = {"ok": False, "pushed": False, "committed": False, "merged": False,
            "restored": False, "conflicts": [], "applied": 0, "deleted": 0,
-           "applied_sample": [], "deleted_sample": [], "brains_deleted": []}
+           "applied_sample": [], "deleted_sample": [], "brains_deleted": [],
+           # Media KHÔNG lên GitHub (xem khối chú thích "GIT CHỈ GIỮ CHỮ" ở đầu file). Đếm ra
+           # đây để giao diện nói thẳng, chứ bỏ qua lặng lẽ thì có ngày ai đó tưởng ảnh của
+           # mình đã được sao lưu.
+           "media_bo_qua": 0, "media_bytes": 0}
     if not trash_dir:
         trash_dir = str(Path(mirror_dir).parent / "brain-trash")   # cạnh mirror (đều trong STATE_DIR)
     gc_trash(trash_dir, 30)              # dọn thùng rác quá 30 ngày
@@ -795,7 +919,7 @@ def _sync_brains_locked(brains_dir: str, mirror_dir: str, repo_url: str, token: 
 
     sync_start = time.time()
     if _brains_has_content(brains_dir):
-        _sync_mirror(brains_dir, mirror_dir)
+        rep.update(_sync_mirror(brains_dir, mirror_dir))
         _git(mirror_dir, "add", "-A")
         c = _git(mirror_dir, "commit", "-m",
                  f"backup: {time.strftime('%Y-%m-%d %H:%M:%S')} ({_host_tag()})")

@@ -68,6 +68,28 @@ class _Scope:
             cha.con.append(self)
 
 
+# Ở Python 3, biến chạy của list/set/dict comprehension và của generator có PHẠM VI RIÊNG - nó
+# không hề rò ra scope chứa nó. Đi xuyên vào đó mà nhặt tên là bộ quét tự đẻ dương tính giả:
+# một dòng `X = [f(n) for n in ...]` ở mức module sẽ bị coi là "module có biến n", rồi mọi hàm
+# nào đếm bằng `n += 1` đều bị báo là quên nonlocal. Đã dính đúng ca đó (git_brain.py, 0.26.2).
+_KHONG_VAO = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp, ast.Lambda)
+
+
+def _ten_bi_gan(node):
+    """Tên bị gán TRONG CHÍNH scope này, không tính tên nằm trong comprehension/lambda."""
+    ra = []
+    thung = [node]
+    while thung:
+        cur = thung.pop()
+        for con in ast.iter_child_nodes(cur):
+            if isinstance(con, _KHONG_VAO):
+                continue
+            thung.append(con)
+        if isinstance(cur, ast.Name) and isinstance(cur.ctx, ast.Store):
+            ra.append(cur.id)
+    return ra
+
+
 def _thu_scope(node, cha=None):
     sc = _Scope(node, cha)
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -97,9 +119,8 @@ def _thu_scope(node, cha=None):
                 sc.cong_don.append((con.target.id, con.lineno))
             elif isinstance(con, (ast.Assign, ast.AnnAssign, ast.For, ast.AsyncFor,
                                   ast.With, ast.AsyncWith, ast.NamedExpr)):
-                for t in ast.walk(con):
-                    if isinstance(t, ast.Name) and isinstance(t.ctx, ast.Store):
-                        sc.gan.add(t.id)
+                for t in _ten_bi_gan(con):
+                    sc.gan.add(t)
             di(con)
 
     di(node)
@@ -201,6 +222,21 @@ def push_to_chat(x):
         print(e, file=sys.stderr)
 '''
 
+# Dương tính giả đã dính thật (git_brain.py, 0.26.2): biến chạy của comprehension ở mức module
+# bị coi là biến của module, rồi mọi hàm đếm bằng đúng tên đó bị báo là quên nonlocal. Ở Python
+# 3 biến chạy comprehension KHÔNG rò ra ngoài, nên báo vậy là sai.
+_MAU_COMPREHENSION = '''
+DS = [str(n) for n in range(3)]
+BO = {k: v for k, v in []}
+
+def dem():
+    n = 0
+    for x in [1, 2]:
+        n += x
+    return n
+'''
+check("KHÔNG báo nhầm khi biến chạy comprehension trùng tên biến đếm trong hàm",
+      quet_nonlocal(_MAU_COMPREHENSION, "mau") == [])
 check("bộ quét TÌM RA lỗi thiếu nonlocal (đúng lỗi 0.13.0)",
       len(quet_nonlocal(_MAU_HONG_NONLOCAL, "mau")) == 1)
 check("và IM khi đã khai nonlocal",

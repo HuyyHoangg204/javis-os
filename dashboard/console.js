@@ -1870,6 +1870,17 @@
           <li>Tạo token: GitHub → Settings → Developer settings → <b>Fine-grained tokens</b> → chọn đúng repo đó → quyền <b>Contents: Read and write</b> → tạo và copy token (dạng <code>github_pat_...</code>).</li>
           <li>Dán URL repo + token vào đây, bấm <b>Kiểm tra</b>, rồi <b>Đồng bộ ngay</b>. Bật tự động để định kỳ tự khớp giữa các máy.</li>
         </ol>
+        <div style="max-width:680px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-1);color:var(--text3);font-size:13.5px;line-height:1.7">
+          <b style="color:var(--text)">Chỉ đồng bộ THÔNG TIN, không đồng bộ media.</b>
+          Lên GitHub là ghi chú, Wiki, ký ức, skill, cấu hình việc định kỳ, script - tức là file chữ
+          (<code>.md .txt .html .csv .json .canvas .py</code>…). <b>Ảnh, video, âm thanh, PDF và các file nhị phân khác KHÔNG lên</b>;
+          chúng vẫn nằm nguyên trên máy này và dùng bình thường, chỉ là không đi vào lịch sử git.
+          <div style="margin-top:6px">Vì sao: git được thiết kế để <b>nhớ mãi mãi</b>. Một file video đã commit là nằm đó vĩnh viễn,
+          xoá về sau cũng không đòi lại được dung lượng, và mỗi lần xuất lại clip là thêm nguyên một bản mới.
+          Vài trăm MB media cộng thói quen render vài lượt sẽ đẩy repo lên nhiều GB trong ít tháng, máy mới clone về phải tải cả những bản đã bỏ từ lâu.
+          Với chữ thì ngược lại: git nén và chỉ lưu phần chênh lệch, nên cả trăm lượt sửa vẫn rất nhẹ.</div>
+          <div style="margin-top:6px">Cần bản sao media thì dùng thứ lưu theo <b>trạng thái hiện tại</b> (Google Drive, ổ cứng ngoài, NAS): xoá là mất thật và đòi lại được dung lượng thật. Hai thứ chia việc cho nhau chứ không thay nhau.</div>
+        </div>
         <div class="si-grid">
           <div class="si-field"><label>URL repo (https)</label><input id="bkRepo" placeholder="Ví dụ: https://github.com/blogminhquy/javis-brain-backup"></div>
           <div class="si-field"><label>GitHub token (fine-grained, quyền Contents)</label><input id="bkToken" type="password" placeholder="Ví dụ: github_pat_..."></div>
@@ -2012,7 +2023,11 @@
         if (r.restored) bits.push("khôi phục từ backup");
         const cf = (r.conflicts || []).length
           ? ` · <span style="color:var(--warn-ink)">${WARN_ICON} ${r.conflicts.length} file sửa trùng 2 nơi - bản mới hơn thắng, bản kia lưu thành .conflict-* (xem: ${esc(r.conflicts.slice(0, 3).map(c => c.path).join(", "))}${r.conflicts.length > 3 ? "..." : ""})</span>` : "";
-        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--green)">${CHECK_ICON} Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}`;
+        // Media bị bỏ qua phải NÓI RA. Im lặng thì có ngày người dùng tưởng ảnh của mình
+        // cũng đã được sao lưu, tới lúc mất máy mới biết là không.
+        const mq = r.media_bo_qua
+          ? `<div style="color:var(--text3);font-size:12.5px;margin-top:3px">Bỏ qua ${r.media_bo_qua} file media${r.media_bytes ? " (" + _humanSize(r.media_bytes) + ")" : ""} - git chỉ giữ chữ. Chúng vẫn nằm nguyên trên máy này; muốn có bản sao thì dùng Drive hoặc ổ ngoài.</div>` : "";
+        el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--green)">${CHECK_ICON} Đồng bộ xong${bits.length ? " - " + bits.join(", ") : " - hai bên đã khớp nhau"}.</span>${cf}${mq}`;
       } else {
         el.querySelector("#bkStatus").innerHTML = `<span style="color:var(--red)">${ic("circle-x")} ${esc(r.error || "lỗi")}</span>`;
       }

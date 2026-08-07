@@ -74,22 +74,41 @@ Mỗi lượt đồng bộ làm 4 việc theo thứ tự:
 Ghi chú an toàn của cơ chế:
 
 - Token **không** được lưu vào brain hay đẩy lên repo. Nó nằm trong `settings.json` nội bộ (đã git bỏ qua). Thông báo lỗi cũng tự che token.
-- File nhạy cảm bị loại khỏi đồng bộ: hội thoại gốc (`memory/conversations`), log loop/learn (`Javis/loop-log`, `Javis/learn-log`, `Javis/learn-staging`), thống kê dùng skill (`Javis/skill-usage.json`), khoá lock, file `.tmp`, và `.git` riêng của từng brain. Những file này chỉ nằm trên máy tạo ra chúng.
+- **Chỉ file CHỮ mới được đồng bộ.** Ảnh, video, âm thanh, PDF và mọi file nhị phân khác không lên repo - xem mục [Chỉ đồng bộ THÔNG TIN, không đồng bộ media](#chỉ-đồng-bộ-thông-tin-không-đồng-bộ-media) ngay dưới.
+- File nhạy cảm cũng bị loại khỏi đồng bộ dù là chữ: hội thoại gốc (`memory/conversations`), log loop/learn (`Javis/loop-log`, `Javis/learn-log`, `Javis/learn-staging`), thống kê dùng skill (`Javis/skill-usage.json`), khoá lock, file `.tmp`, và `.git` riêng của từng brain. Những file này chỉ nằm trên máy tạo ra chúng.
 - Thùng rác brain (`brain-trash` trong thư mục state) nằm NGOÀI vùng đồng bộ nên không lên repo.
 - Máy có thư mục brains **trống** (máy mới, volume mới) được coi là KHÔI PHỤC: chỉ nhận dữ liệu về, không bao giờ đẩy "trạng thái trống" lên đè mất backup.
 - Xoá file/brain trên một máy thì lần đồng bộ sau các máy khác cũng xoá theo (đó là nghĩa của sync). Nhờ repo là git, mọi thứ vẫn nằm trong lịch sử commit - khôi phục được khi cần.
 
-## Ảnh và file đính kèm: đẩy lên repo, nhưng tự hết hạn
+## Chỉ đồng bộ THÔNG TIN, không đồng bộ media
 
 Đây là chỗ dễ bất ngờ nhất, đọc kỹ một lần rồi thôi.
 
-**Ảnh và file VẪN lên repo backup.** Hai thư mục `attachments/` và `inbox/` của brain (ảnh Javis tạo, file bạn gửi qua chat hoặc Telegram) **không** nằm trong danh sách loại trừ ở trên, nên chúng được chép nguyên vào bản sao và đẩy lên GitHub như file thường. Hệ quả thực tế: repo backup có thể phình nhanh vì ảnh, và mỗi tấm ảnh là một blob nằm vĩnh viễn trong lịch sử git.
+**Lên GitHub chỉ có file chữ.** Ghi chú, Wiki, ký ức, skill, cấu hình việc định kỳ, script: `.md`, `.txt`, `.html`, `.csv`, `.json`, `.yaml`, `.canvas`, `.py`, `.svg` và vài đuôi chữ khác. Danh sách đầy đủ nằm ở `TEXT_EXTS` trong `server/git_brain.py`.
 
-**Trong khi đó, git RIÊNG của từng brain lại bỏ qua chúng.** Từ 0.9.247, `.gitignore` của mỗi brain có sẵn `attachments/`, `Attachments/`, `*attachments/`, `inbox/`, và Javis gỡ chúng khỏi index một lần cho brain cũ. Hai cơ chế này khác nhau và đều đúng theo thiết kế: git của brain là để version **tri thức đã chưng cất** (facts, Wiki, skill), còn repo backup là bản sao đầy đủ để cứu hộ.
+**Ảnh, video, âm thanh, PDF và mọi file nhị phân khác KHÔNG lên.** Chúng vẫn nằm nguyên trên máy và dùng bình thường, chỉ là không đi vào lịch sử git và không sang máy khác qua đường này.
 
-**Media tự hết hạn, và việc xoá đó lan lên repo.** Javis coi `attachments/` và `inbox/` là vùng cache: cứ 6 tiếng một lần, file quá **30 ngày** bị xoá, và nếu tổng vượt trần **300 MB** thì xoá từ cũ tới mới cho tới khi xuống dưới trần. Vì hai thư mục này vẫn trong phạm vi đồng bộ, lần đồng bộ kế tiếp sẽ đẩy luôn việc xoá đó lên GitHub và sang máy còn lại.
+### Vì sao lại chặn, thay vì cứ đẩy hết cho chắc
 
-Nghĩa là: **lời hứa "bản sao ngoài an toàn" đúng với ghi chú `.md`, nhưng không đúng với ảnh sau 30 ngày.** Ảnh cũ chỉ còn lấy lại được từ lịch sử commit của repo, không còn ở nhánh hiện tại. Muốn giữ ảnh lâu dài thì rút nội dung ra note `.md`, chuyển file sang thư mục khác của brain, hoặc nới/tắt luật dọn (khoá `media` trong `settings.json`). Chi tiết cách tắt ở [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md).
+Git được thiết kế để **nhớ mãi mãi**, và đó là chỗ khác biệt căn bản với một ổ đĩa hay Google Drive.
+
+Mỗi lần commit, git lấy ruột file, băm ra một mã, rồi cất cái ruột đó thành một cục nén trong `.git/objects` (gọi là *blob*). Xoá file ở lần commit sau chỉ ghi thêm một dòng "từ đây không còn file này nữa" - bản thân blob vẫn phải giữ, vì không giữ thì không quay ngược về commit cũ được. `git gc` cũng không dọn được nó, vì nó vẫn có chủ. Nói cách khác: **xoá file khỏi git không đòi lại được dung lượng.**
+
+Với chữ, tính chất đó là ưu điểm. Git nén rất tốt và chỉ lưu phần chênh lệch giữa các phiên bản, nên một file `.md` sửa cả trăm lượt gộp lại vẫn nhẹ hơn bạn tưởng.
+
+Với media thì ngược hẳn. File `.mp4` hay `.jpg` đã được codec nén sẵn, git không nén thêm được, và hai bản render của cùng một clip thì với git là hai file hoàn toàn khác nhau chứ không phải một file sửa nhẹ. Mỗi lượt xuất lại là thêm nguyên một cục vào kho, vĩnh viễn. Một brain vài trăm MB media cộng thói quen chỉnh vài lượt mỗi clip sẽ đẩy repo lên nhiều GB trong ít tháng, và máy mới clone về phải tải cả những bản render đã bỏ từ năm ngoái.
+
+Lúc đó muốn dọn thì phải **viết lại toàn bộ lịch sử** (`git filter-repo` hoặc BFG). Việc đó đổi mã băm của mọi commit, nên mọi bản sao ở máy khác thành không tương thích và phải tải lại từ đầu. Với Javis đang đồng bộ hai chiều nhiều máy thì đó là thảm hoạ chứ không phải một thao tác bảo trì. Nên cách đúng là ngay từ đầu đừng cho media vào.
+
+### Vậy media sao lưu ở đâu
+
+Dùng thứ lưu theo **trạng thái hiện tại**: Google Drive, OneDrive, ổ cứng ngoài, NAS. Ở đó xoá là mất thật và đòi lại được dung lượng thật - đúng thứ bạn cần cho ảnh và video. Hai công cụ chia việc cho nhau chứ không thay nhau: git giữ tri thức và toàn bộ lịch sử của nó, Drive giữ file nặng ở trạng thái mới nhất.
+
+Sau mỗi lần bấm **⇅ Đồng bộ ngay**, nếu có media bị bỏ qua thì Javis ghi rõ ngay dưới dòng trạng thái: bao nhiêu file, tổng bao nhiêu MB. Bỏ qua lặng lẽ thì có ngày bạn tưởng ảnh của mình cũng đã được sao lưu, tới lúc mất máy mới biết là không.
+
+### Media trong brain vẫn tự hết hạn như cũ
+
+Javis coi `attachments/` và `inbox/` là vùng cache: cứ 6 tiếng một lần, file quá **30 ngày** bị xoá, và nếu tổng vượt trần **300 MB** thì xoá từ cũ tới mới cho tới khi xuống dưới trần. Luật này không liên quan tới đồng bộ, nhưng cần biết vì nó là lý do ảnh cũ tự biến mất khỏi máy. Muốn giữ lâu dài thì rút nội dung ra note `.md`, chuyển file sang thư mục khác của brain, hoặc nới/tắt luật dọn (khoá `media` trong `settings.json`). Chi tiết cách tắt ở [Khắc phục sự cố & FAQ](17-khac-phuc-su-co.md).
 
 ## Khôi phục brain trên máy mới
 

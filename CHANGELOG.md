@@ -4,6 +4,21 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.26.2] - 2026-08-08
+Git chỉ giữ CHỮ, không giữ media. Cỡ chữ khung chat lên 16px.
+### Thay đổi
+- **Đồng bộ GitHub chỉ đưa file chữ lên repo.** Ghi chú, Wiki, ký ức, skill, cấu hình việc định kỳ, script (`.md .txt .html .csv .json .yaml .canvas .py .svg`…). Ảnh, video, âm thanh, PDF và mọi file nhị phân khác **không lên** - chúng vẫn nằm nguyên trên máy và dùng bình thường, chỉ là không đi vào lịch sử git. Danh sách là **CHO PHÉP** chứ không phải danh sách cấm, nên định dạng media mới ra đời tự động nằm ngoài, khỏi chạy theo vá.
+- Vì sao là luật cứng chứ không phải tuỳ chọn: git được thiết kế để nhớ mãi mãi. Nội dung mỗi file commit vào thành một blob nằm vĩnh viễn trong `.git/objects`; xoá file về sau chỉ ghi thêm một dòng "từ đây không còn file này", còn blob vẫn phải giữ để quay ngược về commit cũ được, và `git gc` cũng không dọn được vì nó vẫn có chủ. Với chữ thì đó là ưu điểm (git nén + lưu chênh lệch, sửa cả trăm lượt vẫn nhẹ). Với media thì ngược hẳn: mp4/jpg đã nén sẵn bằng codec nên git không nén thêm được, và hai bản render của cùng một clip là hai file khác hẳn nhau chứ không phải một file sửa nhẹ. Vài trăm MB media cộng thói quen render vài lượt sẽ đẩy repo lên nhiều GB trong ít tháng, và cách duy nhất rút xuống là viết lại toàn bộ lịch sử - việc đó làm mọi bản sao ở máy khác thành không tương thích.
+- **Trang Đồng bộ nói thẳng điều này**, kèm lý do và chỗ nên để media (Drive, ổ ngoài: lưu theo trạng thái hiện tại, xoá là đòi lại được dung lượng thật). Sau mỗi lượt đồng bộ, nếu có media bị bỏ qua thì Javis ghi rõ bao nhiêu file và bao nhiêu MB. Bỏ qua lặng lẽ thì có ngày người dùng tưởng ảnh của mình cũng đã được sao lưu.
+### Sửa lỗi
+- **Luật `.gitignore` nay được ghi theo KHỐI, không nối thêm vào cuối.** Luật allowlist chỉ đúng khi đúng thứ tự (chặn hết → mở cho chữ → chặn lại thư mục cấm). Bản trước chỉ nối dòng còn thiếu vào cuối file, nên với một brain cũ thì mấy dòng "chặn lại" nằm trước dòng "mở cho chữ" và git hiểu ngược: `Javis/learn-log/*.json` được mở lại. Log thô có thể chứa secret nên đó không phải lỗi thẩm mỹ. Luật riêng người dùng tự thêm vẫn được giữ nguyên và vẫn nằm sau khối của Javis để đè lên được.
+- **Máy khác không bị xoá mất media thật.** Máy nào cập nhật trước sẽ dọn media khỏi bản sao rồi đẩy việc xoá đó lên repo; máy thứ hai kéo về mà cứ thế áp là mất file trên đĩa. Cả hai chiều nay đi qua đúng một hàm lọc, nên lệnh xoá media từ remote bị bỏ qua thay vì thi hành.
+### Cải thiện
+- **Cỡ chữ khung chat 15px lên 16px** (cả tin của Javis lẫn tin người dùng). Trần độ dài dòng tính bằng `ch` nên tự giãn theo, giữ nguyên số ký tự mỗi dòng.
+### Kiểm thử
+- Thêm `tests/python/test_git_chi_giu_chu.py`: 45 phép thử, trong đó có **dựng repo git THẬT** rồi hỏi git xem nó định commit những gì - đây là cách duy nhất chắc chắn về thứ tự luật, vì suy luận trên chuỗi `.gitignore` rất dễ sai. Có cả ca nâng cấp một brain cũ đang có luật riêng của người dùng.
+- **Sửa một dương tính giả của bộ quét `test_bien_chua_gan.py`**: nó đi xuyên vào comprehension để nhặt tên bị gán, nên một dòng `X = [f(n) for n in ...]` ở mức module bị coi là "module có biến `n`", rồi mọi hàm đếm bằng `n += 1` đều bị báo là quên `nonlocal`. Ở Python 3 biến chạy comprehension không rò ra ngoài. Đã khoá bằng phép thử riêng.
+
 ## [0.26.1] - 2026-08-07
 Chủ repo gửi ảnh một câu trả lời dài: *"muốn cải thiện lại cách hiển thị của Javis cho dễ đọc, xuống cách dòng nhiều hơn chứ đọc khó quá."* Ba nguyên nhân khác nhau cùng dồn vào một bức tường chữ, sửa thiếu cái nào cũng vẫn khó đọc.
 ### Cải thiện
