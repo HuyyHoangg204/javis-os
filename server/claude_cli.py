@@ -8,6 +8,7 @@ kế hoạch + nhật ký: docs/dev/2026-07-ke-hoach-agent-sdk.md).
 import asyncio
 import json
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -634,6 +635,41 @@ def codex_mcp_open_login_terminal(name):
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
+# Dấu vết "sandbox của Codex không khởi động nổi trong môi trường này".
+#
+# Chủ repo báo 2026-08-07 kèm ảnh: loop nền chạy bằng ChatGPT, mọi lệnh đọc/ghi file đều trả
+# `bwrap: Failed to make / slave: Permission denied`, và bản báo cáo gửi về Telegram là một
+# bài dài model tự kể lại nỗi bối rối của nó. Nguyên nhân nằm ngoài Javis: bubblewrap cần tạo
+# được user namespace + đổi propagation của `/`, mà container Javis chạy user thường, không có
+# CAP_SYS_ADMIN, và Ubuntu 24.04 còn chặn user namespace không đặc quyền bằng AppArmor.
+#
+# Hệ quả: TRONG DOCKER, hai mức sandbox `read-only` (mode suggest) và `workspace-write` (mode
+# auto) của Codex không bao giờ chạy được. Mà loop tạo từ chat mặc định là suggest, nên mọi
+# việc nền chạy bằng ChatGPT trong Docker đều câm theo đúng kiểu này.
+_SANDBOX_HONG = re.compile(r"bwrap:|Failed to make / slave", re.I)
+
+_NOTE_SANDBOX_HONG = (
+    "⚠ Javis tự kiểm: rào sandbox riêng của Codex (ChatGPT) KHÔNG khởi động được trong môi "
+    "trường này, nên mọi lệnh đọc/ghi file của nó đều bị chặn ngay từ đầu. Đây là giới hạn của "
+    "container chứ không phải lỗi của lượt chạy, và thử lại bao nhiêu lần cũng vậy. Hai lối ra: "
+    "đặt biến môi trường JAVIS_CODEX_SANDBOX=off để Codex chạy không có rào riêng (chính "
+    "container vẫn là rào), hoặc chuyển việc nền này sang bộ não Claude."
+)
+
+
+def codex_sandbox_cho_mode(mode: str) -> Optional[str]:
+    """Cờ `--sandbox` của Codex cho một mức quyền của Javis. None = không đặt rào riêng.
+
+    `JAVIS_CODEX_SANDBOX=off` bỏ hẳn rào của Codex ở MỌI mức. Cần cho Docker, nơi bubblewrap
+    không chạy nổi nên rào đó không phải là "chặt hơn" mà là "chết hẳn". Đánh đổi phải nói rõ:
+    lúc đó mức `suggest` không còn thứ gì chặn Codex ghi file, vì Codex không có allowlist
+    per-call như Claude. Ai đặt cờ này là đang chọn "container là rào duy nhất".
+    """
+    if str(os.getenv("JAVIS_CODEX_SANDBOX", "auto")).strip().lower() in ("off", "0", "false", "none"):
+        return None
+    return {"suggest": "read-only", "auto": "workspace-write", "full": None}.get(mode or "full")
+
+
 class CodexCLI:
     def __init__(self, cwd: Optional[str] = None, tag: str = "chat", model: Optional[str] = None,
                  instructions: Optional[str] = None):
@@ -796,6 +832,7 @@ class CodexCLI:
         threading.Thread(target=reader_thread, daemon=True).start()
 
         final_text = ""
+        sandbox_hong = False
         while True:
             item = await queue.get()
             if item is SENTINEL:
@@ -803,6 +840,13 @@ class CodexCLI:
             if isinstance(item, dict) and "__error__" in item:
                 yield {"type": "error", "content": item["__error__"]}
                 continue
+            # Soi trên DÒNG THÔ: output của lệnh nằm rải trong nhiều khuôn item khác nhau tuỳ
+            # bản CLI, còn dấu vết của bwrap thì luôn đi qua đây nguyên văn.
+            if not sandbox_hong and isinstance(item, str) and _SANDBOX_HONG.search(item):
+                sandbox_hong = True
+                print(f"[codex sandbox] rào riêng của Codex không khởi động được "
+                      f"(sandbox={self.sandbox or 'bypass'}) - xem _NOTE_SANDBOX_HONG",
+                      file=sys.stderr)
             try:
                 ev = json.loads(item)
             except json.JSONDecodeError:
@@ -840,6 +884,11 @@ class CodexCLI:
                     yield {"type": "item", "item": it}
             elif t == "turn.completed":
                 u = ev.get("usage") or {}
+                # Dán lời giải thích vào chính bản báo cáo. Không dán thì thứ tới tay chủ là
+                # một bài dài model tự kể lại nỗi bối rối của nó, và không ai đọc ra được là
+                # phải đi sửa ở tầng container.
+                if sandbox_hong:
+                    final_text = (final_text + "\n\n" if final_text else "") + _NOTE_SANDBOX_HONG
                 yield {"type": "final", "content": final_text, "session_id": self.session_id,
                        "tokens_in": (u.get("input_tokens") or 0) + (u.get("cached_input_tokens") or 0),
                        "tokens_out": u.get("output_tokens") or 0}

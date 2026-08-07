@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.25.9] - 2026-08-07
+Chủ repo gửi ảnh Telegram: loop "[CK] Tin Hot Chứng Khoán" chạy bằng ChatGPT thay vì Claude, mọi lệnh đọc/ghi file đều trả `bwrap: Failed to make / slave: Permission denied`, và bản báo cáo về máy là một bài dài model tự kể lại nỗi bối rối của nó.
+### Sửa lỗi
+- **Việc nền chạy bằng ChatGPT không đọc nổi một file nào trong Docker.** Codex bọc mọi lệnh đọc/ghi file của nó bằng bubblewrap, mà bubblewrap cần tạo được user namespace và đổi propagation của `/`. Container Javis chạy user thường, không có `CAP_SYS_ADMIN`, và Ubuntu 24.04 còn chặn user namespace không đặc quyền bằng AppArmor. Nên trong Docker, hai mức rào `read-only` (mode suggest) và `workspace-write` (mode auto) của Codex **không bao giờ khởi động được** - rào đó không phải chặt hơn mà là chết hẳn. Loop tạo từ chat mặc định là `suggest`, nên mọi việc nền chạy bằng ChatGPT trong Docker đều câm theo đúng kiểu này. Chạy bằng Claude thì không sao vì Javis chặn theo từng tool qua chính SDK, không cần bubblewrap.
+- **Ảnh Docker nay đặt sẵn `JAVIS_CODEX_SANDBOX=off`**, để chính container làm rào. Cập nhật lên bản này là việc nền bằng ChatGPT chạy được ngay, không phải đụng gì trên VPS. Đánh đổi được ghi thẳng trong Dockerfile chứ không giấu: Codex không có allowlist per-call như Claude, nên với cờ này thì loop mức `suggest` mất thứ chặn nó ghi file trong container. Các rào về tiền, đơn hàng, đăng bài, gửi tin KHÔNG bị ảnh hưởng vì chúng nằm ở MCP Hub chứ không ở sandbox. Ai muốn giữ rào thì đặt `JAVIS_CODEX_SANDBOX=auto` rồi cấp quyền cho container (vd `security_opt: [apparmor:unconfined]`).
+- **Javis nhận ra dấu vết `bwrap` và tự giải thích trong chính bản báo cáo.** Trước đây thứ tới tay chủ là một bài model tự kể chuyện, đọc xong không ai biết phải đi sửa ở tầng container. Nay cuối lượt có một dòng nói đúng thủ phạm, khẳng định đây không phải lỗi của lượt chạy, và chỉ đúng hai lối ra. Cần cho cả người tự dựng container riêng.
+### Kiểm thử
+- Thêm `tests/python/test_codex_sandbox_docker.py`: 24 phép thử phủ bản đồ mức quyền sang cờ sandbox (kể cả giá trị lạ và mức lạ), đường dây thật qua `aux_engine._build_codex` tới argv, ảnh Docker có đặt cờ và có ghi lý do lẫn đánh đổi hay không, và việc nhận diện dấu vết `bwrap` không bắt nhầm lượt chạy bình thường.
+- Khoá luôn một bẫy dựng ảnh: chú thích không được chen vào giữa khối `ENV` nối dòng bằng `\`, vì hỏng Dockerfile thì VPS không cập nhật được nữa.
+
 ## [0.25.8] - 2026-08-07
 Hai test đỏ lai rai làm nền cho mọi lần chạy đều phải đoán "cái này có phải lỗi mình vừa gây ra không". Sửa dứt cả hai, và một trong hai hoá ra là lỗi thật của sản phẩm chứ không phải lỗi test.
 ### Sửa lỗi

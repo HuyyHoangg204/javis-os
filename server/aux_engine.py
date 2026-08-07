@@ -47,7 +47,8 @@ _KEY_FIELD = {
     "anthropic-api": "anthropic_api_key",
 }
 
-# mode của Javis -> sandbox của Codex CLI
+# mode của Javis -> sandbox của Codex CLI. Bản đồ thật nằm ở `claude_cli.codex_sandbox_cho_mode`
+# (nó còn đọc cờ JAVIS_CODEX_SANDBOX); giữ dict này để mã cũ đọc tên mức vẫn chạy.
 _CODEX_SANDBOX = {"suggest": "read-only", "auto": "workspace-write", "full": None}
 
 # ── Chọn model FREE mạnh nhất trên OpenRouter (mắt xích cuối của router việc nền) ──
@@ -310,13 +311,15 @@ def _build_api(spec, claude_cli_obj, mode, tag):
 
 
 def _build_codex(spec, claude_cli_obj, mode, tag, codex_profile=None):
-    from claude_cli import CodexCLI
+    from claude_cli import CodexCLI, codex_sandbox_cho_mode
     cc = CodexCLI(cwd=getattr(claude_cli_obj, "cwd", None),
                   tag=tag or getattr(claude_cli_obj, "tag", "aux"),
                   model=spec.get("model") or None,
                   instructions=getattr(claude_cli_obj, "system_prompt", None))
     # Codex không có allowlist per-call như Claude → chặn ở tầng sandbox của chính nó.
-    cc.sandbox = _CODEX_SANDBOX.get(mode or getattr(claude_cli_obj, "javis_mode", None) or "full")
+    # `codex_sandbox_cho_mode` còn đọc cờ JAVIS_CODEX_SANDBOX: trong Docker, bubblewrap không
+    # chạy nổi nên rào đó không phải "chặt hơn" mà là "chết hẳn", và cờ là đường thoát.
+    cc.sandbox = codex_sandbox_cho_mode(mode or getattr(claude_cli_obj, "javis_mode", None) or "full")
     if codex_profile:
         try:
             cc.profile = codex_profile()   # profile javis = thấy MCP của Javis (POS, connector...)

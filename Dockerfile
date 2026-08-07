@@ -79,6 +79,21 @@ ENV JAVIS_HOST=0.0.0.0 \
     HOME=/home/javis \
     PATH=/usr/local/bin:$PATH
 
+# Codex (ChatGPT) bọc mọi lệnh đọc/ghi file của nó bằng bubblewrap. Bubblewrap cần tạo được user
+# namespace + đổi propagation của `/`, mà container này chạy user thường, không có CAP_SYS_ADMIN,
+# và Ubuntu 24.04 còn chặn user namespace không đặc quyền bằng AppArmor. Nên Ở ĐÂY rào đó không
+# phải "chặt hơn" mà là "chết hẳn": mọi việc nền chạy bằng ChatGPT đều trả
+# `bwrap: Failed to make / slave: Permission denied` cho TỪNG lệnh một, và loop không đọc nổi
+# một file nào (chủ repo báo 2026-08-07 kèm ảnh). Tắt rào riêng của Codex, để CHÍNH CONTAINER
+# làm rào.
+#
+# Đánh đổi phải nói rõ: Codex không có allowlist per-call như Claude, nên với cờ này thì loop
+# mức `suggest` chạy bằng Codex không còn thứ gì chặn nó ghi file trong container. Các rào về
+# tiền/đơn/đăng bài/gửi tin KHÔNG bị ảnh hưởng - chúng nằm ở MCP Hub chứ không ở sandbox.
+# Muốn bật lại rào: đặt JAVIS_CODEX_SANDBOX=auto và cấp quyền cho container (vd
+# `security_opt: [apparmor:unconfined]`) để bubblewrap khởi động được.
+ENV JAVIS_CODEX_SANDBOX=off
+
 USER javis
 
 # Persist state (/data) + brains (/brains) + Claude auth + Codex auth (login ChatGPT).
