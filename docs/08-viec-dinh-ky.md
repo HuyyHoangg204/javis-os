@@ -68,7 +68,13 @@ Dưới biểu mẫu có dòng nhắc: "Đề xuất = chỉ đọc + gợi ý. 
 - **Khi nào**: ô nhập thời điểm. Xem đầy đủ các dạng nó hiểu ở mục Ô "Khi nào" hiểu những gì bên dưới. Bỏ trống thì báo lỗi `Nhập thời điểm (vd "30 phút nữa", "8h30", "0 7 * * *")`.
 - **Kiểu**: hai nút **⏰ Chỉ nhắc** (chọn sẵn) và **🤖 Tự làm rồi báo**.
   - **⏰ Chỉ nhắc**: tới giờ Javis bắn thẳng một tin Telegram, mở đầu bằng "⏰ Nhắc anh: " rồi tới nội dung bạn viết. Không gọi model, không tốn token.
-  - **🤖 Tự làm rồi báo**: tới giờ Javis chạy engine để **làm** việc đó (được đọc dữ liệu thật qua MCP và ghi file nháp trong brain, không được tạo đơn, tiêu tiền, đăng bài hay gửi tin ra ngoài), rồi gửi kết quả về Telegram.
+  - **🤖 Tự làm rồi báo**: tới giờ Javis chạy engine để **làm** việc đó rồi gửi kết quả về Telegram.
+- **Được phép làm gì** (chỉ hiện khi chọn 🤖 Tự làm rồi báo): ba mức, mặc định **Toàn quyền**.
+  - **Chỉ đọc**: đọc dữ liệu thật qua MCP và đọc file, rồi báo lại. Không ghi gì, không làm gì ra ngoài.
+  - **Ghi file**: thêm quyền ghi file nháp trong brain. Vẫn không tạo đơn, tiêu tiền, đăng bài hay gửi tin.
+  - **Toàn quyền** (mặc định): dùng được mọi công cụ bạn đã đấu, gồm cả hành động ra ngoài. Đây là mức duy nhất làm được những việc kiểu "tới giờ thì gửi tin", "tới giờ thì đăng bài", "tới giờ thì đặt lịch".
+
+  Vì sao mặc định là Toàn quyền: nhắc hẹn làm **đúng một việc bạn đã viết ra và hẹn giờ**, tức là một câu lệnh trong chat được dời sang giờ khác. Trói nó chặt hơn lúc bạn đang ngồi chat thì thành ra bạn dặn "10h mai gửi giúp tôi" mà tới 10h nó báo về là không được phép gửi. Đổi lại, khi chọn mức này form hiện một ô cảnh báo đỏ, và thẻ việc gắn nhãn **toàn quyền** để bạn liếc một cái là biết. Cần nhớ: **việc chạy khi không có ai ngồi cạnh**, không có bước duyệt nào, và gửi tin hay đăng bài thì không rút lại được. Chỉ giao thứ bạn sẵn sàng để nó tự làm.
 
 ### Bước 5: Chọn brain
 
@@ -142,7 +148,7 @@ Dòng thứ ba là lịch sử ngắn: `lần cuối HH:MM` (hoặc `chưa chạ
 
 ### Đọc một thẻ nhắc hẹn
 
-Thẻ nhắc hẹn gọn hơn: tên (hoặc nội dung nếu không đặt tên), rồi một dòng phụ ghi thời điểm và kiểu. Kiểu là `nhắc` (chỉ nhắc), `tự làm + báo`, hoặc `script`.
+Thẻ nhắc hẹn gọn hơn: tên (hoặc nội dung nếu không đặt tên), rồi một dòng phụ ghi thời điểm và kiểu. Kiểu là `nhắc` (chỉ nhắc), `tự làm + báo`, hoặc `script`. Riêng `tự làm + báo` có thêm nhãn mức quyền (`chỉ đọc`, `được ghi file`, hoặc `toàn quyền` in đỏ).
 
 Thời điểm luôn nói rõ **bao giờ chạy**, không bắt bạn tự đọc cron:
 
@@ -290,6 +296,7 @@ Phần **thân file** (bên dưới dấu `---` thứ hai) chính là ô "Mô t�
 | **⚠ Toàn quyền** | Thao tác thật ra ngoài. Hỏi xác nhận 2 lần |
 | **⏰ Chỉ nhắc** | Tới giờ bắn tin "⏰ Nhắc anh: ..." |
 | **🤖 Tự làm rồi báo** | Tới giờ chạy engine làm việc rồi báo kết quả |
+| **Được phép làm gì** | Mức quyền của kiểu Tự làm: Chỉ đọc / Ghi file / Toàn quyền (mặc định) |
 | **💾 Lưu** / **Huỷ** | Lưu hoặc đóng biểu mẫu |
 | Ô **🔍 Tìm việc theo tên...** | Lọc thẻ theo tên, bỏ dấu tiếng Việt |
 | **Bật** / **Tắt** | Gạt trạng thái chạy nền của một việc lặp |

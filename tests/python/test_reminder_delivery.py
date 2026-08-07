@@ -55,7 +55,9 @@ answer = "Hôm nay 27/07/2026, việc quan trọng nhất anh muốn chốt là 
 
 
 async def run():
-    async def task_ok(_brain, _text):
+    # `_run_task` nhận thêm mức quyền từ 0.26.0 (nhắc hẹn có 3 mức như việc lặp). Bắt luôn
+    # tham số đó ở stub để test này khoá đúng phần GIAO KẾT QUẢ, không phải chữ ký hàm.
+    async def task_ok(_brain, _text, _muc_quyen=""):
         return answer, ""
 
     feature._run_task = task_ok
@@ -70,7 +72,7 @@ async def run():
     check("task thành công không lộ prompt nội bộ", internal not in sent[-1][1])
     check("task thành công bỏ prefix 'Javis đã làm'", "Javis đã làm" not in sent[-1][1])
 
-    async def task_error(_brain, _text):
+    async def task_error(_brain, _text, _muc_quyen=""):
         return "", "engine timeout"
 
     feature._run_task = task_error

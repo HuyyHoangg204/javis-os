@@ -5,8 +5,8 @@ Vá đúng lỗ hổng người dùng nêu: Javis GỬI được Telegram ngay l
 hẹn giờ để thức dậy gửi SAU. Module này thêm hàng đợi nhắc hẹn BỀN (JSON trong vault,
 git-backed) + để scheduler nền (main._scheduler_loop, tick 30s) đánh thức đúng giờ:
   - mode "notify" (mặc định): tới giờ bắn thẳng tin nhắc qua Telegram cho ĐÚNG người đã đặt.
-  - mode "task"            : tới giờ chạy engine (ĐỌC dữ liệu thật qua MCP + ghi nháp vault,
-                             KHÔNG tiền/đơn/đăng bài) rồi gửi kết quả về Telegram.
+  - mode "task"            : tới giờ chạy engine làm việc đã hẹn rồi gửi kết quả về Telegram.
+                             Quyền theo `muc_quyen` (suggest | auto | full, mặc định full).
   - mode "script"          : job KHÔNG cần LLM (rẻ, để giám sát) - chạy script có sẵn trong
                              <brain>/Javis/scripts, đẩy stdout về Telegram; exit≠0 → cảnh báo lỗi,
                              stdout rỗng hoặc có cờ [SILENT] → im lặng (port ý no_agent của Hermes).
@@ -25,9 +25,13 @@ tạo, cứ chạy đúng giờ, rồi kết quả rơi vào hư không - ngư�
 Thời gian do SERVER tính (giờ VN, UTC+7) từ delay_min | at | due_at → engine chỉ cần map câu
 nói của user, KHỎI cần biết "bây giờ" trong prompt (giữ prompt-cache ổn định).
 
-An toàn: mode "task" chạy engine ở mức ĐỌC-MCP (hub mode suggest) + ghi FILE vault (như loop
-'auto'), KHÔNG Bash/Web, KHÔNG hành động tiền/đơn/đăng bài. Module KHÔNG import main (tránh
-vòng lặp import): mọi helper tiêm qua RemindersDeps.
+MỨC QUYỀN của mode "task": ba mức như loop (suggest chỉ đọc, auto thêm ghi file, full toàn
+quyền), MẶC ĐỊNH `full`. Nhắc hẹn khác loop ở chỗ căn bản - nó làm ĐÚNG một việc người dùng đã
+viết ra và hẹn giờ, tức là một câu lệnh trong chat được dời sang giờ khác - nên trói nó chặt
+hơn lúc chat là tự mâu thuẫn. Đổi lại, lúc tạo thì trả kèm `canh_bao` và chỗ gọi phải đọc lại
+cho người dùng. Xem `CANH_BAO_TOAN_QUYEN` và `MUC_QUYEN_MAC_DINH`.
+
+Module KHÔNG import main (tránh vòng lặp import): mọi helper tiêm qua RemindersDeps.
 """
 from __future__ import annotations
 
@@ -53,6 +57,45 @@ import aux_engine   # engine viec nen theo model phu nguoi dung chon
 
 VN_TZ = timezone(timedelta(hours=7))
 VALID_MODE = {"notify", "task", "script"}
+
+# Mức quyền của nhắc hẹn kiểu "task". Cùng bộ từ với loop để người dùng chỉ phải học một lần.
+VALID_MUC_QUYEN = {"suggest", "auto", "full"}
+
+# Mặc định TOÀN QUYỀN, và đây là một quyết định có chủ ý chứ không phải bỏ sót.
+#
+# Nhắc hẹn khác loop ở chỗ căn bản: loop tự nghĩ ra việc để làm mỗi vòng, còn nhắc hẹn làm ĐÚNG
+# một việc người dùng đã viết ra và hẹn giờ từ trước. Nó là một câu lệnh trong chat được dời
+# sang giờ khác, nên trói nó chặt hơn lúc chat là tự mâu thuẫn: người dùng gõ "10h mai gửi
+# link vào nhóm" rồi tới giờ Javis báo về là nó không được phép gửi.
+#
+# Trước bản này mức quyền bị ghim cứng ở chỉ-đọc, nên MỌI nhắc hẹn yêu cầu một hành động ra
+# ngoài (gửi tin, đăng bài, đặt lịch, tạo đơn) đều thức dậy đúng giờ, chạy, rồi báo về là không
+# làm được - trong khi việc thì vẫn chưa ai làm. Nay mở quyền và ĐỔI LẠI BẰNG MỘT LỜI CẢNH BÁO
+# rõ ràng lúc tạo; ai muốn mức cũ thì đặt muc_quyen="suggest" cho nhắc hẹn đó.
+MUC_QUYEN_MAC_DINH = "full"
+
+# Cảnh báo hiện lúc tạo một nhắc hẹn có thể tự hành động. Viết TRUNG TÍNH, không gắn với một ca
+# dùng cụ thể nào: mỗi người đấu một bộ công cụ khác nhau, nên chỉ nói đúng ba điều mà ai cũng
+# cần biết - nó chạy một mình, nó có quyền gì, và cái gì không rút lại được.
+CANH_BAO_TOAN_QUYEN = (
+    "⚠ Nhắc hẹn kiểu giao việc chạy MỘT MÌNH khi tới giờ, với đầy đủ quyền như lúc bạn đang "
+    "ngồi chat: nó dùng được mọi công cụ đã đấu, nên tuỳ việc bạn giao mà nó có thể gửi tin, "
+    "đăng bài, đặt lịch, tạo đơn hoặc tiêu tiền thật. Ở bước đó không có ai duyệt lại, và phần "
+    "lớn những việc đó không rút lại được. Chỉ giao thứ bạn sẵn sàng để nó tự làm. Muốn nó chỉ "
+    "đọc rồi báo lại thì đặt mức quyền \"chỉ đọc\" cho nhắc hẹn này."
+)
+
+NHAN_MUC_QUYEN = {"suggest": "chỉ đọc", "auto": "được ghi file", "full": "toàn quyền"}
+
+
+def muc_quyen_cua(rem: dict) -> str:
+    """Mức quyền một nhắc hẹn SẼ chạy. Bản ghi cũ chưa có trường này thì theo mặc định hiện tại.
+
+    Đọc qua đây thay vì `rem.get("muc_quyen", ...)` rải khắp nơi: chỗ HIỂN THỊ và chỗ CHẠY phải
+    nói cùng một con số, không thì thẻ ghi một đằng mà tới giờ nó làm một nẻo.
+    """
+    mq = str((rem or {}).get("muc_quyen") or "").strip().lower()
+    return mq if mq in VALID_MUC_QUYEN else MUC_QUYEN_MAC_DINH
 MIN_LEAD_S = 3                 # tối thiểu 3s trong tương lai (tránh bắn ngay/quá khứ)
 MAX_DELAY_DAYS = 366           # trần: không hẹn quá ~1 năm (chỉ áp cho hẹn 1-lần, không áp cron)
 MAX_FIRE_PER_TICK = 6          # trần số nhắc bắn mỗi nhịp (chống dồn spam khi server vừa bật lại)
@@ -255,10 +298,13 @@ class RemindersFeature:
             return True, ""
 
     # ── tạo (sync; caller async giữ self._io) ──
+    # (hàm module-level `muc_quyen_cua` ở cuối file - dùng chung cho _view và _run_task)
     def _create(self, brain: str, text: str, *, delay_min=None, at=None, due_at=None,
                 chat_id="", mode="notify", repeat_min=0, label="", cron=None, script="",
-                created_by="user", allow_no_channel=False) -> dict:
+                created_by="user", allow_no_channel=False, muc_quyen=None) -> dict:
         mode = mode if mode in VALID_MODE else "notify"
+        mq = str(muc_quyen or "").strip().lower()
+        mq = mq if mq in VALID_MUC_QUYEN else MUC_QUYEN_MAC_DINH
         # ĐỦ ĐIỀU KIỆN MỚI TẠO. notify/task tồn tại chỉ để BÁO cho người - chưa đấu Telegram thì
         # tới giờ nó chạy xong rồi ném kết quả vào hư không, người dùng tưởng Javis quên việc.
         # Thà chặn ngay lúc tạo và nói thiếu gì. (script = job giám sát, im lặng là bình thường.)
@@ -293,6 +339,7 @@ class RemindersFeature:
             "text": text[:2000], "mode": mode, "due_at": float(due),
             "chat_id": str(chat_id or ""), "repeat_min": rep, "cron": cron_expr,
             "script": script_name, "label": (label or "")[:120], "status": "pending",
+            "muc_quyen": mq,
             "created_by": created_by, "created_at": _now(),
             "fired_at": 0.0, "result": "", "error": "",
         }
@@ -317,10 +364,13 @@ class RemindersFeature:
                 # thô thì người dùng không biết lịch chạy lúc nào - đúng lỗi khách báo.
                 "cron": cron, "cron_human": cron_util.describe_cron(cron) if cron else "",
                 "script": r.get("script", ""), "fired_at": r.get("fired_at", 0),
+                # Bản ghi cũ (tạo trước khi có mức quyền) không có trường này → hiện đúng mức
+                # nó SẼ chạy, chứ không phải để trống rồi người dùng tự đoán.
+                "muc_quyen": muc_quyen_cua(r),
                 "result": (r.get("result") or "")[:500], "error": r.get("error", "")}
 
     def update(self, brain: str, rid: str, *, text=None, label=None, mode=None, chat_id=None,
-               cron=None, at=None, delay_min=None, due_at=None) -> dict:
+               cron=None, at=None, delay_min=None, due_at=None, muc_quyen=None) -> dict:
         """Sửa 1 nhắc/lịch ĐANG CHỜ: nội dung, tên, kiểu, và thời điểm. Trả {"ok", "error",
         "reminder"}. Chỉ nhận tham số được truyền (None = giữ nguyên) nên gọi sửa một phần
         được. Đổi lịch thì tính lại due_at ngay để người dùng thấy lần chạy kế tiếp mới."""
@@ -347,6 +397,11 @@ class RemindersFeature:
                 cur["mode"] = m
         if chat_id is not None:
             cur["chat_id"] = str(chat_id)
+        if muc_quyen not in (None, ""):
+            mq = str(muc_quyen).strip().lower()
+            if mq not in VALID_MUC_QUYEN:
+                return {"ok": False, "error": f"mức quyền không hợp lệ: {muc_quyen}"}
+            cur["muc_quyen"] = mq
         has_when = any(v not in (None, "") for v in (cron, at, delay_min, due_at))
         if has_when:
             try:
@@ -457,7 +512,7 @@ class RemindersFeature:
         deliver, msg = True, ""
         if mode == "task":
             async with self.lock:
-                body, err = await self._run_task(brain, text)
+                body, err = await self._run_task(brain, text, muc_quyen_cua(rem))
             if body:
                 # `text`/`head` là prompt nội bộ để agent làm việc, có thể dài và chứa đường dẫn,
                 # vai trò, quy trình. Telegram chỉ cần KẾT QUẢ cuối; ghép prompt vào đây vừa rối
@@ -558,41 +613,81 @@ class RemindersFeature:
         err = (err_b or b"").decode("utf-8", "replace")
         return out, err, (proc.returncode if proc.returncode is not None else -1)
 
-    async def _run_task(self, brain: str, text: str):
-        """mode 'task': chạy engine ĐỌC-MCP + ghi FILE vault (an toàn), trả (kết_quả, lỗi)."""
+    async def _run_task(self, brain: str, text: str, muc_quyen: str = ""):
+        """mode 'task': tới giờ chạy engine làm việc user đã hẹn. Trả (kết_quả, lỗi).
+
+        Mức quyền quyết định nó được chạm tới đâu, khớp với ba mức của loop:
+          suggest - chỉ đọc (MCP đọc + đọc file), không ghi gì
+          auto    - thêm quyền ghi file trong vault, hub vẫn chặn nhóm tool nguy hiểm
+          full    - toàn quyền: mọi tool, mọi MCP đã đấu, gồm cả nhóm hành động ra ngoài
+        """
+        mq = str(muc_quyen or "").strip().lower()
+        if mq not in VALID_MUC_QUYEN:
+            mq = MUC_QUYEN_MAC_DINH
         try:
             sysprompt = self.deps.build_system_prompt(brain)
         except Exception:
             sysprompt = ""
-        # allowlist = file tools (ghi nháp vault) + pattern MCP (gọi tool đọc). Bash/Web/Task
-        # KHÔNG có trong list → tự bị chặn (mirror nhánh 'suggest' của loop).
-        tools = list(self.deps.safe_tools)
-        if self.deps.mcp_allow_patterns:
-            try:
-                tools += list(self.deps.mcp_allow_patterns() or [])
-            except Exception:
-                pass
-        cli = claude_engine(system_prompt=sysprompt, cwd=self.deps.brain_root(brain),
-                        tag="reminder", allowed_tools=tools)
-        if self.deps.apply_mcp:
-            try:
-                self.deps.apply_mcp(cli, mode="suggest")   # hub ENFORCE chỉ-đọc (chặn ghi/tiền/đơn)
-            except TypeError:
-                self.deps.apply_mcp(cli)
+        if mq == "full":
+            # TOÀN QUYỀN: không allowlist → mọi tool + mọi MCP đã đấu (mirror nhánh full của
+            # loop). Đây là mức DUY NHẤT làm được việc user hẹn kiểu "tới giờ thì gửi/đăng/đặt":
+            # nhóm tool hành động ra ngoài bị hub xếp loại nguy hiểm nên hai mức dưới không
+            # những gọi không được mà còn KHÔNG NHÌN THẤY nó.
+            cli = claude_engine(system_prompt=sysprompt, cwd=self.deps.brain_root(brain),
+                                tag="reminder", allowed_tools=None)
+            if self.deps.apply_mcp:
+                try:
+                    # brain BẮT BUỘC ở nhánh ungated: plugin in-process nạp ở đây và cần biết
+                    # vault nào, thiếu thì nó rơi về brain mặc định.
+                    self.deps.apply_mcp(cli, mode="full", brain=brain)
+                except TypeError:
+                    self.deps.apply_mcp(cli)
         else:
-            mcpf = _empty_mcp_file()
-            if mcpf:
-                cli.mcp_config = mcpf
-                cli.mcp_strict = True
-        cli = aux_engine.apply(self.deps, cli, mode="suggest", tag="reminder")
+            # allowlist = file tools + pattern MCP. Bash/Web/Task KHÔNG có trong list → tự bị
+            # chặn (mirror nhánh suggest/auto của loop).
+            base = self.deps.safe_tools if mq == "auto" else self.deps.readonly_tools
+            tools = list(base)
+            if self.deps.mcp_allow_patterns:
+                try:
+                    tools += list(self.deps.mcp_allow_patterns() or [])
+                except Exception:
+                    pass
+            cli = claude_engine(system_prompt=sysprompt, cwd=self.deps.brain_root(brain),
+                                tag="reminder", allowed_tools=tools)
+            if self.deps.apply_mcp:
+                try:
+                    self.deps.apply_mcp(cli, mode=mq, brain=brain)   # hub ENFORCE theo mức
+                except TypeError:
+                    self.deps.apply_mcp(cli)
+            else:
+                mcpf = _empty_mcp_file()
+                if mcpf:
+                    cli.mcp_config = mcpf
+                    cli.mcp_strict = True
+        cli = aux_engine.apply(self.deps, cli, mode=mq, tag="reminder")
         cli.max_wall_s = 300
         if not cli.is_available():
             return "", "Claude CLI chưa cài"
+        rang_buoc = {
+            "suggest": ("Mức quyền của nhắc hẹn này là CHỈ ĐỌC: được đọc dữ liệu thật qua MCP "
+                        "và đọc file, KHÔNG ghi file, KHÔNG hành động ra ngoài. Việc nào cần "
+                        "hành động thì mô tả lại cho user tự làm."),
+            "auto": ("Mức quyền của nhắc hẹn này là ĐƯỢC GHI FILE: đọc dữ liệu thật qua MCP và "
+                     "ghi file nháp trong vault, nhưng KHÔNG tạo đơn / tiêu tiền / chạy quảng "
+                     "cáo / đăng bài / gửi tin ra ngoài."),
+            # Không kể lể "hãy cẩn thận": user đã được cảnh báo lúc tạo và đã chọn mức này. Nói
+            # đúng một điều model cần biết mà nó không tự suy ra được: việc này chạy KHÔNG có
+            # ai ngồi cạnh, nên hỏi lại là hỏi vào hư không.
+            "full": ("Mức quyền của nhắc hẹn này là TOÀN QUYỀN: user đã chủ động cấp, nên cứ "
+                     "làm đúng việc được giao bằng các công cụ đã đấu, gồm cả hành động ra "
+                     "ngoài. Không có ai ngồi cạnh để duyệt hay trả lời câu hỏi ở bước này: "
+                     "làm được thì làm rồi thuật lại đã làm gì, không làm được thì nói thẳng "
+                     "là chưa làm và vì sao, tuyệt đối đừng hỏi lại rồi ngồi đợi."),
+        }[mq]
         prompt = (
             "NHIỆM VỤ NHẮC HẸN - tới giờ user đã đặt trước. Làm việc dưới đây rồi VIẾT câu trả lời "
             "NGẮN GỌN như tin nhắn Telegram gửi cho user (tiếng Việt, không bảng, không gạch ngang dài). "
-            "Được ĐỌC dữ liệu thật qua MCP (POS/quảng cáo/lịch...) và ghi file nháp trong vault; "
-            "TUYỆT ĐỐI KHÔNG tạo đơn / tiêu tiền / chạy quảng cáo / đăng bài / gửi tin ra ngoài.\n\n"
+            + rang_buoc + "\n\n"
             "Việc cần làm:\n" + text
         )
         out, err = "", ""
@@ -645,6 +740,7 @@ class RemindersFeature:
                         repeat_min=p.get("repeat_min", 0), label=p.get("label", ""),
                         created_by=str(p.get("created_by") or "user"),
                         allow_no_channel=bool(p.get("allow_no_channel") or False),
+                        muc_quyen=p.get("muc_quyen"),
                     )
             except NotifyNotReady as e:
                 # can_force: chỗ gọi (dashboard/chat) hỏi lại người dùng rồi tạo tiếp với
@@ -657,6 +753,13 @@ class RemindersFeature:
             return {"ok": True, "id": rem["id"], "mode": rem["mode"],
                     "due_at": rem["due_at"], "due_human": _fmt_vn(rem["due_at"]),
                     "cron": rem["cron"], "repeat_min": rem["repeat_min"],
+                    "muc_quyen": rem.get("muc_quyen"),
+                    # Cảnh báo đi CÙNG kết quả tạo, không nằm đâu đó trong tài liệu: đây là lúc
+                    # duy nhất người dùng chắc chắn đang nhìn. Chỗ gọi (chat/dashboard) có nhiệm
+                    # vụ đọc lại nguyên văn cho họ.
+                    "canh_bao": (CANH_BAO_TOAN_QUYEN
+                                 if (rem["mode"] == "task" and rem.get("muc_quyen") == "full")
+                                 else ""),
                     # Kèm lời đọc để chỗ gọi (chat) nhắc lại lịch bằng tiếng Việt, khỏi bắt user
                     # tự dịch "0 7 * * *".
                     "cron_human": cron_util.describe_cron(rem["cron"]) if rem["cron"] else ""}
@@ -691,12 +794,14 @@ class RemindersFeature:
                                    text: str = Form(None), label: str = Form(None),
                                    mode: str = Form(None), chat_id: str = Form(None),
                                    cron: str = Form(None), at: str = Form(None),
-                                   delay_min: str = Form(None), due_at: str = Form(None)):
+                                   delay_min: str = Form(None), due_at: str = Form(None),
+                                   muc_quyen: str = Form(None)):
             """Sửa nhắc/lịch đang chờ (trang Việc định kỳ: nút Sửa). Bỏ trống trường nào thì giữ
             nguyên trường đó; truyền cron HOẶC at/delay_min/due_at để đổi thời điểm."""
             async with self._io:
                 return self.update(brain, id, text=text, label=label, mode=mode, chat_id=chat_id,
-                                   cron=cron, at=at, delay_min=delay_min, due_at=due_at)
+                                   cron=cron, at=at, delay_min=delay_min, due_at=due_at,
+                                   muc_quyen=muc_quyen)
 
         @router.post("/reminders/delete")
         async def reminders_delete(id: str = Form(...), brain: str = Form("brain")):

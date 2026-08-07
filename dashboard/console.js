@@ -1273,8 +1273,15 @@
               <div class="si-field"><label>Kiểu</label><div class="si-row" id="lpRemModes">
                 <button class="si-chip sel" data-rmode="notify">${ic("alarm-clock")} Chỉ nhắc</button>
                 <button class="si-chip" data-rmode="task">${ic("bot")} Tự làm rồi báo</button></div></div>
+              <div class="si-field" id="lpRemMqWrap" style="display:none"><label>Được phép làm gì</label><div class="si-row" id="lpRemMq">
+                <button class="si-chip" data-mq="suggest">Chỉ đọc</button>
+                <button class="si-chip" data-mq="auto">Ghi file</button>
+                <button class="si-chip sel" data-mq="full">Toàn quyền</button></div></div>
             </div>
-            <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy việc (đọc MCP, ghi nháp) rồi báo kết quả.</div>
+            <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy đúng việc này rồi báo kết quả.</div>
+            <div id="lpRemMqWarn" style="display:none;margin-top:6px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
+              <b>${WARN_ICON} TOÀN QUYỀN.</b> Tới giờ việc này chạy <b>một mình</b>, với đầy đủ quyền như lúc bạn đang ngồi chat: nó dùng được mọi công cụ đã đấu, nên tuỳ việc bạn giao mà nó có thể <b>gửi tin, đăng bài, đặt lịch, tạo đơn hoặc tiêu tiền thật</b>. Ở bước đó không có ai duyệt lại, và phần lớn những việc đó <b>không rút lại được</b>. Chỉ giao thứ bạn sẵn sàng để nó tự làm; muốn nó chỉ đọc rồi báo lại thì chọn <b>Chỉ đọc</b>.
+            </div>
           </div>
           <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
@@ -1296,6 +1303,7 @@
     let fcur = { mode: "suggest" };
     let fkind = "loop";      // loại việc đang tạo: loop (việc lặp) | reminder (nhắc hẹn)
     let frmode = "notify";   // kiểu nhắc hẹn: notify (chỉ nhắc) | task (tự làm rồi báo)
+    let frmq = "full";       // mức quyền của kiểu "task": suggest | auto | full
     function syncFormChips() {
       el.querySelectorAll("#lpModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mode === fcur.mode));
       const w = el.querySelector("#lpFullWarn"); if (w) w.style.display = (fcur.mode === "full" && fkind === "loop") ? "block" : "none";
@@ -1321,9 +1329,22 @@
       if (el.querySelector("#lpSlug").value || el.querySelector("#lpRemId").value) return;
       fkind = c.dataset.kind; syncKindUI();
     });
+    // Mức quyền chỉ có nghĩa với kiểu "Tự làm rồi báo" - "Chỉ nhắc" không chạy engine nào cả,
+    // nên phơi ô đó ra là bày thêm một lựa chọn không làm gì.
+    function syncRemMq() {
+      const wrap = el.querySelector("#lpRemMqWrap");
+      const warn = el.querySelector("#lpRemMqWarn");
+      if (wrap) wrap.style.display = frmode === "task" ? "" : "none";
+      if (warn) warn.style.display = (frmode === "task" && frmq === "full") ? "block" : "none";
+      el.querySelectorAll("#lpRemMq .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.mq === frmq));
+    }
     el.querySelectorAll("#lpRemModes .si-chip").forEach(c => c.onclick = () => {
       frmode = c.dataset.rmode;
       el.querySelectorAll("#lpRemModes .si-chip").forEach(x => x.classList.toggle("sel", x.dataset.rmode === frmode));
+      syncRemMq();
+    });
+    el.querySelectorAll("#lpRemMq .si-chip").forEach(c => c.onclick = () => {
+      frmq = c.dataset.mq; syncRemMq();
     });
 
     // "Khi nào" (nhắc hẹn) → payload cho POST /reminders. Cron 5 trường/@macro → {cron};
@@ -1389,6 +1410,9 @@
       fcur = { mode: lp ? lp.mode : "suggest" };
       fkind = rem ? "reminder" : "loop";
       frmode = rem && rem.mode === "task" ? "task" : "notify";
+      // Mở form một nhắc hẹn cũ thì hiện ĐÚNG mức nó đang chạy (bản ghi cũ chưa có trường này
+      // thì server đã quy về mặc định trong _view, nên chỗ này không phải đoán lại).
+      frmq = (rem && rem.muc_quyen) || "full";
       const locked = !!(lp || rem);   // đang SỬA (loop hay nhắc) → khoá loại việc + brain
       el.querySelector("#lpSlug").value = lp ? lp.slug : "";
       el.querySelector("#lpRemId").value = rem ? rem.id : "";
@@ -1424,6 +1448,7 @@
       bsel.disabled = locked;
       syncKindUI();
       syncFormChips();
+      syncRemMq();
       el.querySelector("#lpForm").style.display = "block";
       el.querySelector("#lpName").focus();
     }
@@ -1451,12 +1476,14 @@
           const f = new FormData();
           f.append("id", remId); f.append("brain", brainVal);
           f.append("label", name); f.append("text", body); f.append("mode", frmode);
+          f.append("muc_quyen", frmq);
           if (timePayload) Object.keys(timePayload).forEach(k => f.append(k, timePayload[k]));
           try { r = await (await fetch("/reminders/update", { method: "POST", body: f })).json(); }
           catch (e) { r = { error: e.message }; }
         } else {
           r = await createReminder(Object.assign(
-            { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard" }, timePayload));
+            { text: body, label: name, mode: frmode, muc_quyen: frmq, brain: brainVal,
+              created_by: "dashboard" }, timePayload));
         }
         b.innerHTML = SAVE_ICON + " Lưu";
         if (!r.ok) {
@@ -1468,8 +1495,8 @@
             const fb = el.querySelector("#lpForce");
             if (fb) fb.onclick = async () => {
               const r2 = await createReminder(Object.assign(
-                { text: body, label: name, mode: frmode, brain: brainVal, created_by: "dashboard",
-                  allow_no_channel: true }, timePayload));
+                { text: body, label: name, mode: frmode, muc_quyen: frmq, brain: brainVal,
+                  created_by: "dashboard", allow_no_channel: true }, timePayload));
               if (!r2.ok) { msg.innerHTML = Icons.warn(r2.error || "Lưu lỗi"); return; }
               el.querySelector("#lpForm").style.display = "none";
               loadAll();
@@ -1607,6 +1634,10 @@
     // Nhắc hẹn đang chờ: gộp cùng loop trong mỗi nhóm brain. Loop = việc bền (.md, sửa trong
     // Obsidian); nhắc = việc phù du. Cả hai đều gắn brain_path để thao tác đúng brain.
     const MODE_LBL = { notify: "nhắc", task: "tự làm + báo", script: "script" };
+    // Mức quyền của nhắc hẹn kiểu "tự làm": phải hiện trên thẻ. Việc này tới giờ chạy một mình,
+    // nên "nó được phép làm tới đâu" là thứ người dùng cần liếc một cái là biết, không phải mở
+    // form Sửa mới thấy.
+    const MQ_LBL = { suggest: "chỉ đọc", auto: "được ghi file", full: "toàn quyền" };
     // Câu tả LỊCH của một nhắc hẹn. Trước đây thẻ cron chỉ in "cron 0 7 * * *" rồi hết - không
     // đọc được lịch, cũng không biết lần chạy kế tiếp là lúc nào (lỗi khách báo).
     function remWhen(r) {
@@ -1622,12 +1653,13 @@
       const title = r.label || r.text || "Nhắc hẹn";
       const when = remWhen(r);
       const kind = MODE_LBL[r.mode] || "nhắc";
+      const mq = r.mode === "task" ? (MQ_LBL[r.muc_quyen] || "") : "";
       const div = document.createElement("div");
       div.className = "wf-card";
       div.dataset.kind = "rem";
-      div.dataset.search = _lpNorm(`${title} ${when} ${r.cron || ""} ${kind}`);
+      div.dataset.search = _lpNorm(`${title} ${when} ${r.cron || ""} ${kind} ${mq}`);
       div.innerHTML = `<b>${ic("alarm-clock")} ${esc(title)}</b>
-        <div class="dim" style="font-size:12px;color:var(--text3)">${esc(when)} · ${esc(kind)}${r.cron ? ` · <code>${esc(r.cron)}</code>` : ""}</div>
+        <div class="dim" style="font-size:12px;color:var(--text3)">${esc(when)} · ${esc(kind)}${mq ? ` · <span class="rm-mq${r.muc_quyen === "full" ? " on" : ""}">${esc(mq)}</span>` : ""}${r.cron ? ` · <code>${esc(r.cron)}</code>` : ""}</div>
         ${r.error ? `<div style="font-size:12px;color:var(--warn-ink);margin-top:4px">${WARN_ICON} lần chạy trước lỗi: ${esc(r.error.slice(0, 160))}</div>` : ""}
         <div class="wf-actions" style="margin-top:8px">
           <button class="s-btn-ghost rmEdit">Sửa</button>

@@ -1245,6 +1245,14 @@ li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color:
 /* Workflow card (tab Lịch vẫn dùng) */
 .wf-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; transition: border-color 0.3s; }
 .wf-card.archived { opacity: 0.5; }
+/* Mức quyền của nhắc hẹn "tự làm". Mức toàn quyền phải NỔI trên thẻ: việc đó tới giờ tự chạy
+   một mình và làm được cả hành động không rút lại được, nên nó không được trông giống một dòng
+   phụ chú xám như các mức khác. */
+.rm-mq { color: var(--text3); }
+.rm-mq.on {
+  color: var(--red); font-weight: 600;
+  border: 1px solid rgba(224, 102, 74, .45); border-radius: 999px; padding: 0 6px;
+}
 .wf-card.running { border-color: var(--accent); }
 .wf-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
 .wf-spacer { flex: 1; min-width: 8px; }

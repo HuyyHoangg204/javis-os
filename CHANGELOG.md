@@ -4,6 +4,19 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.26.0] - 2026-08-07
+Nhắc hẹn kiểu "tự làm rồi báo" giờ **làm được đúng việc bạn hẹn**, kể cả việc phải chạm ra ngoài. Trước bản này mức quyền của nó bị ghim cứng ở chỉ-đọc, nên mọi lời hẹn kiểu "10h mai gửi giúp tôi" đều thức dậy đúng giờ, chạy, rồi báo về là không làm được, còn việc thì vẫn chưa ai làm.
+### Thêm mới
+- **Ba mức quyền cho nhắc hẹn**, cùng bộ từ với việc lặp: **Chỉ đọc** (đọc MCP và file rồi báo lại), **Ghi file** (thêm quyền ghi nháp trong brain), **Toàn quyền** (dùng được mọi công cụ đã đấu, gồm cả hành động ra ngoài). Đổi được ở form trên trang Việc định kỳ, và hiện thành nhãn ngay trên thẻ việc.
+- **Mặc định là Toàn quyền, và đây là quyết định có chủ ý.** Nhắc hẹn khác việc lặp ở chỗ căn bản: việc lặp tự nghĩ ra việc để làm mỗi vòng, còn nhắc hẹn làm ĐÚNG một việc bạn đã viết ra và hẹn giờ, tức là một câu lệnh trong chat được dời sang giờ khác. Trói nó chặt hơn lúc bạn đang ngồi chat là tự mâu thuẫn.
+- **Cảnh báo đi kèm ở đúng lúc bạn đang nhìn.** Chọn Toàn quyền trên form thì hiện ô cảnh báo đỏ; tạo qua chat thì tool `javis_schedule` trả kèm câu cảnh báo và Javis phải đọc lại nguyên văn. Nội dung nói ba điều: việc chạy một mình, không có ai duyệt lại, và phần lớn hành động ra ngoài không rút lại được.
+### Sửa lỗi
+- **Nhắc hẹn cũ (tạo trước bản này) tự chạy ở mức mặc định mới** thay vì rơi vào chỉ-đọc, nên những lời hẹn đang chờ trong hàng đợi làm được việc ngay mà không phải tạo lại.
+- Prompt của nhắc hẹn nay nói đúng mức quyền của chính nó. Bản cũ dán cứng câu "tuyệt đối không gửi tin ra ngoài" cho mọi nhắc hẹn, nên kể cả khi mở quyền ở tầng công cụ thì model vẫn tự từ chối. Mức toàn quyền còn được dặn thêm một điều nó không tự suy ra được: lúc đó không có ai ngồi cạnh, nên hỏi lại là hỏi vào hư không - làm được thì làm rồi thuật lại, không làm được thì nói thẳng.
+### Kiểm thử
+- Thêm `tests/python/test_nhac_hen_muc_quyen.py`: 39 phép thử, trong đó phần đáng canh nhất là **ba mức dựng engine khác nhau THẬT** (allowlist, mức của hub, brain truyền xuống, và câu ràng buộc trong prompt) chứ không phải chỉ đổi cái nhãn. Có cả ca bản ghi cũ thiếu trường và giá trị rác.
+- Khoá luôn yêu cầu **cảnh báo phải trung tính**: test bác bỏ nếu trong câu cảnh báo xuất hiện tên một kênh hay một ngành cụ thể. Javis là công cụ cho nhiều người, mỗi người đấu một bộ công cụ khác nhau.
+
 ## [0.25.9] - 2026-08-07
 Chủ repo gửi ảnh Telegram: loop "[CK] Tin Hot Chứng Khoán" chạy bằng ChatGPT thay vì Claude, mọi lệnh đọc/ghi file đều trả `bwrap: Failed to make / slave: Permission denied`, và bản báo cáo về máy là một bài dài model tự kể lại nỗi bối rối của nó.
 ### Sửa lỗi

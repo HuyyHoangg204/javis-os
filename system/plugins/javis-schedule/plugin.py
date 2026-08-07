@@ -357,9 +357,17 @@ async def _post_reminder(payload: dict, brain_name: str = "") -> str:
     where = f" (brain {brain_name})" if brain_name else ""
     if data.get("cron"):
         lich = data.get("cron_human") or data["cron"]
-        return (f"Đã đặt lịch lặp {lich} (cron {data['cron']}){where} (id {data.get('id')}), "
-                f"lần chạy kế tiếp {data.get('due_human') or '?'}.")
-    return f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'}{where} (id {data.get('id')})."
+        ra = (f"Đã đặt lịch lặp {lich} (cron {data['cron']}){where} (id {data.get('id')}), "
+              f"lần chạy kế tiếp {data.get('due_human') or '?'}.")
+    else:
+        ra = f"Đã đặt nhắc hẹn lúc {data.get('due_human') or '?'}{where} (id {data.get('id')})."
+    # Việc tới giờ tự chạy MỘT MÌNH với đầy đủ quyền. Máy chủ gửi kèm câu cảnh báo; đọc lại
+    # NGUYÊN VĂN cho user chứ đừng tóm tắt hay bỏ qua - đây là lúc duy nhất họ chắc chắn đang
+    # nhìn, và sau đó thì không ai duyệt gì nữa.
+    if data.get("canh_bao"):
+        ra += ("\n\n" + data["canh_bao"]
+               + "\n(NÓI LẠI nguyên văn đoạn cảnh báo trên cho user, đừng nuốt.)")
+    return ra
 
 
 async def _get_reminders(vault_root: str) -> dict:
@@ -405,6 +413,9 @@ async def _do_create(vault_root: str, args: dict) -> str:
     payload = {"text": prompt, "label": name, "mode": ("notify" if notify_only else "task"),
                "brain": vault_root, "chat_id": chat_id, "created_by": "javis_schedule",
                "allow_no_channel": bool(args.get("allow_no_channel") or False)}
+    # Bỏ trống thì máy chủ tự đặt mặc định; chỉ gửi khi model có ý hạ/nâng mức rõ ràng.
+    if str(args.get("muc_quyen") or "").strip():
+        payload["muc_quyen"] = str(args["muc_quyen"]).strip().lower()
     payload.update(_reminder_time_payload(schedule))
     return await _post_reminder(payload, brain_name=brain_name)
 
@@ -600,6 +611,13 @@ def register(ctx) -> None:
                 "notify_only": {"type": "boolean",
                                  "description": ("true = ép thành nhắc MỘT LẦN (kho reminders) dù "
                                                  "schedule trông giống chu kỳ lặp. Mặc định false.")},
+                "muc_quyen": {"type": "string", "enum": ["suggest", "auto", "full"],
+                              "description": ("Quyền của việc lúc tới giờ chạy. 'full' (mặc định) "
+                                              "= dùng được mọi công cụ đã đấu, gồm cả hành động "
+                                              "ra ngoài - cần cho việc kiểu 'tới giờ thì gửi/"
+                                              "đăng/đặt'. 'auto' = đọc + ghi file, không hành "
+                                              "động ra ngoài. 'suggest' = chỉ đọc rồi báo lại. "
+                                              "Chỉ hạ mức khi user muốn vậy.")},
                 "chat_id": {"type": "string",
                              "description": "chat_id Telegram người yêu cầu, để báo đúng người. Bỏ trống nếu không rõ."},
                 "allow_no_channel": {"type": "boolean",
