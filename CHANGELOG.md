@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.26.23] - 2026-08-12
+### Sửa lỗi
+- **Mã QR của xác thực 2 lớp quét không ra.** Chủ repo bật 2FA, QR hiện ra đàng hoàng, điện thoại soi vào thì chịu. Ba lỗi cộng dồn, và cả ba đều KHÔNG nhìn thấy được bằng mắt vì cái QR trông vẫn bình thường.
+- **Vùng trắng viền chỉ có 2 ô, chuẩn QR đòi 4.** Thiếu vùng đó thì máy quét không tách được mã ra khỏi nền xung quanh.
+- **Chuỗi otpauth nhét thừa `algorithm=SHA1&digits=6&period=30`** - cả ba đều là giá trị MẶC ĐỊNH mà mọi app Authenticator tự hiểu. 34 ký tự thừa đẩy QR từ phiên bản 6 (41x41 ô) lên phiên bản 8 (49x49 ô) trong cùng một khung hình. Nay chỉ khai khi hằng số thật sự khác mặc định.
+- **CSS ép ảnh QR xuống 200px trong khi ảnh gốc 265px**, tức mỗi ô còn 3,77 pixel. Đây là thủ phạm nặng nhất: người dùng soi điện thoại vào MÀN HÌNH máy tính chứ không phải tờ giấy, nên cỡ mỗi ô quyết định tất cả. Nay để ảnh ra đúng cỡ server tính (8 pixel mỗi ô, hơn gấp đôi).
+- **Tên workspace dài làm QR phình lại.** Tên nằm HAI chỗ trong chuỗi otpauth nên mỗi ký tự tốn gấp đôi; đo thật thì tên 48 ký tự đẩy QR lên phiên bản 11 (69 ô). Nay cắt tên ở 24 ký tự, nên đặt tên kiểu gì QR cũng giữ được 8 pixel mỗi ô.
+- **Nền QR nay là trắng thật**, không còn trong suốt dựa vào màu nền của thẻ bọc - ai dùng tông tối trước đây sẽ thấy mã đen nằm trên nền tối.
+- **Tên trong app Authenticator lấy theo workspace và theo NGƯỜI.** Trước đây hiện "Javis OS: admin" - đúng về kỹ thuật nhưng vô nghĩa khi nằm giữa chục tài khoản 2FA trên điện thoại. Nay lấy tên workspace thật cộng tên người dùng (`USER_NAME`), rơi về tên đăng nhập khi chưa đặt: "Javis OS: Minh Quý".
+- **Nhãn GIỮ nguyên dấu tiếng Việt.** Bản đầu bóc sạch dấu ("Minh Quý" thành "Minh Quy") vì sợ app hiện chuỗi hỏng; nỗi sợ đó lỗi thời - Key Uri Format cho phép nhãn UTF-8 phần trăm-mã-hoá và các app phổ biến đọc đúng từ lâu. Chỉ còn bỏ ký tự điều khiển và dấu ':' (nó là dấu ngăn giữa tên workspace và tên tài khoản, lọt vào là vỡ nhãn). Đã đo: kể cả tên có dấu dài hết mức thì QR vẫn giữ 8 pixel mỗi ô.
+- Thêm canary đo bằng SỐ chứ không đọc chữ: mỗi ô phải >= 7 pixel ở cỡ tự nhiên, viền phải 4 ô, nền không được trong suốt, và CSS không được ép ảnh về một cỡ pixel cố định. Vế cuối là cách âm thầm nhất để phá lại mọi thứ ở trên - server trả ảnh đúng cỡ, trình duyệt nén lại, và không test phía server nào thấy được.
+
 ## [0.26.22] - 2026-08-12
 ### Thêm mới
 - **Cài được NHIỀU bản Javis trên cùng một VPS, mỗi bản một link riêng.** Trước bản này thì không: bản thứ hai dựng lên là chết ngay. Bản thân app đã đa-bản-được từ lâu (`JAVIS_PORT`, `JAVIS_STATE_DIR` đều đọc từ biến môi trường); chỗ chặn nằm hết ở file cài đặt, và đều là cùng một loại lỗi - một cái tên bị đóng cứng ở nơi Docker/Traefik/systemd định danh theo phạm vi TOÀN MÁY. Năm cái tên đó: `container_name: javis`, cổng máy chủ `7777`, tên router/service Traefik `javis`, `/etc/systemd/system/javis.service`, và `~/.codex/javis.config.toml`.
@@ -21,6 +33,7 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 - `JAVIS_BIND` cho phép thu cổng về `127.0.0.1` khi đã có proxy đứng trước. Làm bằng biến chứ không phải một dòng `ports` trong file override, vì compose NỐI CHỒNG danh sách `ports` giữa các file `-f` chứ không thay thế - khai lại là ra hai binding cùng một cổng và Docker báo `port is already allocated`.
 - Thêm `test_nhieu_ban_mot_vps.py` khoá cả năm cái tên toàn cục, khoá luôn điều kiện quan trọng nhất là bỏ trống mọi biến thì mọi file phải render ra y hệt trước đây. Test tự bung `${VAR:-mặc định}` như compose làm nên chạy được ở CI không có Docker.
 - DEPLOY.md có mục riêng cho việc này, kèm bảng nói rõ trùng biến nào thì hỏng ra làm sao, và nói thẳng cái gì dùng chung cái gì riêng (không có gì dùng chung - mỗi bản phải đăng nhập Claude một lần).
+
 ## [0.26.21] - 2026-08-11
 ### Sửa lỗi
 - **Xác thực 2 lớp không tìm thấy được từ trang Cài đặt.** Javis có HAI bề mặt cài đặt tài khoản - trang **Tài khoản** (đủ thứ, gồm luồng bật 2FA có QR) và khối "Tài khoản đăng nhập" cũ nhúng trong trang **Cài đặt** (chỉ đổi mật khẩu). 0.26.20 thêm 2FA vào chỗ đầu mà quên chỗ sau. Hậu quả không phải "thiếu một nút": người dùng mở trang Cài đặt, thấy khối tài khoản không nhắc gì tới 2FA, rồi kết luận Javis chưa có tính năng đó - trong khi nó đã chạy được cả ngày. Một tính năng bảo mật mà người ta không tìm ra thì bằng không.
