@@ -4,6 +4,18 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.29.0] - 2026-08-13
+### Thêm mới
+- **Bộ não thứ 10: Antigravity CLI - dùng gói Google của bạn, và chọn được đúng dàn model như trong Antigravity IDE**, gồm cả model không phải của Google. Đây là đường Google chỉ định sau khi họ ngắt Gemini CLI với tài khoản cá nhân.
+- Cài một lần trên máy chạy Javis rồi gõ `agy` để đăng nhập Google, vào trang **Models** bấm **Kiểm tra lại** là xong. Chạy trên VPS cũng được: nó tự in ra một đường link cho bạn mở trên máy mình.
+- Danh sách model **hỏi thẳng CLI** chứ Javis không giữ bảng chép tay, nên tài khoản bạn được cấp model nào là thấy đúng model đó.
+- Ngang hàng Claude Code và ChatGPT: chạy được lệnh máy, gọi được mọi kết nối đã đấu, dùng skill, nhận việc nền và trả lời qua Telegram.
+
+## [0.28.9] - 2026-08-13
+### Sửa lỗi
+- **Google đã ngắt Gemini CLI với mọi tài khoản cá nhân từ 18/06/2026** - gói miễn phí, AI Pro lẫn Ultra. Trước bản này chat bằng nó chỉ ra dòng trống khó hiểu; giờ Javis nói thẳng chuyện gì đã xảy ra và chỉ sang đường còn dùng được. Đây là chặn từ phía Google, không phải lỗi máy bạn.
+- Thẻ **Google Gemini CLI** ở trang Models hết mời đăng nhập như thể vẫn dùng được. Muốn model Gemini thì dùng **OpenRouter** (nhiều model một chỗ, có cả Gemini lẫn Claude) hoặc **Google Gemini (API)**.
+
 ## [0.28.8] - 2026-08-12
 ### Sửa lỗi
 - **Ô dán mã khi đăng nhập Google đã gõ được.** Nút "Xong" bị giãn ra chiếm hết hàng làm ô nhập teo lại còn vài chục pixel, không dán nổi mã vào. Màn hình hẹp thì nút tự rơi xuống dòng dưới cho ô nhập đủ rộng.
