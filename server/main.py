@@ -4441,12 +4441,32 @@ async def files_list(brain: str = Query("brain"), path: str = Query(None)):
     root = _files_root(brain)
     broot = Path(_brain_root(brain)).resolve()
     try:
-        # path VẮNG (None) = điểm vào mặc định = BRAIN; path="" = trần (ổ đĩa); còn lại = tương đối trần
-        d = broot if path is None else _safe_path(brain, path)
+        # path VẮNG (None) = điểm vào mặc định = BRAIN; path="" = trần (ổ đĩa); còn lại = tương đối trần.
+        # Dùng _safe_serve_path (chỉ-đọc) nên chấp CẢ quy ước tương đối GỐC BRAIN - link trong chat
+        # do AI ghi theo lối đó, trước đây rơi hết vào nhánh lỗi bên dưới.
+        d = broot if path is None else _safe_serve_path(brain, path)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
+    # Trỏ trúng một FILE, hoặc trúng chỗ KHÔNG CÓ GÌ, thì đừng trả về một câu lỗi trên nền rỗng.
+    # Người dùng vừa bấm một link trong chat: đích của họ ở đây chứ không phải chữ "Không phải thư
+    # mục" giữa màn hình trắng (chủ repo báo 2026-08-13). Mở thư mục CHA - hoặc tổ tiên gần nhất
+    # còn tồn tại - rồi nói rõ đích là gì:
+    #   focus   = tên file mà đường dẫn trỏ trúng (client soi sáng + mở thẳng ra sửa)
+    #   missing = đường dẫn đã hỏi nhưng không có (client tự đi tìm theo tên, không dấu cũng khớp)
+    focus, missing = "", ""
     if not d.is_dir():
-        return JSONResponse({"error": "Không phải thư mục"}, status_code=400)
+        if d.is_file():
+            focus, d = d.name, d.parent
+        else:
+            missing = (path or "").replace("\\", "/").strip("/")
+            leo = d.parent
+            while not leo.is_dir() and root in leo.parents:
+                leo = leo.parent
+            # Leo hết đường mà chỉ tới TRẦN (trên localhost trần là cả ổ đĩa) thì về nhà brain:
+            # đổ nguyên ổ đĩa ra vì một link gõ sai là câu trả lời tệ hơn cả câu lỗi cũ.
+            if not leo.is_dir() or (leo == root and root != broot):
+                leo = broot if broot.is_dir() else root
+            d = leo
     items = []
     for p in sorted(d.iterdir(), key=lambda x: (x.is_file(), x.name.lower())):
         try:
@@ -4459,6 +4479,7 @@ async def files_list(brain: str = Query("brain"), path: str = Query(None)):
     return {"root": root.name or str(root), "path": _files_rel(root, d),
             "home": _files_rel(root, broot),                       # brain = 'nhà' (nút ⌂)
             "parent": None if d == root else _files_rel(root, d.parent),   # None = đã ở trần → ẩn Lên
+            "focus": focus, "missing": missing,
             "items": items}
 
 

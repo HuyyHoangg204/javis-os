@@ -309,6 +309,25 @@
     return '<a class="jv-img-link" href="' + esc(h) + '"' + vp +
       ' target="_blank" rel="noopener" title="Bấm để xem phóng to">' + img + "</a>";
   }
+  // ---------------------------------------------------------------- frontmatter YAML
+  // Khoi `---\n...\n---` o DAU mot file .md la METADATA (type, status, created...), khong phai
+  // van ban de soan. Truoc ban nay no roi vao luat "--- = duong ke ngang", nen mo mot note trong
+  // trinh sua WYSIWYG roi bam Luu la frontmatter bien thanh "* * *" cong may dong chu roi: file
+  // hong that su, va moi thu doc metadata (Javis, dataview, Obsidian) doc truot tu do. Chu repo
+  // gap dung canh nay 2026-08-13 ("mot so file .md dang khong doc duoc").
+  //
+  // Cach chua: cat ra thanh MOT khoi rieng, contenteditable=false, va giu NGUYEN VAN trong
+  // data-fm. Luat turndown "jvfrontmatter" (console.js) tra lai dung chuoi do khi luu - cung co
+  // che ma khoi dataview / code block da dung.
+  var FRONTMATTER_RE = /^\uFEFF?---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/;
+  function frontmatterHtml(block) {
+    var than = String(block)
+      .replace(/^\uFEFF?---[ \t]*\r?\n/, "")
+      .replace(/\r?\n---[ \t]*\r?\n?$/, "");
+    return '<div class="jv-fm" contenteditable="false" data-fm="' + esc(encodeURIComponent(block)) + '">' +
+      '<div class="jv-fm-head">' + ic("tag") + " Thuộc tính</div>" +
+      '<pre class="jv-fm-body">' + esc(than) + "</pre></div>";
+  }
   function tableHtml(tbl) {
     var rows = tbl.trim().split("\n").filter(function (r) { return r.trim(); });
     var cells = function (r) { return r.replace(/^\||\|$/g, "").split("|").map(function (c) { return c.trim(); }); };
@@ -329,7 +348,15 @@
       .replace(/~~([^~]+)~~/g, "<del>$1</del>")
       .replace(/\b_([^_\n]+)_\b/g, "<em>$1</em>")
       .replace(/\n/g, "<br>");
-    return s;
+    // Go dau \ thoat cua markdown (CUOI CUNG, sau khi da bat nhan manh - go truoc thi "\*" lai
+    // thanh in nghieng, dung y nghia nguoc lai). Hai cai duoc cung mot nhat:
+    //   - Dung chuan markdown: "\*" hien ra dau sao, khong hien ca dau gach cheo.
+    //   - CHONG DON BACKSLASH trong trinh sua. Turndown thoat "1." dau dong thanh "1\.", ma neu
+    //     o day khong go ra thi lan luu sau turndown lai thoat chinh dau gach do -> "1\\.", roi
+    //     "1\\\." - moi lan mo file ra sua la file ban them mot lop (do trong file chu repo gui
+    //     2026-08-13). Go ra thi vong lap dung yen: "1." -> "1\." -> "1." -> "1\.".
+    // Code (fence lan inline) da nam trong placeholder tu truoc nen KHONG dinh nhat nay.
+    return s.replace(/\\([\\`*_{}\[\]()#+\-.!>~|])/g, "$1");
   }
 
   // ---------------------------------------------------------------- block parse (line-based, ben hon regex)
@@ -423,6 +450,9 @@
     var ph = [];
     function put(html) { ph.push(html); return OPEN + (ph.length - 1) + CLOSE; }
 
+    // 0) frontmatter YAML o DAU file .md -> khoi rieng, KHONG cho sua, giu nguyen van de luu lai
+    //    dung tung ky tu. Xem frontmatterHtml ben duoi de biet vi sao day la mot loi mat du lieu.
+    raw = raw.replace(FRONTMATTER_RE, function (m) { return put(frontmatterHtml(m)) + "\n"; });
     // 1) code fence hoan chinh (phai xu ly truoc moi thu)
     raw = raw.replace(/```([^\n]*)\n([\s\S]*?)```/g, function (_m, info, code) {
       return "\n" + put(renderFence(info, code, false)) + "\n";

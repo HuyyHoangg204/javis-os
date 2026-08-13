@@ -699,6 +699,20 @@ input.md-cb { cursor: pointer; accent-color: var(--accent); margin-right: 6px; v
 li.task-item { list-style: none; margin-left: -16px; }
 li.task-done > .dv-ttext, li.task-done { color: var(--text3); }
 li.task-done > .dv-ttext { text-decoration: line-through; text-decoration-color: var(--text3); }
+/* Frontmatter YAML của note (--- ... --- ở đầu file): khối metadata, KHÔNG phải văn bản để soạn.
+   Hiện ra cho thấy, khoá lại để không sửa nhầm - và nhờ vậy lưu lại vẫn nguyên vẹn từng ký tự. */
+.jv-fm {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--bg2);
+  margin: 0 0 12px; overflow: hidden; user-select: none;
+}
+.jv-fm .jv-fm-head {
+  font-size: 12px; letter-spacing: .4px; color: var(--text3); padding: 5px 12px 4px;
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+}
+.jv-fm .jv-fm-body {
+  margin: 0; padding: 8px 12px; font: 12.5px/1.6 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--text2); white-space: pre-wrap; word-break: break-word; background: none;
+}
 .jv-dataview {
   border: 1px solid var(--border); border-radius: 10px; background: var(--bg2);
   margin: 10px 0; overflow: hidden;
@@ -2062,6 +2076,13 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 .ne-nav button:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-line); }
 .ne-nav button:disabled { opacity: 0.35; cursor: default; }
 .ne-actions { display: flex; gap: 5px; flex: none; align-items: center; }
+/* Màn hẹp: tên file xuống hẳn một dòng riêng. Thanh nút có tới 8 nút, để chung một dòng thì tên
+   file bị bóp còn 0px - mở file ra mà không biết đang mở file nào. */
+@media (max-width: 700px) {
+  .ne-bar { flex-wrap: wrap; padding: 8px 10px; }
+  .ne-title { order: -1; flex: 1 0 100%; }
+  .ne-actions { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+}
 .ne-actions button { background: var(--surface-1); border: 1px solid var(--border); color: var(--text2);
   cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
 .ne-actions button:hover { color: var(--text); border-color: var(--info-line); }
@@ -2093,10 +2114,18 @@ a.jv-fcode:hover code { color: var(--accent); text-decoration: underline; }
 .ne-body.mode-preview .ne-prev { border-left: none; }
 .ne-img { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 16px; }
 .ne-img img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+/* .pdf xem tại chỗ (nền trắng vì trình xem PDF của trình duyệt tự vẽ trên nền của nó) */
+.ne-frame { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; }
 .ne-dl { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
   color: var(--text2); padding: 24px; text-align: center; }
 .ne-dl .ne-dl-ico { font-size: 46px; }
 .ne-dl a { color: var(--text); }
+/* Gợi ý "có lẽ là file này" khi link trỏ hụt - bấm một phát là mở đúng file */
+.ne-hits { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; max-width: 620px; }
+.ne-hits .dim { width: 100%; color: var(--text3); font-size: 13px; }
+.ne-hits button { background: var(--surface-1); border: 1px solid var(--border); color: var(--text2);
+  cursor: pointer; font-size: 13px; padding: 4px 10px; border-radius: 6px; }
+.ne-hits button:hover { color: var(--text); border-color: var(--accent-line); }
 /* markdown trong preview */
 .ne-prev h1, .ne-prev h2, .ne-prev h3, .ne-prev h4 { color: var(--text); margin: .6em 0 .3em; line-height: 1.3; }
 .ne-prev h1 { font-size: 1.5em; } .ne-prev h2 { font-size: 1.28em; } .ne-prev h3 { font-size: 1.12em; }

@@ -4,6 +4,12 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.33.4] - 2026-08-13
+### Sửa lỗi
+- **Mở file trong trang Tệp tin giờ dùng đúng trình sửa của khung chat.** Không còn ô soạn thảo trần bật lên giữa màn hình: file .md, .txt, .html mở **ngay trong trang**, có soạn thảo trực quan, thanh định dạng, Lùi/Tiến, đổi tên, xoá, phóng to. Bấm **✕** hoặc `Esc` là về lại danh sách.
+- **Lưu note .md không còn làm hỏng file.** Khối `---` đầu note (status, type, created...) trước đây bị biến thành `* * *` ngay lần lưu đầu, và mỗi lần mở ra sửa lại thêm một lớp dấu gạch chéo vào tiêu đề. Nay khối đó hiện thành mục **Thuộc tính** khoá lại, giữ nguyên từng ký tự. File đã lỡ hỏng thì sửa tay lại một lần là xong.
+- **Bấm link file trong chat không còn rơi vào trang trắng "Không phải thư mục".** Link trỏ vào file thì mở thẳng ra sửa; link trỏ trượt (hay gặp: chat ghi tên có dấu còn file lưu không dấu) thì Javis tự dò cả brain theo tên rồi bày ra file tên gần giống, bấm một phát là mở.
+
 ## [0.33.3] - 2026-08-13
 ### Sửa lỗi
 - **Hết nháy cửa sổ đen trên Windows.** Thi thoảng đang dùng, một khung terminal đen chớp lên giữa màn hình rồi tắt - do Javis chạy nền không có cửa sổ nên mỗi lệnh phụ nó gọi lại được Windows cấp cho một cửa sổ mới. Đã bịt toàn bộ, và có bài kiểm tự động canh để đừng lọt lại lần nữa.

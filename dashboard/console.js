@@ -151,6 +151,7 @@
   let _settings = null;
   let _renderGen = 0;         // token chống race: mỗi lần đổi trang tăng 1; render async cũ tự bỏ
   let _fmPending = null;       // { dir, file } - vị trí mở sẵn cho trang Tệp tin (khi bấm link file/thư mục trong chat)
+  let _fmSauKhiDong = null;    // việc trang Tệp tin cần làm khi đóng trình sửa (nạp lại danh sách)
   let graphEnabled = true;
   const isNarrow = () => window.matchMedia("(max-width: 860px)").matches;
   const liteMode = () => !graphEnabled || isNarrow();
@@ -909,14 +910,18 @@
     @media(hover:none){.fm-row-act{opacity:1}}
     .fm-row-act button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text3);cursor:pointer;font-size:13px;padding:3px 9px;border-radius:6px;white-space:nowrap} .fm-row-act button:hover{color:var(--text-hi);border-color:rgba(120,180,255,.5)}
     .fm-row-act button.danger:hover{color:var(--red);border-color:rgba(255,120,120,.5)}
-    .fm-modal{position:fixed;inset:0;z-index:9999;display:none;background:rgba(4,8,18,.62);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px}
-    .fm-modal.open{display:flex}
-    .fm-modal-card{width:min(920px,94vw);max-height:86vh;display:flex;flex-direction:column;background:var(--panel-solid);border:1px solid rgba(120,180,255,.3);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.6);overflow:hidden}
-    .fm-vhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--hairline);color:var(--text);font-size:16px}
-    .fm-vhead b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .fm-vhead button{background:none;border:1px solid rgba(255,255,255,.15);color:var(--text);border-radius:6px;cursor:pointer;padding:4px 10px;margin-left:6px} .fm-vhead button:hover{border-color:rgba(120,180,255,.6)}
-    .fm-modal-card textarea{width:100%;flex:1;min-height:56vh;background:var(--field-bg);color:var(--text);border:none;outline:none;padding:14px;font:15px/1.55 ui-monospace,Consolas,monospace;resize:none}
-    .fm-readbox{padding:16px;color:var(--text3);overflow:auto;max-height:70vh}
+    /* Mở file trong trang Tệp tin: trình sửa DÍNH vào đúng khung của trang, không popup nữa.
+       Cùng một node #noteEditor mà trang Trò chuyện vẫn mượn - một trình sửa, một trải nghiệm. */
+    .fm-edit{display:none;position:relative;min-height:0}
+    .fm-page.edit-on{display:flex;flex-direction:column;height:100%}
+    .fm-page.edit-on>.fm-browse{display:none}
+    .fm-page.edit-on>.fm-edit{display:flex;flex:1 1 auto}
+    .fm-edit>.note-editor:not(.ne-full){position:static;inset:auto;z-index:auto;flex:1 1 auto;min-height:0;border:1px solid var(--hairline);border-radius:12px;overflow:hidden}
+    .fm-miss{margin-bottom:12px;padding:11px 13px;border:1px solid rgba(224,160,74,.45);border-radius:10px;background:rgba(224,160,74,.08);color:var(--warn-ink);font-size:13px;line-height:1.55}
+    .fm-miss b{color:var(--text)}
+    .fm-miss-hits{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+    .fm-miss-hits button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text2);cursor:pointer;font-size:12.5px;padding:4px 9px;border-radius:6px}
+    .fm-miss-hits button:hover{color:var(--text-hi);border-color:var(--link-ink)}
     .si-grid{display:flex;flex-direction:column;gap:14px;max-width:640px}
     .si-field label{display:block;font-size:14px;color:var(--text3);margin-bottom:5px}
     .si-field select,.si-field input,.si-field textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--hairline);background:var(--field-bg);color:var(--text);font-size:15px;outline:none}
@@ -951,10 +956,25 @@
     const st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
   }
 
+  // Rời trang Tệp tin: TRẢ trình sửa về khoang não trước khi #cviewBody bị ghi đè, y như trang
+  // Trò chuyện vẫn làm. Không trả là mất luôn node #noteEditor, và lần sau mở file ra trắng trơn.
+  function _fmRoiTrang() {
+    document.body.classList.remove("on-files");
+    _fmSauKhiDong = null;
+    _returnNoteEditor();
+  }
+
   async function renderFiles(el) {
     _injectExtraCss();
     let cur = "";
-    el.innerHTML = `<div class="cview-section">
+    // Vào LẠI trang này trong khi trình sửa đang mượn khung của bản render cũ (openFilesAt gọi
+    // thẳng renderPage("files") nên _pageLeave không chạy) → trả node về trước, kẻo el.innerHTML
+    // bên dưới xoá luôn cả trình sửa.
+    if (document.getElementById("fmEdit")) _fmRoiTrang();
+    document.body.classList.add("on-files");
+    _pageLeave = _fmRoiTrang;
+    el.innerHTML = `<div class="fm-page">
+      <div class="cview-section fm-browse">
       <div class="fm-search-tools">
         <div class="vault-search fm-search">
           <span class="vs-ico">${ic("search")}</span>
@@ -979,16 +999,15 @@
           <button class="s-btn-ghost" id="fmRefresh">↻</button>
         </div>
       </div>
+      <div id="fmMiss"></div>
       <div id="fmList" class="fm-list">Đang tải...</div>
-    </div>
-    <div id="fmModal" class="fm-modal"><div class="fm-modal-card" id="fmModalCard"></div></div>`;
+      </div>
+      <div class="fm-edit" id="fmEdit"></div>
+    </div>`;
     const listEl = el.querySelector("#fmList"), crumbEl = el.querySelector("#fmCrumb");
     const searchInput = el.querySelector("#fmSearch"), searchClear = el.querySelector("#fmSearchClear");
-    const searchMeta = el.querySelector("#fmSearchMeta");
-    const modal = el.querySelector("#fmModal"), card = el.querySelector("#fmModalCard");
-    const closeModal = () => modal.classList.remove("open");
-    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
-    const TEXT_EDIT_EXTS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py", ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"];
+    const searchMeta = el.querySelector("#fmSearchMeta"), missEl = el.querySelector("#fmMiss");
+    const TEXT_EDIT_EXTS = VT_TEXT_EXTS;   // một danh sách duy nhất với trình sửa - hai bản sao là hai luật lệch nhau
     const IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];   // .svg = sửa text
     // URL tĩnh phục vụ file inline (ảnh hiện, pdf mở tab). dl=1 → ép tải về.
     const rawUrl = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
@@ -1007,24 +1026,68 @@
     async function load(path) {
       // path === undefined → điểm vào mặc định (brain); "" = trần (ổ đĩa); chuỗi = tương đối trần
       resetSearchUi();
+      missEl.innerHTML = "";
       listEl.innerHTML = "Đang tải...";
       const qp = (path === undefined || path === null) ? "" : `&path=${encodeURIComponent(path)}`;
       let resp, d;
       try { resp = await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}${qp}`); d = await resp.json().catch(() => ({})); }
-      catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">Lỗi kết nối: ${esc(e.message)}</div>`; return; }
+      catch (e) { listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">Lỗi kết nối: ${esc(e.message)}</div>`; return null; }
       if (!resp.ok || d.error) {
         const msg = d.error || (resp.status === 404
           ? "Máy chủ Javis chưa có chức năng Tệp tin - hãy KHỞI ĐỘNG LẠI server (stop-javis.bat → start-javis.vbs) rồi tải lại trang."
           : resp.status === 401 ? "Phiên đăng nhập hết hạn - tải lại trang & đăng nhập."
           : "Lỗi máy chủ (" + resp.status + ").");
-        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">${WARN_ICON} ${esc(msg)}</div>`; return;
+        listEl.innerHTML = `<div class="empty" style="padding:20px;color:var(--red)">${WARN_ICON} ${esc(msg)}</div>`;
+        // Server cũ trả 400 "Không phải thư mục" khi path trỏ vào FILE. Đừng để người dùng đứng
+        // trước một trang trống: lùi về thư mục cha rồi soi sáng đúng file đó.
+        const lui = String(path || "");
+        if (resp.status === 400 && lui.includes("/")) {
+          const ten = lui.split("/").pop();
+          const d2 = await load(lui.slice(0, lui.lastIndexOf("/")));
+          if (d2) revealFile(ten);
+          return d2;
+        }
+        return null;
       }
       cur = d.path || ""; upTarget = d.parent;
       const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
       crumb(d.root);
       const items = d.items || [];
-      if (!items.length) { listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:var(--text3)">Thư mục trống.</div>`; return; }
-      listEl.innerHTML = ""; items.forEach(it => listEl.appendChild(row(it)));
+      if (!items.length) listEl.innerHTML = `<div class="empty" style="padding:20px;text-align:center;color:var(--text3)">Thư mục trống.</div>`;
+      else { listEl.innerHTML = ""; items.forEach(it => listEl.appendChild(row(it))); }
+      // Link trỏ vào chỗ không có gì: nói rõ đã tìm cái gì, đang đứng ở đâu, rồi tự đi tìm theo
+      // TÊN (server khớp cả khi lệch dấu tiếng Việt) - tên trong chat hay khác tên trên đĩa.
+      if (d.missing) khongThayFile(d.missing, d.home);
+      return d;
+    }
+    // Đi tìm file mà một đường dẫn hụt đang nhắm tới, rồi bày ra cho bấm một phát là mở.
+    // Đường dẫn hiện cho người đọc luôn cắt tiền tố nhà brain: "06 - Sources/x.md" là thứ họ
+    // thấy trong chat, còn "home/user/.../brains/Brain Default/06 - Sources/x.md" chỉ tổ rối mắt.
+    const trongBrain = (p, home) => {
+      const h = String(home || "").replace(/\/+$/, "");
+      const s = String(p || "");
+      return h && s.indexOf(h + "/") === 0 ? s.slice(h.length + 1) : s;
+    };
+    async function khongThayFile(missing, home) {
+      const ten = String(missing).split("/").pop() || missing;
+      missEl.innerHTML = `<div class="fm-miss">${WARN_ICON} Không có <b>${esc(trongBrain(missing, home))}</b> trong brain này.
+        Đang mở thư mục gần nhất còn tồn tại. <span id="fmMissWait">Đang tìm file tên giống…</span>
+        <div class="fm-miss-hits" id="fmMissHits"></div></div>`;
+      let items = [];
+      try {
+        const r = await fetch(`/files/search?brain=${encodeURIComponent(fbrain())}&q=${encodeURIComponent(ten)}&mode=name&limit=8`);
+        items = ((await r.json()) || {}).items || [];
+      } catch (e) {}
+      const wait = missEl.querySelector("#fmMissWait"), hits = missEl.querySelector("#fmMissHits");
+      if (!wait || !hits) return;
+      if (!items.length) { wait.textContent = "Không tìm thấy file nào tên gần giống."; return; }
+      wait.textContent = items.length === 1 ? "Có lẽ là file này:" : "Có lẽ là một trong các file này:";
+      items.forEach(it => {
+        const b = document.createElement("button");
+        b.innerHTML = `${_fileIcon(it.ext || "")} ${esc(trongBrain(it.path, home) || it.name)}`;
+        b.onclick = () => moTrongTrang(it.path, { name: it.name, ext: it.ext || "", type: "file" });
+        hits.appendChild(b);
+      });
     }
     function crumb(rootName) {
       const parts = cur ? cur.split("/") : []; let acc = "";
@@ -1102,7 +1165,7 @@
         <span class="fm-search-kind">${esc(match)}</span>
         <span class="fm-row-act"><button data-act="open">Mở</button><button data-act="dl" title="Tải file về máy">⤓ Tải</button><button data-act="loc">Vị trí</button></span>`;
       const openHit = () => {
-        if (editable || viewable) openFile(it.path, target);
+        if (editable || viewable) moTrongTrang(it.path, target);
         else window.open(rawUrl(it.path), "_blank");
       };
       div.querySelector(".fm-search-main").onclick = openHit;
@@ -1139,12 +1202,12 @@
         <span class="fm-row-act">${acts}</span>`;
       // Click TÊN: thư mục → mở vào; ảnh/pdf/text → xem trước; file khác → mở tab mới.
       const nameGo = it.type === "dir" ? () => load(rel)
-        : (editable || viewable) ? () => openFile(rel, it)
+        : (editable || viewable) ? () => moTrongTrang(rel, it)
         : () => window.open(rawUrl(rel), "_blank");
       div.querySelector(".fm-name").onclick = nameGo; div.querySelector(".fm-ico").onclick = nameGo;
       div.querySelectorAll("[data-act]").forEach(b => b.onclick = (e) => {
         e.stopPropagation(); const a = b.dataset.act;
-        if (a === "edit" || a === "view") openFile(rel, it);
+        if (a === "edit" || a === "view") moTrongTrang(rel, it);
         else if (a === "open") window.open(rawUrl(rel), "_blank");
         else if (a === "dl") _dlFile(rel);
         else if (a === "zip") _dlFolder(rel, it.name);
@@ -1153,45 +1216,22 @@
       });
       return div;
     }
-    async function openFile(rel, it) {
-      modal.classList.add("open");
-      const _raw = rawUrl(rel), _ext = it.ext || "";
-      const _vhead = `<div class="fm-vhead"><b>${esc(it.name)}</b><span><a href="${_raw}" target="_blank"><button>↗ Tab mới</button></a> <a href="${rawUrl(rel, 1)}"><button title="Tải file về máy">⤓ Tải</button></a> <button id="fmVClose">${X_ICON}</button></span></div>`;
-      // Ảnh / PDF: xem trước ngay qua /files/raw (không cần đọc dạng text).
-      if (IMG_EXTS.includes(_ext)) {
-        card.innerHTML = _vhead + `<div class="fm-readbox" style="text-align:center;overflow:auto"><img src="${_raw}" alt="${esc(it.name)}" style="max-width:100%;height:auto;border-radius:8px"></div>`;
-        card.querySelector("#fmVClose").onclick = closeModal; return;
-      }
-      if (_ext === ".pdf") {
-        card.innerHTML = _vhead + `<iframe src="${_raw}" style="width:100%;height:72vh;border:0;background:#fff"></iframe>`;
-        card.querySelector("#fmVClose").onclick = closeModal; return;
-      }
-      card.innerHTML = `<div class="fm-vhead"><b>${esc(it.name)}</b><button id="fmVClose">${X_ICON}</button></div><div class="fm-readbox">Đang mở...</div>`;
-      card.querySelector("#fmVClose").onclick = closeModal;
-      let resp, d;
-      try { resp = await fetch(`/files/read?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`); d = await resp.json().catch(() => ({})); }
-      catch (e) { card.querySelector(".fm-readbox").innerHTML = `<span style="color:var(--red)">Lỗi: ${esc(e.message)}</span>`; return; }
-      const dlUrl = `/files/download?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}`;
-      if (!resp.ok || d.error) {
-        const m = d.error || (resp.status === 404 ? "Server chưa có chức năng Tệp tin - khởi động lại server Javis."
-          : resp.status === 401 ? "Hết phiên đăng nhập - tải lại trang." : "Lỗi (" + resp.status + ")");
-        card.querySelector(".fm-readbox").innerHTML = `<span>${esc(m)} - <a href="${_raw}" target="_blank" style="color:var(--link-ink)">Mở trong tab mới</a> · <a href="${rawUrl(rel, 1)}" style="color:var(--link-ink)">Tải về</a></span>`;
-        return;
-      }
-      // Nút Tải luôn có, kể cả file đang sửa được (.md...) - trước đây file sửa được chỉ có nút Lưu.
-      const dlBtn = `<a href="${dlUrl}"><button title="Tải file về máy">⤓ Tải</button></a>`;
-      const head = `<div class="fm-vhead"><b>${esc(d.name)}</b><span>${d.editable ? '<button id="fmSave">' + SAVE_ICON + ' Lưu</button>' : ""}${dlBtn}<button id="fmVClose">${X_ICON}</button></span></div>`;
-      if (d.editable) {
-        card.innerHTML = head + `<textarea id="fmText" spellcheck="false">${esc(d.content)}</textarea>`;
-        card.querySelector("#fmSave").onclick = async () => {
-          const f = new FormData(); f.append("brain", fbrain()); f.append("path", rel); f.append("content", card.querySelector("#fmText").value);
-          const r = await (await fetch("/files/write", { method: "POST", body: f })).json();
-          const b = card.querySelector("#fmSave"); b.innerHTML = r.ok ? CHECK_ICON + " Đã lưu" : WARN_ICON + " Lỗi"; setTimeout(() => b.innerHTML = SAVE_ICON + " Lưu", 1500);
-        };
-      } else {
-        card.innerHTML = head + `<div class="fm-readbox"><pre style="white-space:pre-wrap;margin:0;color:var(--text)">${esc(d.content || "")}</pre></div>`;
-      }
-      card.querySelector("#fmVClose").onclick = closeModal;
+    // Mở file NGAY TRONG TRANG, bằng ĐÚNG trình sửa của khung chat (#noteEditor) - không popup nữa.
+    //
+    // Popup cũ (.fm-modal) là một trình sửa thứ hai, nghèo hơn hẳn: một ô textarea trần, không
+    // WYSIWYG, không thanh định dạng, không Lùi/Tiến, không đổi tên/xoá, không phóng to. Mở cùng
+    // MỘT file .md từ chat và từ trang Tệp tin lại ra hai trải nghiệm khác hẳn nhau (chủ repo báo
+    // 2026-08-13). Nay mượn chính node trình sửa kia, y như cách trang Trò chuyện vẫn mượn.
+    function moTrongTrang(rel, it) {
+      const slot = el.querySelector("#fmEdit");
+      if (!slot) { window.open(rawUrl(rel), "_blank"); return; }
+      const ten = (it && it.name) || String(rel).split("/").pop();
+      // Đuôi file suy từ TÊN khi người gọi không đưa: openNote chọn nhánh (soạn thảo / xem ảnh /
+      // tải về) theo đuôi, thiếu đuôi là file .md cũng rơi vào cửa "hãy tải về".
+      const duoi = (it && it.ext) || (ten.includes(".") ? "." + ten.split(".").pop().toLowerCase() : "");
+      _fmSauKhiDong = () => { load(cur); };   // đóng trình sửa → danh sách khớp lại (file có thể vừa đổi tên/xoá)
+      _borrowNoteEditor(slot);
+      openNote(rel, { name: ten, ext: duoi, type: "file" });
     }
     async function doRename(rel, oldname) {
       const nn = prompt("Tên mới:", oldname); if (!nn || nn === oldname) return;
@@ -1260,8 +1300,15 @@
       try { const d = await (await fetch(`/files/list?brain=${encodeURIComponent(fbrain())}`)).json(); home = d.home || ""; }
       catch (e) {}
       const full = brainRelDir ? (home ? home + "/" + brainRelDir : brainRelDir) : (home || undefined);
-      await load(full);
-      if (fileName) revealFile(fileName);
+      const d = await load(full);
+      // Đường dẫn hoá ra trỏ vào một FILE (server trả `focus` kèm thư mục cha): đó là thứ người
+      // dùng nhắm tới, nên MỞ THẲNG ra sửa. Đây chính là cú bấm "tưởng là thư mục" - trước đây
+      // nó rơi vào một trang trống ghi "Không phải thư mục".
+      if (d && d.focus) { revealFile(d.focus); moTrongTrang(cur ? cur + "/" + d.focus : d.focus, { name: d.focus }); return; }
+      if (!fileName) return;
+      revealFile(fileName);
+      // Có tên file mà thư mục này không chứa nó → cũng là một link trỏ hụt, đi tìm cho ra.
+      if (!listEl.querySelector(".fm-row.fm-target")) khongThayFile(brainRelDir ? brainRelDir + "/" + fileName : fileName);
     }
     const pend = _fmPending; _fmPending = null;
     if (pend) openVaultTarget(pend.dir, pend.file);
@@ -4989,10 +5036,13 @@
   // trang Trò chuyện thì phía dưới là khung chat đang có nội dung; đè lên nó vừa chật vừa
   // rối. Yêu cầu của chủ repo: mở file thì khung chat biến mất hẳn, chỉ còn trình sửa.
   // Vẫn MƯỢN chính #noteEditor chứ không dựng trình sửa thứ hai - cùng lý do với cây Vault.
+  // `into` = khung sẽ mượn trình sửa. Bỏ trống = khung của trang Trò chuyện (#chatPageEdit).
+  // Từ 0.33.4 trang Tệp tin cũng mượn chính node này (#fmEdit) thay vì bật popup riêng - một
+  // trình sửa duy nhất cho cả app, không có bản nghèo hơn ở góc nào nữa.
   let _neSlot = null;
-  function _borrowNoteEditor() {
+  function _borrowNoteEditor(into) {
     const ed = document.getElementById("noteEditor");
-    const into = document.getElementById("chatPageEdit");
+    into = into || document.getElementById("chatPageEdit");
     if (!ed || !into) return false;
     if (!_neSlot) _neSlot = { node: ed, parent: ed.parentNode, next: ed.nextSibling };
     into.appendChild(ed);
@@ -5002,7 +5052,9 @@
   }
   function _returnNoteEditor() {
     const s = _neSlot; if (!s || !s.parent) return;
-    const into = document.getElementById("chatPageEdit");
+    // Khung đang mượn = CHA hiện tại của node, không tra cứng #chatPageEdit: giờ có hai trang
+    // cùng mượn được, tra cứng một cái là trang kia không bao giờ bỏ được lớp .edit-on.
+    const into = s.node.parentNode;
     const main = into && into.parentNode;
     if (main && main.classList) main.classList.remove("edit-on");
     if (s.next && s.next.parentNode === s.parent) s.parent.insertBefore(s.node, s.next);
@@ -5144,6 +5196,7 @@
   // KHÔNG đụng renderFiles/openVaultTarget (deep-link chat) - openNote là luồng riêng, additive.
   // ============================================================
   const VT_IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];
+  const VT_FRAME_EXTS = [".pdf"];   // trình duyệt tự hiện được -> xem tại chỗ, không mời tải về
   const VT_TEXT_EXTS = [".md", ".txt", ".json", ".yaml", ".yml", ".csv", ".js", ".ts", ".py",
     ".html", ".css", ".toml", ".ini", ".log", ".sh", ".bat", ".xml", ".svg", ".env"];
   let _vtHome = "";            // đường dẫn (theo trần duyệt) của gốc brain
@@ -5485,6 +5538,9 @@
     // lại là luồng thường gặp nhất, xoá vệt ở đây là bắt người ta đi lại từ đầu.
     document.removeEventListener("keydown", _neKeyHandler, true);
     _vtMarkActive(null);
+    // Trang Tệp tin vừa mượn trình sửa: đóng ra thì danh sách file phải khớp lại - ngay trong
+    // trình sửa có nút đổi tên và xoá, quay về mà vẫn thấy tên cũ là nhìn vào một danh sách sai.
+    if (typeof _fmSauKhiDong === "function") { const f = _fmSauKhiDong; _fmSauKhiDong = null; try { f(); } catch (e) {} }
     try { recomputeGraph(); } catch (e) {}   // chạy lại não (đã gate active===home + không lite + studio đóng)
   }
   // Đổi tên file đang mở: lưu nội dung hiện tại trước (giữ chữ đã gõ), đổi tên, rồi mở lại ở tên mới.
@@ -5549,13 +5605,43 @@
     body.innerHTML = `<div class="ne-dl"><div class="ne-dl-ico">${_fileIcon(it.ext)}</div>`
       + `<div><b>${esc(loi || "Không tìm thấy file")}</b><br>`
       + `Link trỏ tới <code>${esc(rel)}</code> nhưng chỗ đó không có gì.<br>`
-      + `File có thể đã đổi tên, bị xoá, hoặc link ghi sai đường dẫn.</div></div>`;
+      + `File có thể đã đổi tên, bị xoá, hoặc link ghi sai đường dẫn.</div>`
+      + `<div class="ne-hits" id="neMissHits"><span class="dim">Đang tìm file tên gần giống…</span></div></div>`;
     const ed = document.getElementById("noteEditor");
     actions.innerHTML = "";
     const b = document.createElement("button");
     b.innerHTML = X_ICON; b.title = "Đóng (Esc)"; b.onclick = closeNote;
     actions.appendChild(b);
     if (ed) ed.classList.remove("ne-full");
+    _neTimFileGan(String(rel).split("/").pop(), body.querySelector("#neMissHits"));
+  }
+  // Link hụt thường KHÔNG phải file đã mất - chỉ là tên trong chat lệch tên trên đĩa (hay gặp
+  // nhất: chat ghi có dấu tiếng Việt còn file lưu không dấu). /files/search?mode=name khớp cả hai
+  // chiều dấu, nên đi tìm hộ rồi bày ra cho bấm một phát là mở, thay vì bỏ người dùng ở ngõ cụt.
+  async function _neTimFileGan(ten, host) {
+    if (!host || !ten) return;
+    let items = [];
+    try {
+      const r = await fetch(`/files/search?brain=${encodeURIComponent(fbrain())}&q=${encodeURIComponent(ten)}&mode=name&limit=8`);
+      items = ((await r.json()) || {}).items || [];
+    } catch (e) {}
+    if (!host.isConnected) return;
+    if (!items.length) { host.innerHTML = `<span class="dim">Tìm cả brain cũng không có file nào tên gần giống.</span>`; return; }
+    host.innerHTML = `<span class="dim">${items.length === 1 ? "Có lẽ là file này:" : "Có lẽ là một trong các file này:"}</span>`;
+    items.forEach(hit => {
+      const b = document.createElement("button");
+      b.type = "button";
+      // Cắt tiền tố nhà brain cho dễ đọc: người dùng nghĩ theo "06 - Sources/x.md", không phải
+      // theo đường dẫn đầy đủ trên đĩa.
+      const nhan = (_vtHome && String(hit.path || "").indexOf(_vtHome + "/") === 0)
+        ? hit.path.slice(_vtHome.length + 1) : (hit.path || hit.name);
+      b.innerHTML = `${_fileIcon(hit.ext || "")} ${esc(nhan)}`;
+      b.onclick = () => {
+        openNote(hit.path, { name: hit.name, ext: hit.ext || "", type: "file" });
+        try { _vtRevealInTree(hit.path); } catch (e) {}
+      };
+      host.appendChild(b);
+    });
   }
 
   // Nạp turndown (HTML→markdown) LAZY, chỉ khi cần lưu bản WYSIWYG. + plugin GFM (bảng).
@@ -5590,6 +5676,14 @@
         replacement: (c, n) => "![[" + n.getAttribute("data-vault-path") + "]]" });
       // Các khối render đặc biệt của mdToHtml phải TRẢ VỀ đúng fence gốc khi lưu bản WYSIWYG,
       // nếu không nội dung note bị phá (mất truy vấn dataview, mất code). Round-trip:
+      // Frontmatter: trả lại NGUYÊN VĂN khối `---...---`. Thiếu luật này thì mỗi lần lưu một
+      // note có frontmatter là hỏng metadata (`---` thành `* * *`) - lỗi mất dữ liệu thật.
+      _td.addRule("jvfrontmatter", { filter: (n) => n.nodeName === "DIV" && n.classList.contains("jv-fm"),
+        replacement: (c, n) => {
+          let t = n.getAttribute("data-fm") || "";
+          try { t = decodeURIComponent(t); } catch (e) {}
+          return t.replace(/\s+$/, "");   // turndown tự chèn dòng trống ngăn cách khối
+        } });
       _td.addRule("jvdataview", { filter: (n) => n.nodeName === "DIV" && n.classList.contains("jv-dataview"),
         replacement: (c, n) => {
           let q = n.getAttribute("data-dv-q") || "";
@@ -5743,8 +5837,9 @@
     _neOpenRel = rel || "";     // để chip "file đang mở" biết có cần nạp lại hay chỉ cần đưa mắt về
     _neLayNoiDung = null; _neGocText = null;   // file mới: mốc so sánh dựng lại ở dưới
     // Đang ở trang Trò chuyện thì trình sửa chiếm chỗ khung chat thay vì đè lên visual não
-    // (thứ không hề hiện ở trang này).
+    // (thứ không hề hiện ở trang này). Trang Tệp tin cũng vậy: chiếm chỗ danh sách file.
     if (document.body.classList.contains("on-chat")) _borrowNoteEditor();
+    else if (document.body.classList.contains("on-files")) _borrowNoteEditor(document.getElementById("fmEdit"));
     document.removeEventListener("keydown", _neKeyHandler, true);
     document.addEventListener("keydown", _neKeyHandler, true);
     try { if (window.__javisGraph && window.__javisGraph.pause) window.__javisGraph.pause(); } catch (e) {}
@@ -5754,6 +5849,12 @@
 
     if (VT_IMG_EXTS.includes(ext)) {
       body.innerHTML = `<div class="ne-img"><img src="${_vtRaw(rel)}" alt="${esc(it.name || "")}"></div>`;
+      _neCommonBtns(actions, rel, it); _vtMarkActive(null); return;
+    }
+    // .pdf: trình duyệt tự đọc được, nên xem NGAY tại chỗ thay vì mời tải về. Popup cũ của trang
+    // Tệp tin có sẵn khung xem này; bỏ popup mà không mang theo là mất một thứ đang chạy tốt.
+    if (VT_FRAME_EXTS.includes(ext)) {
+      body.innerHTML = `<iframe class="ne-frame" src="${_vtRaw(rel)}"></iframe>`;
       _neCommonBtns(actions, rel, it); _vtMarkActive(null); return;
     }
     if (VT_TEXT_EXTS.includes(ext)) {
