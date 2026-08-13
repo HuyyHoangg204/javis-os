@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.33.5] - 2026-08-13
+### Sửa lỗi
+- **Javis tự chữa mấy note .md đã hỏng từ bản cũ.** Vào trang Tệp tin, nếu còn file dính lỗi ở bản trước 0.33.4 (khối thuộc tính đầu note biến thành `* * *`, chữ bị dồn dấu gạch chéo) thì Javis hiện danh sách và bạn bấm một nút là chữa hết. Không file nào hỏng thì không hiện gì cả.
+- Javis chỉ đụng vào đúng dấu vết của lỗi đó, nên đường kẻ ngang giữa bài hay note còn lành đều giữ nguyên.
+
 ## [0.33.4] - 2026-08-13
 ### Sửa lỗi
 - **Mở file trong trang Tệp tin giờ dùng đúng trình sửa của khung chat.** Không còn ô soạn thảo trần bật lên giữa màn hình: file .md, .txt, .html mở **ngay trong trang**, có soạn thảo trực quan, thanh định dạng, Lùi/Tiến, đổi tên, xoá, phóng to. Bấm **✕** hoặc `Esc` là về lại danh sách.

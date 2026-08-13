@@ -51,6 +51,7 @@ import openai_oauth
 import claude_models   # model Claude LIVE cho provider anthropic-cli (hỏi bằng API key, nếu có)
 import gemini_cli      # bộ não thứ 9: Gemini CLI (Google đã ngắt hạng cá nhân 18/06/2026)
 import winproc         # chạy lệnh con câm lặng trên Windows (không nháy console đen)
+import md_repair       # chữa file .md bị vòng lưu WYSIWYG của bản <= 0.33.3 làm hỏng
 import antigravity_cli   # bộ não thứ 10: Antigravity CLI (`agy`) - bản Google chỉ định thay Gemini CLI
 import gemini_oauth    # đăng nhập Google ngay trên dashboard rồi bắc cầu token sang Gemini CLI
 import totp            # xác thực 2 lớp (TOTP) cho cổng đăng nhập - thuần toán, không đụng cấu hình
@@ -4552,6 +4553,84 @@ async def files_search(brain: str = Query("brain"), q: str = Query(""), limit: i
 
     items = await run_in_threadpool(_walk)
     return {"items": items, "q": q, "mode": mode}
+
+
+# --- Chữa file .md bị bản cũ làm hỏng ------------------------------------------------------
+# Bản <= 0.33.3 lưu note .md qua trình sửa trực quan là phá frontmatter (`---` thành `* * *`)
+# và dồn dấu gạch chéo (`1.` -> `1\.` -> `1\\.`). 0.33.4 bịt đường đó, nhưng file đã hỏng thì
+# phải chữa. Luật nhận dạng nằm trong md_repair.py - chỉ sửa thứ mà CHỈ lỗi đó tạo ra được.
+_MD_HONG_MAX_FILE = 1_000_000        # cùng ngưỡng với tìm theo nội dung
+_MD_HONG_MAX_HIT = 500               # đủ để một brain rất to vẫn liệt được, không phình vô hạn
+
+
+def _quet_md_hong(brain: str, chi_path: set = None):
+    """Đi khắp GỐC BRAIN tìm file .md hỏng. Trả về [{path, name, van_de, mo_ta}] (path theo TRẦN,
+    giống /files/list). chi_path (tương đối trần) = chỉ soi đúng mấy file đó."""
+    root = _files_root(brain)
+    broot = Path(_brain_root(brain)).resolve()
+    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".obsidian", ".trash", ".venv", ".pytest_cache"}
+    out = []
+    for dirpath, dirnames, filenames in os.walk(broot):
+        dirnames[:] = [dn for dn in dirnames if not dn.startswith(".") and dn not in SKIP_DIRS]
+        for fn in sorted(filenames):
+            if not fn.lower().endswith(".md") or len(out) >= _MD_HONG_MAX_HIT:
+                continue
+            p = Path(dirpath) / fn
+            try:
+                rel = _files_rel(root, p)
+            except ValueError:
+                continue
+            if chi_path is not None and rel not in chi_path:
+                continue
+            try:
+                if p.stat().st_size > _MD_HONG_MAX_FILE:
+                    continue
+                txt = p.read_text(encoding="utf-8")
+            except (OSError, ValueError, UnicodeDecodeError):
+                continue
+            van_de = md_repair.tim_van_de(txt)
+            if van_de:
+                out.append({"path": rel, "name": fn, "van_de": van_de,
+                            "mo_ta": md_repair.mo_ta_van_de(van_de)})
+    return out
+
+
+@app.get("/files/md-hong")
+async def files_md_hong(brain: str = Query("brain")):
+    """CHỈ SOI, không ghi gì: liệt kê file .md còn dấu vết hỏng của bản cũ."""
+    from starlette.concurrency import run_in_threadpool
+    items = await run_in_threadpool(_quet_md_hong, brain)
+    return {"items": items, "cham_nguong": len(items) >= _MD_HONG_MAX_HIT}
+
+
+@app.post("/files/md-hong/sua")
+async def files_md_hong_sua(brain: str = Form("brain"), paths: str = Form("")):
+    """Chữa thật. `paths` = JSON list đường dẫn (theo trần); bỏ trống = chữa mọi file soi thấy.
+
+    Ghi bằng _atomic_write_text nên không có cảnh file bị cắt nửa chừng. Brain có bật sao lưu
+    git thì mọi thay đổi vẫn lần lại được như mọi lần sửa khác."""
+    from starlette.concurrency import run_in_threadpool
+    chi = None
+    if (paths or "").strip():
+        try:
+            chi = {str(x).replace("\\", "/").strip("/") for x in json.loads(paths)}
+        except (ValueError, TypeError):
+            return JSONResponse({"error": "Danh sách đường dẫn không đọc được"}, status_code=400)
+
+    def _lam():
+        da_sua, loi = [], []
+        for it in _quet_md_hong(brain, chi):
+            try:
+                f = _safe_path(brain, it["path"])
+                moi, van_de = md_repair.sua(f.read_text(encoding="utf-8"))
+                _atomic_write_text(f, moi)
+                da_sua.append({"path": it["path"], "name": it["name"], "van_de": van_de})
+            except (OSError, ValueError, UnicodeDecodeError) as e:
+                loi.append({"path": it["path"], "name": it["name"], "loi": str(e)})
+        return da_sua, loi
+
+    da_sua, loi = await run_in_threadpool(_lam)
+    return {"ok": True, "da_sua": da_sua, "loi": loi}
 
 
 @app.get("/files/read")

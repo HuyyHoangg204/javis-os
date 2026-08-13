@@ -148,6 +148,18 @@ Lưu ý:
 - File lớn hơn 2MB sẽ không mở để xem trong trình duyệt. Javis báo bạn tải về thay vì mở.
 - Nếu file là dạng nhị phân (không phải văn bản), trình sửa đề nghị **⤓ Tải** về thay vì hiển thị ô soạn thảo.
 
+### Chữa file .md hỏng từ bản cũ
+
+Bản Javis **trước 0.33.4** có một lỗi âm thầm: mở note `.md` trong trình sửa trực quan rồi bấm Lưu là khối `---` ở đầu note (frontmatter: `type`, `status`, `created`...) bị biến thành `* * *`, và mỗi lần mở ra sửa lại thêm một lớp dấu gạch chéo vào chữ (`1.` → `1\.` → `1\\.`). File vẫn mở được, nhưng metadata coi như mất - Javis, dataview và Obsidian đều đọc trượt từ đó.
+
+Bản này đã bịt đường đó. Với file lỡ hỏng rồi:
+
+1. Vào trang **Tệp tin**. Javis tự soi cả brain một lượt ngay khi bạn vào. **Không có file nào hỏng thì không hiện gì cả** - im lặng là tin tốt.
+2. Có thì hiện một khung vàng ở đầu trang, kèm danh sách file và hỏng ở chỗ nào.
+3. Bấm **Chữa hết N file**. Javis dựng lại khối thuộc tính và gỡ dấu gạch chéo thừa, rồi báo lại số file đã chữa.
+
+Javis chỉ sửa thứ mà **chỉ lỗi đó mới tạo ra được**: khối `* * *` ở ngay đầu file kẹp giữa toàn dòng trông như metadata, và chuỗi từ hai dấu gạch chéo trở lên. Đường kẻ ngang giữa bài, file có frontmatter còn lành, hay một dấu gạch chéo lẻ bạn cố ý gõ - đều không bị đụng tới.
+
 ### Khi link trỏ trượt: Javis đi tìm hộ
 
 Đường dẫn trong chat có lúc lệch tên file trên đĩa - hay gặp nhất là chat ghi có dấu ("Kế hoạch...") còn file lưu không dấu ("Ke Hoach..."). Trước đây bấm vào là rơi vào một trang trống ghi "Không phải thư mục". Nay:

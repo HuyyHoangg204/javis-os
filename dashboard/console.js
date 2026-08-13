@@ -922,6 +922,17 @@
     .fm-miss-hits{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
     .fm-miss-hits button{background:var(--surface-2);border:1px solid var(--hairline);color:var(--text2);cursor:pointer;font-size:12.5px;padding:4px 9px;border-radius:6px}
     .fm-miss-hits button:hover{color:var(--text-hi);border-color:var(--link-ink)}
+    .fm-fix{margin-bottom:12px;padding:12px 14px;border:1px solid rgba(224,160,74,.45);border-radius:10px;background:rgba(224,160,74,.08);color:var(--text2);font-size:13px;line-height:1.6}
+    .fm-fix.xong{border-color:rgba(63,220,134,.45);background:rgba(63,220,134,.08)}
+    .fm-fix b{color:var(--text)}
+    .fm-fix code{background:var(--surface-2);border-radius:4px;padding:1px 5px;font-size:12px}
+    .fm-fix-list{margin:9px 0 2px;max-height:190px;overflow:auto;border:1px solid var(--hairline);border-radius:8px}
+    .fm-fix-row{display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--surface-2);font-size:12.5px;color:var(--text3)}
+    .fm-fix-row:last-child{border-bottom:none}
+    .fm-fix-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+    .fm-fix-row em{flex:none;font-style:normal;font-size:11.5px;opacity:.8}
+    .fm-fix-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    @media(max-width:700px){.fm-fix-row em{display:none}}
     .si-grid{display:flex;flex-direction:column;gap:14px;max-width:640px}
     .si-field label{display:block;font-size:14px;color:var(--text3);margin-bottom:5px}
     .si-field select,.si-field input,.si-field textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--hairline);background:var(--field-bg);color:var(--text);font-size:15px;outline:none}
@@ -999,6 +1010,7 @@
           <button class="s-btn-ghost" id="fmRefresh">↻</button>
         </div>
       </div>
+      <div id="fmFix"></div>
       <div id="fmMiss"></div>
       <div id="fmList" class="fm-list">Đang tải...</div>
       </div>
@@ -1007,11 +1019,13 @@
     const listEl = el.querySelector("#fmList"), crumbEl = el.querySelector("#fmCrumb");
     const searchInput = el.querySelector("#fmSearch"), searchClear = el.querySelector("#fmSearchClear");
     const searchMeta = el.querySelector("#fmSearchMeta"), missEl = el.querySelector("#fmMiss");
+    const fixEl = el.querySelector("#fmFix");
     const TEXT_EDIT_EXTS = VT_TEXT_EXTS;   // một danh sách duy nhất với trình sửa - hai bản sao là hai luật lệch nhau
     const IMG_EXTS = [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico"];   // .svg = sửa text
     // URL tĩnh phục vụ file inline (ảnh hiện, pdf mở tab). dl=1 → ép tải về.
     const rawUrl = (rel, dl) => `/files/raw?brain=${encodeURIComponent(fbrain())}&path=${encodeURIComponent(rel)}${dl ? "&dl=1" : ""}`;
     let searchMode = "name", searchTimer = null, searchSeq = 0;
+    let homeRel = "";   // tiền tố nhà brain (server trả trong /files/list) - để cắt cho gọn khi hiện đường dẫn
 
     function resetSearchUi() {
       if (searchTimer) clearTimeout(searchTimer);
@@ -1049,7 +1063,7 @@
         }
         return null;
       }
-      cur = d.path || ""; upTarget = d.parent;
+      cur = d.path || ""; upTarget = d.parent; homeRel = d.home || homeRel;
       const upBtn = el.querySelector("#fmUp"); if (upBtn) upBtn.style.display = (upTarget === null || upTarget === undefined) ? "none" : "";
       crumb(d.root);
       const items = d.items || [];
@@ -1088,6 +1102,65 @@
         b.onclick = () => moTrongTrang(it.path, { name: it.name, ext: it.ext || "", type: "file" });
         hits.appendChild(b);
       });
+    }
+    // ---- Chữa file .md bị bản cũ (<= 0.33.3) làm hỏng ----------------------------------
+    // Lưu note qua trình sửa trực quan hồi đó phá khối `---` đầu note và dồn dấu gạch chéo.
+    // Người dùng KHÔNG có cách nào tự biết là file mình hỏng, và cũng không có lý do gì phải
+    // đi tìm một nút "sửa" mà họ không biết là tồn tại. Nên: tự soi một lần khi vào trang, im
+    // lặng nếu mọi thứ lành, và chỉ lên tiếng khi có thứ thật sự cần chữa.
+    async function soiMdHong() {
+      let items = [];
+      try {
+        const r = await fetch(`/files/md-hong?brain=${encodeURIComponent(fbrain())}`);
+        if (!r.ok) return;                                  // server cũ chưa có -> im lặng
+        items = ((await r.json()) || {}).items || [];
+      } catch (e) { return; }
+      if (!items.length || !fixEl.isConnected) return;
+      veBangSua(items);
+    }
+    function veBangSua(items) {
+      const n = items.length;
+      fixEl.innerHTML = `<div class="fm-fix">${WARN_ICON}
+        <b>${n} file .md còn dấu vết hỏng từ bản cũ.</b>
+        Bản Javis trước 0.33.4 lưu note qua trình sửa trực quan là làm hỏng khối thuộc tính
+        (<code>---</code> đầu note thành <code>* * *</code>) và dồn dấu gạch chéo vào chữ.
+        Bản này đã bịt đường đó; mấy file lỡ hỏng thì chữa lại một lần là xong.
+        <div class="fm-fix-list" id="fmFixList"></div>
+        <div class="fm-fix-act">
+          <button class="s-btn" id="fmFixGo">Chữa hết ${n} file</button>
+          <button class="s-btn-ghost" id="fmFixNo">Để sau</button>
+        </div></div>`;
+      const ds = fixEl.querySelector("#fmFixList");
+      items.slice(0, 12).forEach(it => {
+        const d = document.createElement("div");
+        d.className = "fm-fix-row";
+        d.innerHTML = `${_fileIcon(".md")} <span>${esc(trongBrain(it.path, homeRel))}</span><em>${esc(it.mo_ta || "")}</em>`;
+        ds.appendChild(d);
+      });
+      if (n > 12) {
+        const d = document.createElement("div");
+        d.className = "fm-fix-row"; d.textContent = `… và ${n - 12} file nữa`;
+        ds.appendChild(d);
+      }
+      fixEl.querySelector("#fmFixNo").onclick = () => { fixEl.innerHTML = ""; };
+      fixEl.querySelector("#fmFixGo").onclick = async (ev) => {
+        const b = ev.currentTarget; b.disabled = true; b.textContent = "Đang chữa…";
+        let d = {};
+        try {
+          const fd = new FormData();
+          fd.append("brain", fbrain());
+          fd.append("paths", JSON.stringify(items.map(x => x.path)));
+          d = await (await fetch("/files/md-hong/sua", { method: "POST", body: fd })).json();
+        } catch (e) { d = { error: e.message }; }
+        const xong = (d.da_sua || []).length, hong = (d.loi || []).length;
+        // Nói đúng số thật, kể cả khi có file chữa không xong - im lặng nuốt phần hỏng là
+        // để người dùng tưởng đã sạch trong khi chưa.
+        fixEl.innerHTML = `<div class="fm-fix${hong || d.error ? "" : " xong"}">${hong || d.error ? WARN_ICON : CHECK_ICON}
+          ${d.error ? `Không chữa được: ${esc(d.error)}`
+            : `Đã chữa <b>${xong} file</b>.${hong ? ` Còn <b>${hong} file</b> không ghi được - xem quyền ghi của thư mục brain.` : " Mở lại note là thấy khối thuộc tính về đúng chỗ."}`}
+        </div>`;
+        if (xong) load(cur);
+      };
     }
     function crumb(rootName) {
       const parts = cur ? cur.split("/") : []; let acc = "";
@@ -1313,6 +1386,7 @@
     const pend = _fmPending; _fmPending = null;
     if (pend) openVaultTarget(pend.dir, pend.file);
     else load();   // undefined → điểm vào mặc định = brain (dù trần duyệt có thể là cả ổ đĩa)
+    soiMdHong();   // chạy nền: im lặng nếu không có file nào hỏng
   }
 
   // ============================================
