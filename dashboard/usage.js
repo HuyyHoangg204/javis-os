@@ -19,6 +19,10 @@
 (function () {
   "use strict";
 
+  // Locale để định dạng số/ngày. Lấy từ i18n chứ KHÔNG khoá "vi-VN": người dùng đổi
+  // ngôn ngữ giao diện thì ngày giờ phải đổi theo, nếu không thì nửa màn hình tiếng Anh
+  // mà ngày vẫn dd/mm/yyyy kiểu Việt.
+  const LOC = () => (window.JavisI18n && JavisI18n.locale()) || "vi-VN";
   var PERIODS = [
     ["today", "Hôm nay"], ["yesterday", "Hôm qua"],
     ["this_week", "Tuần này"], ["last_week", "Tuần trước"],
@@ -218,7 +222,7 @@
   // fetch KHÔNG reject với status 4xx/5xx, mà middleware đăng nhập của Javis lại trả 401 kèm
   // một THÂN JSON. Nên `.then(r => r.json())` trơn sẽ resolve ngon lành với {error:...}, khối
   // .catch không bao giờ chạy, và trang vẽ ra "0 token / $0.00 / Chưa có dữ liệu" ở mọi ô -
-  // trông y hệt một tháng chưa dùng gì. Phiên hết hạn mà báo là "anh chưa tiêu đồng nào" là
+  // trông y hệt một tháng chưa dùng gì. Phiên hết hạn mà báo là "bạn chưa tiêu đồng nào" là
   // kiểu sai tệ nhất: nó không giống lỗi.
   function jsonOk(r) {
     if (!r.ok) {
@@ -335,7 +339,7 @@
       var pct = (p.id !== "off" && m.phan_tram)
         ? '<span class="tk-muc-pct">-' + (+m.phan_tram || 0) + "% token</span>" : "";
       var tok = m.token_moi_request != null
-        ? '<span class="tk-muc-tok">' + (+m.token_moi_request || 0).toLocaleString("vi-VN") + " token mỗi lượt</span>" : "";
+        ? '<span class="tk-muc-tok">' + (+m.token_moi_request || 0).toLocaleString(LOC()) + " token mỗi lượt</span>" : "";
       // Bộ não đang chạy không ăn được mức này thì phải nói NGAY trên nút. Khoe một con số
       // không bao giờ tới là dạy người dùng thôi tin cả trang.
       var na = m.ap_dung === false ? '<span class="tk-muc-na">không áp cho bộ não đang dùng</span>' : "";
@@ -366,7 +370,7 @@
       + "<span>Chế độ tiết kiệm token: <b>" + esc((dangDung && dangDung.nhan) || d.muc || "?") + "</b>"
       + (mm.phan_tram ? ' <span class="pc">-' + (+mm.phan_tram || 0) + "%</span>" : "")
       + (mm.token_moi_request != null
-        ? " · " + (+mm.token_moi_request || 0).toLocaleString("vi-VN") + " token mỗi lượt" : "")
+        ? " · " + (+mm.token_moi_request || 0).toLocaleString(LOC()) + " token mỗi lượt" : "")
       + "</span>"
       + '<span class="sp">' + (state.moMuc ? "Thu lại" : "Đổi")
       + ic(state.moMuc ? "chevron-up" : "chevron-down", { cls: "ic-sm" }) + "</span></button>";
@@ -481,7 +485,7 @@
       var cls = tl >= 0.9 ? "bad" : (tl >= 0.7 ? "warn" : "ok");
       body = '<div class="big ' + cls + '">' + pct(tl) + "</div>"
         + '<div class="track"><div class="fill ' + cls + '" style="width:' + Math.round(tl * 100) + '%"></div></div>'
-        + '<div class="s">' + fTok(c.tokens) + " token trong 5 giờ qua, trên trần anh khai "
+        + '<div class="s">' + fTok(c.tokens) + " token trong 5 giờ qua, trên trần bạn khai "
         + fTok(c.tran_khai) + ".</div>";
     } else {
       body = '<div class="big">' + fTok(c.tokens) + "</div>";
@@ -490,16 +494,16 @@
         body += '<div class="track"><div class="fill" style="width:' + Math.round(tl2 * 100) + '%"></div></div>'
           + '<div class="s">token trong 5 giờ qua. '
           + (tl2 >= 0.99
-            ? "Đây đang là 5 giờ bận nhất của anh từ trước tới nay."
-            : "Bằng " + pct(tl2) + " mức cao nhất anh từng chạm (" + fTok(c.dinh) + ").")
+            ? "Đây đang là 5 giờ bận nhất của bạn từ trước tới nay."
+            : "Bằng " + pct(tl2) + " mức cao nhất bạn từng chạm (" + fTok(c.dinh) + ").")
           + "</div>";
       } else {
-        body += '<div class="s">token trong 5 giờ qua. Chưa đủ lịch sử để biết mốc của anh ở đâu.</div>';
+        body += '<div class="s">token trong 5 giờ qua. Chưa đủ lịch sử để biết mốc của bạn ở đâu.</div>';
       }
       body += '<div class="s">Khai trần gói ở ô Tiền mặt thì Javis báo được lúc sắp bị chặn.</div>';
     }
     if (!thueBao) {
-      body += '<div class="s">Anh đang dùng API key nên không có trần gói; số này chỉ để thấy nhịp dùng.</div>';
+      body += '<div class="s">Bạn đang dùng API key nên không có trần gói; số này chỉ để thấy nhịp dùng.</div>';
     }
     return '<div class="tk-a"><div class="h">' + ic("chart-column", { cls: "ic-sm" }) + "Cửa sổ 5 giờ</div>"
       + body + "</div>";
@@ -510,12 +514,12 @@
     var k = t.tiet_kiem || {};
     if (!k.du_du_lieu) {
       // Hai lý do khác hẳn nhau, và gộp làm một là nói dối theo hướng làm người ta tắt chế độ
-      // tiết kiệm đi: "chưa chạy lượt nào" với "anh đang chỉnh tay nên Javis không biết cấu
+      // tiết kiệm đi: "chưa chạy lượt nào" với "bạn đang chỉnh tay nên Javis không biết cấu
       // hình đó tốn bao nhiêu".
       return '<div class="tk-a"><div class="h">' + ic("sparkles", { cls: "ic-sm" }) + "Đã tiết kiệm</div>"
         + '<div class="big">-</div><div class="s">'
         + (k.khong_do_duoc
-          ? "Anh đang tự chỉnh tay từng đường nên Javis không biết cấu hình này tốn bao nhiêu mỗi lượt. Chọn một mức có sẵn là đo được."
+          ? "Bạn đang tự chỉnh tay từng đường nên Javis không biết cấu hình này tốn bao nhiêu mỗi lượt. Chọn một mức có sẵn là đo được."
           : "Chưa có lượt nào của Javis trong kỳ này để tính.")
         + "</div></div>";
     }
@@ -555,7 +559,7 @@
       + '<button class="tk-mini" data-act="ns">Huỷ</button></div>'
       + '<div class="hint">Bốn con số này Javis không tự biết được: nhà cung cấp không cho lấy giá gói'
       + " hay hạn mức gói qua API. Để trống thì trang chỉ nói được cái nó đo được."
-      + " Tự phanh chỉ đụng tới <b>việc chạy nền</b>, chat của anh không bị hạ model.</div></div>";
+      + " Tự phanh chỉ đụng tới <b>việc chạy nền</b>, chat của bạn không bị hạ model.</div></div>";
   }
 
   function card(k, v, sub, accent) {
@@ -668,7 +672,7 @@
     var db = t.du_bao || {};
     var cards = '<div class="tk-cards">'
       + card("Tổng token", fTok(k.tokens), deltaHtml, true)
-      + card("Số lượt", (k.turns || 0).toLocaleString("vi-VN"), fTok(k.avg_per_turn) + " token mỗi lượt")
+      + card("Số lượt", (k.turns || 0).toLocaleString(LOC()), fTok(k.avg_per_turn) + " token mỗi lượt")
       + card("Cache đỡ cho", fCost(cache.usd), "nhờ dùng lại ngữ cảnh (" + pct(cache.ty_le) + ")")
       + card("Phiên", (k.sessions || 0), "tb " + fTok(k.avg_per_session) + "/phiên")
       + (db.co ? card("Hết kỳ ước chừng", fTok(db.tokens), "còn " + (db.con_ngay || 0) + " ngày nữa") : "")

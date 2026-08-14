@@ -10,6 +10,11 @@ import json
 import math
 import re
 import threading
+
+import lang as lang_mod
+import lang_registry
+import localefmt
+import lexicon
 import time
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
@@ -23,8 +28,7 @@ CORE_CONTRACT_VERSION = "javis-core-contract-v1"
 TOKENIZER_POLICY_VERSION = "tokenizer-observe-v1"
 THOI_GIAN_POLICY_VERSION = "dong-ho-vn-v1"
 
-# Việt Nam không có giờ mùa hè nên UTC+7 là hằng số - không phụ thuộc tzdata của máy chủ.
-_TZ_VN = timezone(timedelta(hours=7))
+# Múi giờ đã dời sang `localefmt` (đọc từ cấu hình). Hằng cũ gỡ đi để không còn hai nguồn.
 _THU_VN = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"]
 
 
@@ -36,10 +40,47 @@ _DONG_HO_NOW = None
 
 
 def _bay_gio():
-    return _DONG_HO_NOW() if _DONG_HO_NOW else datetime.now(_TZ_VN)
+    return _DONG_HO_NOW() if _DONG_HO_NOW else localefmt.now()
 
 
-def dong_ho(now=None) -> str:
+def _cau_ngon_ngu(lang: str = "") -> str:
+    """Câu ra lệnh ngôn ngữ cho hợp đồng đầu ra của đường TIẾT KIỆM TOKEN.
+
+    Đường này không đi qua `build_system_prompt` nên nó không bao giờ thấy khối
+    "# === NGÔN NGỮ ===". Đây là chỗ DUY NHẤT bắt được nó bằng một lần sửa, vì đúng ba hàm
+    dựng capsule đều gọi `_output_contract_text`.
+
+    Chưa chốt được ngôn ngữ thì giữ nguyên câu cũ ("bám theo người dùng") - hành vi đang chạy
+    tốt, không có lý do làm nó thụt lùi.
+    """
+    ma = lang_registry.chuan_hoa(lang)
+    if not ma:
+        return "Dùng đúng ngôn ngữ người dùng đang dùng."
+    l = lang_registry.get(ma)
+    return (f"Viết TOÀN BỘ câu trả lời bằng {l.lang_directive} ({l.code}); giữ nguyên không "
+            f"dịch tên riêng, đường dẫn, tên tool và khối mã. {l.nudge}")
+
+def _nhan_mui_gio(n) -> str:
+    """Nhãn múi giờ cho câu đồng hồ, vd "Asia/Ho_Chi_Minh (UTC+7)".
+
+    Trước đây ghim cứng "Việt Nam (UTC+7)", nên người dùng đổi múi giờ xong vẫn thấy Javis
+    khai giờ Việt Nam - sai một cách rất khó ngờ vì con số giờ thì đã đúng.
+    """
+    try:
+        ten = localefmt.ten_tz()
+    except Exception:
+        ten = "Asia/Ho_Chi_Minh"
+    try:
+        phut = int(n.utcoffset().total_seconds() // 60)
+        dau = "+" if phut >= 0 else "-"
+        gio, du = divmod(abs(phut), 60)
+        lech = f"UTC{dau}{gio}" + (f":{du:02d}" if du else "")
+    except Exception:
+        lech = "UTC+7"
+    return f"{ten} ({lech})"
+
+
+def dong_ho(now=None, lang: str = "") -> str:
     """Một dòng "bây giờ là mấy giờ" để nhét vào MỌI prompt Javis gửi đi.
 
     Vì sao phải có. Model không có đồng hồ; Javis vốn để nó tự gọi tool `javis_now`. Nhưng
@@ -57,9 +98,13 @@ def dong_ho(now=None) -> str:
     HÔM NAY đếm token theo thời gian thật), nên dòng này không làm mất thêm lần cache nào.
     """
     n = now or _bay_gio()
-    return (f"Bây giờ là {n:%H:%M} {_THU_VN[n.weekday()]} ngày {n:%d/%m/%Y}, "
-            "giờ Việt Nam (UTC+7). Đây là giờ THẬT tại thời điểm câu hỏi này được gửi: cứ "
-            "dùng thẳng khi cần biết hôm nay/bây giờ, không phải đoán và không cần gọi tool.")
+    # Tên thứ trong tuần và câu dẫn lấy từ sổ đăng ký ngôn ngữ. Câu đồng hồ là DỮ LIỆU
+    # ("thứ hai", "giờ Việt Nam") chứ không phải luật hành xử, nên nó phải theo ngôn ngữ
+    # người đọc - khác với CLAUDE.md vốn cố ý giữ một bản tiếng Việt duy nhất.
+    l = lang_registry.get(lang)
+    return l.clock_template.format(
+        hm=f"{n:%H:%M}", weekday=l.weekdays[n.weekday()] if l.weekdays else "",
+        date=f"{n:%d/%m/%Y}", tz=_nhan_mui_gio(n))
 
 
 CORE_CONTRACT = """# Javis Core Contract
@@ -135,6 +180,13 @@ class CompileRequest:
     # same budget/source-map path as tools. Empty by default so Phase 4-7 contracts
     # and provider adapters remain byte-for-byte compatible.
     context_items: tuple[ContextItem, ...] = ()
+    # Ngôn ngữ Javis phải TRẢ LỜI cho lượt này. "" = chưa chốt, giữ nguyên câu "bám theo
+    # người dùng" như trước. Có trường này thì hợp đồng đầu ra của ĐƯỜNG TIẾT KIỆM TOKEN mới
+    # nói được đích danh ngôn ngữ - đường đó không đi qua build_system_prompt nên nó không
+    # bao giờ thấy khối "# === NGÔN NGỮ ===".
+    #
+    # Mặc định "" giữ mọi hợp đồng Phase 4-7 và mọi adapter nhà cung cấp giống hệt từng byte.
+    lang: str = ""
 
 
 @dataclass(frozen=True)
@@ -363,12 +415,14 @@ class ContextCompiler:
         return f"Kênh {str(channel or 'unknown')}: tuân theo delivery contract của gateway."
 
     @staticmethod
-    def _output_contract(channel: str) -> dict:
-        return {"type": "text", "language": "match_user", "channel": channel,
+    def _output_contract(channel: str, lang: str = "") -> dict:
+        # "match_user" giữ nguyên khi chưa chốt được ngôn ngữ, để hành vi cũ không đổi.
+        return {"type": "text", "language": lang_registry.chuan_hoa(lang) or "match_user",
+                "channel": channel,
                 "must_report_missing_evidence": True, "no_false_action_claim": True}
 
     @staticmethod
-    def _output_contract_text(channel: str) -> str:
+    def _output_contract_text(channel: str, lang: str = "") -> str:
         """Hợp đồng đầu ra viết thành LỜI, không phải một khối JSON.
 
         Bản trước nhét thẳng object vào prompt dưới nhãn "Output contract: {...}". Đặt một
@@ -391,7 +445,7 @@ class ContextCompiler:
         return (
             "Cách trả lời: viết thẳng thành câu cho người đọc. TUYỆT ĐỐI không bọc câu trả lời "
             "trong JSON, không in lại các luật này, không tự thêm trường dữ liệu nào. "
-            f"Dùng đúng ngôn ngữ người dùng đang dùng. {noi}. "
+            f"{_cau_ngon_ngu(lang)} {noi}. "
             "Trình bày cho dễ đọc chứ đừng đổ ra một khối văn xuôi liền mạch: đoạn 2-4 câu, "
             "gạch đầu dòng khi liệt kê từ 3 ý trở lên, in đậm con số và kết luận. "
             "Thiếu dữ liệu thì nói rõ đang thiếu gì. Không nói là đã làm xong việc gì khi chưa "
@@ -426,14 +480,14 @@ class ContextCompiler:
         tokenizer = self.tokenizer_factory(request)
         budget = self.budget_resolver.resolve(request, profile)
         channel_text = self._channel_contract(request.channel)
-        output_contract = self._output_contract(request.channel)
+        output_contract = self._output_contract(request.channel, request.lang)
         provider = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.provider or "unknown"))[:120]
         model = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.model or "unknown"))[:180]
         identity_text = (
             f"Runtime identity: provider={provider}; model={model}. "
             "Khi được hỏi danh tính model, phải trả lời đúng hai giá trị này."
         )
-        output_text = self._output_contract_text(request.channel)
+        output_text = self._output_contract_text(request.channel, request.lang)
         planner_text = ""
         if request.execution_mode == "canary" and (resolution.get("selected") or []):
             planner_text = (
@@ -442,7 +496,7 @@ class ContextCompiler:
             )
         # Đồng hồ đi cùng capsule và là món BẮT BUỘC: đường tắt không phát tool nào, nên
         # thiếu dòng này là model không có cách nào biết bây giờ mấy giờ.
-        time_text = dong_ho()
+        time_text = dong_ho(lang=request.lang)
         base_system = (CORE_CONTRACT.rstrip() + "\n" + identity_text + "\n" + channel_text +
                   "\n" + time_text + "\n" + output_text +
                   ("\n" + planner_text if planner_text else ""))
@@ -852,14 +906,14 @@ class ContextCompiler:
         provider = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.provider or "unknown"))[:120]
         model = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.model or "unknown"))[:180]
         channel_text = self._channel_contract(request.channel)
-        output_contract = self._output_contract(request.channel)
+        output_contract = self._output_contract(request.channel, request.lang)
         system = (
             CORE_CONTRACT.rstrip() + "\n"
             f"Runtime identity: provider={provider}; model={model}.\n" + channel_text + "\n"
             "Đây là vòng tổng hợp cuối của một capability read-only. Không gọi tool, không lập kế hoạch "
             "mới, không tuyên bố đã ghi, gửi, xoá hay thay đổi dữ liệu. Chỉ dùng evidence được gateway "
             "cung cấp và phải ghi nguyên evidence_ref trong câu trả lời.\n"
-            + self._output_contract_text(request.channel)
+            + self._output_contract_text(request.channel, request.lang)
         )
         safe_evidence = {
             "evidence_ref": evidence_ref,
@@ -977,7 +1031,7 @@ class ContextCompiler:
         budget = self.budget_resolver.resolve(request, profile)
         provider = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.provider or "unknown"))[:120]
         model = re.sub(r"[^a-zA-Z0-9_.:/-]", "_", str(request.model or "unknown"))[:180]
-        output_contract = self._output_contract(request.channel)
+        output_contract = self._output_contract(request.channel, request.lang)
         system = (
             CORE_CONTRACT.rstrip() + "\n"
             f"Runtime identity: provider={provider}; model={model}.\n"
@@ -986,7 +1040,7 @@ class ContextCompiler:
             "không tuyên bố write. Chỉ dùng bundle evidence gateway đã xác minh. Mọi fact live quan "
             "trọng phải dẫn ít nhất một evidence_ref nguyên văn. Nếu evidence xung đột hoặc thiếu, "
             "nói rõ giới hạn thay vì suy đoán.\n"
-            + self._output_contract_text(request.channel)
+            + self._output_contract_text(request.channel, request.lang)
         )
         user = (
             "Mục tiêu hiện tại:\n" + str(request.objective or "") +
@@ -1112,10 +1166,43 @@ class DeterministicQualityGate:
     def evaluate(self, objective: str, response: str, channel: str,
                  had_error: bool = False, compiler_report: dict | None = None,
                  expected_evidence_ref: str = "", read_only: bool = False,
-                 expected_evidence_refs: tuple[str, ...] = ()) -> QualityDecision:
+                 expected_evidence_refs: tuple[str, ...] = (),
+                 lang: str = "") -> QualityDecision:
         text = str(response or "")
         reasons = []
         status = "pass"
+
+        # Bộ mẫu theo ngôn ngữ của CÂU TRẢ LỜI (khác cổng đường tắt: cổng kia đọc câu hỏi).
+        #
+        # Đây là cổng BẮT LỖI, nên luật suy biến khác hẳn cổng mở rộng quyền: không có bộ từ
+        # vựng thì KHÔNG được lặng lẽ cho qua. Hai việc phải làm:
+        #   1. chạy mẫu của MỌI bộ từ vựng đang có - bắt nhầm một câu vô hại chỉ khiến Javis
+        #      soát lại, còn bỏ sót một câu khai man "đã gửi xong" là rào chắn mất tác dụng;
+        #   2. đánh dấu `lang_unverified` để trace nói rõ lượt này KHÔNG kiểm được, thay vì
+        #      im lặng để người đọc trace tưởng đã kiểm và thấy sạch.
+        # `lang` rỗng thì DÒ THẲNG TỪ CÂU TRẢ LỜI. Đây không phải đường tắt cho lười: cổng này
+        # kiểm thứ model THẬT SỰ đã viết ra, nên ngôn ngữ của chính văn bản đó là căn cứ đúng
+        # hơn ngôn ngữ ta đã YÊU CẦU nó dùng - model vẫn có thể trả lời sai ngôn ngữ, và lúc
+        # ấy ta muốn kiểm bằng bộ từ vựng khớp với cái nó viết.
+        _ma = lang_registry.chuan_hoa(lang) or lang_mod.detect(text)[0]
+        _lex = lexicon.get(_ma)
+        _bo = [_lex] if _lex is not None else [lexicon.get(m) for m in lexicon.ma_list()]
+        _bo = [m for m in _bo if m is not None]
+
+        def _khop(ten_tap: str) -> bool:
+            for mod in _bo:
+                mau = getattr(mod, ten_tap, None)
+                if mau is not None and mau.search(text):
+                    return True
+            return False
+
+        def _chua_cum(ten_tap: str) -> bool:
+            low = text.casefold()
+            for mod in _bo:
+                for cum in getattr(mod, ten_tap, ()) or ():
+                    if cum in low:
+                        return True
+            return False
         if not text.strip():
             return QualityDecision("fail", ("empty_response",), 1.0, 0)
         if self._CONTROL.search(text):
@@ -1138,23 +1225,28 @@ class DeterministicQualityGate:
         # dùng hành động theo, nên nói số mà không có nguồn là dạng bịa nguy hiểm
         # nhất. Chỉ soát khi bước này ĐÁNG LẼ phải có evidence (có expected ref),
         # tránh bắt nhầm câu trả lời giải thích thuần tuý.
-        if (expected_evidence_ref or expected_evidence_refs) and self._QUANTITATIVE.search(text):
+        if (expected_evidence_ref or expected_evidence_refs) and _khop("QUANTITATIVE"):
             has_ref = (expected_evidence_ref and expected_evidence_ref in text) or any(
                 ref in text for ref in required_refs)
             if not has_ref:
                 reasons.append("quantitative_fact_without_evidence")
                 status = "revise"
-        if read_only and self._FALSE_ACTION.search(text):
+        if read_only and _khop("FALSE_ACTION"):
             reasons.append("false_action_claim")
             status = "revise"
         if int(report.get("selected_count") or 0) > 0:
-            low = text.casefold()
-            if any(phrase in low for phrase in self._CAPABILITY_DENIAL):
+            if _chua_cum("CAPABILITY_DENIAL"):
                 reasons.append("capability_denial_conflict")
                 status = "gather_more"
         if channel == "telegram" and len(text) > 8000:
             reasons.append("telegram_response_too_long")
             status = "revise"
+        if _lex is None and _ma:
+            # Ngôn ngữ trả lời không có bộ từ vựng: đã chạy hợp mọi bộ ở trên nhưng vẫn phải
+            # nói ra rằng lượt này CHƯA được kiểm đúng ngôn ngữ của nó. KHÔNG đổi `status`:
+            # đánh trượt mọi câu trả lời tiếng Nhật chỉ vì chưa có lexicon tiếng Nhật là phạt
+            # người dùng vì một thiếu sót của chúng ta.
+            reasons.append("lang_unverified")
         return QualityDecision(status, tuple(reasons), 0.9 if not reasons else 0.75, len(text))
 
 

@@ -2,6 +2,10 @@
 // JAVIS OS - Studio: Agents / Skills / Workflows
 // ============================================
 (function () {
+  // Locale để định dạng số/ngày. Lấy từ i18n chứ KHÔNG khoá "vi-VN": người dùng đổi
+  // ngôn ngữ giao diện thì ngày giờ phải đổi theo, nếu không thì nửa màn hình tiếng Anh
+  // mà ngày vẫn dd/mm/yyyy kiểu Việt.
+  const LOC = () => (window.JavisI18n && JavisI18n.locale()) || "vi-VN";
   const studio = document.getElementById("studio");
   const editor = document.getElementById("studioEditor");
   const brain = () => (window.currentBrainPath ? currentBrainPath() : "brain");
@@ -204,7 +208,7 @@
         const canApprove = d.code && d.task_id;
         stepsEl.insertAdjacentHTML("beforeend",
           `<div class="run-info wf-wait">${ic("triangle-alert", { cls: "ic-warn" })} ` +
-          `Workflow dừng chờ anh duyệt bước "${esc(d.node || "")}"${d.prompt ? ": " + esc(d.prompt) : ""}` +
+          `Workflow dừng chờ bạn duyệt bước "${esc(d.node || "")}"${d.prompt ? ": " + esc(d.prompt) : ""}` +
           (canApprove
             ? `<div class="wf-wait-act"><button type="button" class="wf-approve" ` +
               `data-task="${esc(d.task_id)}" data-node="${esc(d.node || "")}" ` +
@@ -214,7 +218,7 @@
           `</div>`);
         stepsEl.scrollTop = stepsEl.scrollHeight;
       } else if (d.type === "escalation") {
-        stepsEl.insertAdjacentHTML("beforeend", `<div class="run-info">${ic("triangle-alert", { cls: "ic-warn" })} Agent dừng và chuyển lại cho anh: ${esc(d.reason || "")}</div>`);
+        stepsEl.insertAdjacentHTML("beforeend", `<div class="run-info">${ic("triangle-alert", { cls: "ic-warn" })} Agent dừng và chuyển lại cho bạn: ${esc(d.reason || "")}</div>`);
       } else if (d.type === "error") {
         es.close();
         endRun();
@@ -439,7 +443,7 @@
       if (countEl) countEl.textContent = `đã chọn ${chosen.size}/${skills.length}`;
       if (!groups.size) { host.innerHTML = `<div class="dim sp-empty">Không có skill nào khớp "${esc(q)}".</div>`; return; }
       host.innerHTML = "";
-      [...groups.keys()].sort((x, y) => x.localeCompare(y, "vi")).forEach(g => {
+      [...groups.keys()].sort((x, y) => x.localeCompare(y, LOC())).forEach(g => {
         const list = groups.get(g);
         const nSel = list.filter(s => chosen.has(s.slug)).length;
         // Đang tìm thì mọi nhóm còn khớp đều sổ ra - lọc xong mà vẫn phải bấm mở từng nhóm
@@ -592,7 +596,7 @@
       // không đi qua bộ đếm, nên "chưa thấy dùng" là tham khảo, KHÔNG phải phán quyết.
       let usageHtml = "";
       if (s.use_count > 0) {
-        const when = s.last_used_at ? new Date(s.last_used_at * 1000).toLocaleDateString("vi-VN") : "";
+        const when = s.last_used_at ? new Date(s.last_used_at * 1000).toLocaleDateString(LOC()) : "";
         usageHtml = ` · <span class="sk-usage">đã dùng ${s.use_count} lần${when ? ", gần nhất " + when : ""}</span>`;
       } else if (s.stale) {
         usageHtml = ` · <span class="sk-usage sk-stale" title="Javis chỉ đếm được skill nạp qua tool javis_use_skill. Claude Code nạp native qua .claude/skills thì không đếm được, nên đây chỉ là tham khảo - không có nghĩa skill vô dụng.">chưa thấy dùng</span>`;

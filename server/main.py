@@ -5,6 +5,7 @@ Kiến trúc: Voice (browser) ⇄ FastAPI WebSocket ⇄ Claude Code CLI subproce
 Javis KHÔNG gọi Anthropic API trực tiếp. Mọi reasoning + tool calling đi qua
 `claude` CLI đã cài trên máy → tự kế thừa MCP, skills, auth.
 """
+import localefmt   # múi giờ theo cấu hình, thay UTC+7 nhúng cứng
 import os
 import json
 import math
@@ -100,6 +101,8 @@ import write_path_runtime    # Phase 9: write có xác nhận, idempotency và r
 from telegram_bot import TelegramBot, parse_chat_ids as tg_parse_ids
 import zalo_bot   # kênh Zalo Bot của chủ (API chính thức) - cùng khế ước với TelegramBot
 import channel_context   # metadata kênh + gom file trả về kênh chat (port gateway hermes-agent)
+import lang as lang_mod   # chốt ngôn ngữ trả lời cho một lượt
+import lang_registry      # sổ đăng ký: mọi thứ về một ngôn ngữ nằm đúng một chỗ
 import background_status  # việc nền còn sống của một khung chat + bắt lời hứa "xong em báo"
 import chatbot_log       # nhật ký hội thoại khách + thống kê câu bot trả lời không nổi
 import chatbot_runtime   # bộ giám sát Bot chuyên trách (mỗi bot một poller Telegram)
@@ -362,9 +365,15 @@ def _fit_memory_index(mem: str, cap: int = None) -> str:
 
 
 def build_system_prompt(brain: str = "brain", include_memory: bool = True,
-                        include_skills: bool = True) -> str:
+                        include_skills: bool = True,
+                        lang: "lang_mod.LangDecision | str | None" = None) -> str:
     """CLAUDE.md + nạp MEMORY.md của vault đang chọn → Javis luôn nhớ ngữ cảnh."""
     base = CLAUDE_MD_PATH.read_text(encoding="utf-8") if CLAUDE_MD_PATH.exists() else ""
+    # Chốt ngôn ngữ NGAY đầu hàm: khối NGÔN NGỮ ở cuối cần nó, mà danh sách skill ở giữa cũng
+    # cần (mô tả skill là bề mặt ĐỐI CHIẾU với câu người dùng vừa gõ, nên nó phải cùng thứ
+    # tiếng với câu đó thì định tuyến mới sắc).
+    _lq = lang if isinstance(lang, lang_mod.LangDecision) else None
+    _lma = (_lq.lang if _lq else lang_registry.chuan_hoa(lang or "")) or lang_registry.MAC_DINH
     idx = _brain_memory_dir(brain) / "MEMORY.md"
     mem = ""
     try:
@@ -412,7 +421,7 @@ def build_system_prompt(brain: str = "brain", include_memory: bool = True,
     # danh sách rỗng thì Javis sẽ tự khai là mình không có skill nào - một câu SAI, và sai theo
     # hướng khiến nó đi tạo lại thứ đã có.
     try:
-        _skills = skill_router.list_skills(root)
+        _skills = skill_router.list_skills(root, _lma)
     except Exception:
         _skills = None
     try:
@@ -427,7 +436,11 @@ def build_system_prompt(brain: str = "brain", include_memory: bool = True,
     # Đồng hồ. Cùng một dòng với capsule của đường tiết kiệm (context_compiler.dong_ho), để
     # bật hay tắt tiết kiệm thì Javis vẫn biết bây giờ mấy giờ y như nhau. Model không có
     # đồng hồ, và tool `javis_now` thì không phải đường nào cũng phát tool.
-    base += "\n\n# === BÂY GIỜ ===\n" + context_compiler.dong_ho()
+    # Khối NGÔN NGỮ + đồng hồ đi CÙNG NHAU và đi CUỐI, sát chỗ model bắt đầu trả lời.
+    # Ngôn ngữ đặt ở cuối vì luật càng gần chỗ sinh chữ thì model càng ít trôi; đồng hồ
+    # đi kèm vì tên thứ trong tuần cũng phải theo ngôn ngữ đó.
+    base += "\n\n# === BÂY GIỜ ===\n" + context_compiler.dong_ho(lang=_lma)
+    base += lang_mod.khoi_ngon_ngu(_lq or lang_mod.LangDecision(_lma, "default", 1.0, True))
     try:
         # 1 dòng MỨC DÙNG để Javis TRẢ LỜI được khi user hỏi "token tiêu bao nhiêu" (chi tiết ở panel).
         _t = usage_store.summary().get("today", {}).get("total", {})
@@ -562,7 +575,7 @@ def log_conversation(brain: str, user_msg: str, javis_msg: str):
     """Ghi log hội thoại vào Memory của vault đang chọn (nguyên liệu để học)."""
     try:
         from datetime import datetime, timezone, timedelta
-        now = datetime.now(timezone(timedelta(hours=7)))
+        now = localefmt.now()
         conv = _brain_memory_dir(brain) / "conversations"
         f = conv / f"{now.strftime('%Y-%m-%d')}.md"
         u = _clip_for_log(_redact_secrets(user_msg))
@@ -1652,7 +1665,7 @@ async def _execute_write_proposal(plan, provider: str, api_key: str, model: str,
                 f"Trạng thái hiện tại: {registered.get('invocation_status')}.")
     elif status == "locked":
         text = ("Đang có một hành động ghi khác trên cùng tài nguyên chưa kết thúc. "
-                "Javis dừng để tránh ghi chồng; anh xử lý xong việc kia rồi nhắn lại.")
+                "Javis dừng để tránh ghi chồng; bạn xử lý xong việc kia rồi nhắn lại.")
     elif status != "prepared":
         text = ("Không ghi được ý định vào sổ nên Javis dừng trước khi gọi tool. "
                 "Chưa có gì thay đổi.")
@@ -1682,7 +1695,7 @@ async def _execute_write_proposal(plan, provider: str, api_key: str, model: str,
             f"Javis chuẩn bị chạy hành động ghi: {lease.capability_name}.\n"
             f"Tham số: {summary}\n\n"
             f"Việc này thay đổi dữ liệu thật và không tự hoàn tác được, nên Javis "
-            f"CHƯA chạy. Anh bấm nút duyệt bên dưới, hoặc nhắn lại đúng câu: "
+            f"CHƯA chạy. Bạn bấm nút duyệt bên dưới, hoặc nhắn lại đúng câu: "
             f"XAC NHAN {code}\n"
             f"Không muốn nữa thì nhắn: huỷ\n"
             f"<!-- JAVIS_ASK: {ask} -->"
@@ -1745,7 +1758,7 @@ async def _execute_write_confirmation(plan, ws, session_id: str, runtime_trace,
             str(invocation.get("lease_id") or ""), "FAILED_FINAL",
             error_code="approved_arguments_unavailable")
         text = ("Javis không còn giữ tham số đã được duyệt (tiến trình đã khởi động lại), "
-                "nên không chạy hành động ghi này. Anh nhắn lại yêu cầu để Javis đề xuất mới.")
+                "nên không chạy hành động ghi này. Bạn nhắn lại yêu cầu để Javis đề xuất mới.")
         await ws.send_text(json.dumps({
             "type": "response", "content": text, "engine": "javis-gateway",
             "model": model, "session_id": session_id,
@@ -1792,11 +1805,11 @@ async def _execute_write_confirmation(plan, ws, session_id: str, runtime_trace,
                     "lệnh đọc: hành động ĐÃ được thực hiện. Javis không chạy lại.")
         elif reconciled.get("status") == "FAILED_FINAL":
             text = ("Kết nối bị gián đoạn, Javis kiểm chứng lại bằng lệnh đọc và thấy hành "
-                    "động CHƯA được thực hiện. Anh nhắn lại nếu muốn Javis làm lại.")
+                    "động CHƯA được thực hiện. Bạn nhắn lại nếu muốn Javis làm lại.")
         else:
             text = ("Kết nối bị gián đoạn và Javis KHÔNG kiểm chứng được là hành động đã "
                     "chạy hay chưa. Javis tuyệt đối không chạy lại để tránh làm hai lần. "
-                    "Anh kiểm tra trực tiếp bên hệ thống đích rồi báo lại giúp em.")
+                    "Bạn kiểm tra trực tiếp bên hệ thống đích rồi báo lại giúp mình.")
     elif status == "SUCCEEDED":
         evidence = outcome.get("evidence")
         text = "Đã thực hiện xong hành động ghi."
@@ -2200,7 +2213,7 @@ async def _execute_readonly_path(plan, provider: str, api_key: str, model: str,
         )
         final_text = (
             "Đã đọc dữ liệu và lưu evidence nhưng capsule tổng hợp vượt policy hiện tại. "
-            f"Anh có thể dùng lại nguồn này: {evidence.ref}"
+            f"Bạn có thể dùng lại nguồn này: {evidence.ref}"
         )
         _CONTEXT_RUNTIME.record_runtime_event(runtime_trace, "readonly_path.failed", {
             "stage": "final_compile", "error_code": compiled.status,
@@ -2310,8 +2323,8 @@ def _schedule_cancel_reply(action: dict) -> str:
         return str(action.get("list_result") or "Không có lịch đang chạy để xoá.")
     if action.get("needs_choice"):
         return (
-            "Em đã đọc danh sách lịch thật nhưng có nhiều mục gần giống nhau nên chưa xoá để tránh nhầm. "
-            "Anh nói đúng tên hoặc ID cần xoá:\n\n" + str(action.get("list_result") or "")
+            "Mình đã đọc danh sách lịch thật nhưng có nhiều mục gần giống nhau nên chưa xoá để tránh nhầm. "
+            "Bạn nói đúng tên hoặc ID cần xoá:\n\n" + str(action.get("list_result") or "")
         )
     return "⚠ " + str(action.get("error") or "Không thể thao tác lịch.")
 
@@ -3015,6 +3028,13 @@ async def settings_get():
     cfg = cfgmod.read_settings()
     safe = json.loads(json.dumps(cfg))
     safe["auth"] = {"username": cfg["auth"].get("username", ""), "has_password": bool(cfg["auth"].get("password_hash"))}
+    # Danh sách ngôn ngữ đi kèm cài đặt luôn, thay vì bắt dashboard gọi thêm một endpoint.
+    # Nguồn duy nhất là sổ đăng ký phía server: dashboard KHÔNG khai lại danh sách, nếu không
+    # thì thêm ngôn ngữ mới phải nhớ sửa hai chỗ và chỗ bị quên hỏng trong im lặng.
+    safe["lang_list"] = lang_registry.cho_giao_dien()
+    # Gói locale (múi giờ, tiền tệ, locale định dạng số). Dashboard KHÔNG tự suy nó từ ngôn
+    # ngữ: hai thứ đó tách rời, người dùng đọc tiếng Anh mà vẫn ngồi ở UTC+7 là bình thường.
+    safe["locale_fmt"] = localefmt.cho_giao_dien()
     for kf in ("openrouter_key", "anthropic_api_key", "openai_api_key", "gemini_api_key", "groq_api_key"):
         k = cfg["model"].get(kf, "")
         safe["model"][kf] = ("••••" + k[-4:]) if k else ""
@@ -3048,7 +3068,24 @@ async def settings_set(section: str = Form(...), data: str = Form("{}")):
     except json.JSONDecodeError:
         return JSONResponse({"ok": False, "error": "data không phải JSON"}, status_code=400)
 
-    if section == "general":
+    if section == "locale":
+        # Nhánh RIÊNG chứ không nhét vào "general": endpoint này dùng allowlist TỪNG KEY chứ
+        # không merge, nên key nào không có tên trong một nhánh sẽ bị bỏ trong khi vẫn trả
+        # {"ok": true} và nút vẫn hiện "Đã lưu". Một cụm cài đặt mới mà quên nhánh của nó thì
+        # người dùng bấm lưu, thấy báo thành công, F5 xong mất sạch - không lỗi, không log.
+        lc = cfg.setdefault("locale", {})
+        if "reply_lang" in patch:
+            v = str(patch["reply_lang"] or "").strip().lower()
+            # "auto" là giá trị HỢP LỆ, không phải chuỗi rỗng: nó nghĩa là "bám theo người
+            # dùng", khác hẳn với "chưa chọn".
+            lc["reply_lang"] = "auto" if v in ("", "auto") else (lang_registry.chuan_hoa(v) or "auto")
+        if "ui_lang" in patch:
+            lc["ui_lang"] = lang_registry.chuan_hoa(patch["ui_lang"]) or lang_registry.MAC_DINH
+        if "tz" in patch:
+            lc["tz"] = str(patch["tz"] or "").strip() or "Asia/Ho_Chi_Minh"
+        if "currency" in patch:
+            lc["currency"] = str(patch["currency"] or "").strip().upper() or "VND"
+    elif section == "general":
         if "workspace_name" in patch:
             cfg["workspace_name"] = patch["workspace_name"] or "Javis OS"
         if "setup_done" in patch:
@@ -4118,7 +4155,7 @@ def _log_agent_run(brain, slug, task, out):
         d = _brain_memory_dir(brain) / "agents" / slug / "runs"
         d.mkdir(parents=True, exist_ok=True)
         from datetime import datetime, timezone, timedelta
-        now = datetime.now(timezone(timedelta(hours=7)))
+        now = localefmt.now()
         with open(d / f"{now.strftime('%Y-%m-%d')}.md", "a", encoding="utf-8") as fh:
             fh.write(f"\n## {now.strftime('%H:%M')}\n**Task:** {task}\n\n**Kết quả:** {out[:1500]}\n")
     except Exception:
@@ -4184,8 +4221,11 @@ def skills_index(brain: str) -> list:
         except OSError:
             return None
 
+    # Danh sách trên trang Kỹ năng đi theo NGÔN NGỮ GIAO DIỆN, không theo ngôn ngữ trả lời:
+    # đây là chữ trên màn hình. Skill nào chưa có bản dịch thì hiện nguyên bản gốc.
+    _ui = localefmt.ngon_ngu_giao_dien()
     out = []
-    for s in skill_router.list_skills(root):
+    for s in skill_router.list_skills(root, _ui):
         rec = usage.get(s["slug"])
         if not isinstance(rec, dict):   # sidecar tay-sửa hỏng dạng: {"slug": "khong-phai-dict"}
             rec = {}
@@ -4305,6 +4345,13 @@ async def save_skill(name: str = Form(...), description: str = Form(""), group: 
     d = disabled_dir if disabled_dir.is_dir() else (sk / slug)
     d.mkdir(parents=True, exist_ok=True)
     meta = {"name": name, "description": description, "group": (group or "Chung").strip()}
+    # GIỮ LẠI các bản dịch (`description_en`, `name_en`...) của skill đang có. Form chỉ gửi lên
+    # bản gốc, nên ghi đè trắng meta là mỗi lần user bấm Lưu lại xoá sạch bản dịch mà không ai
+    # thấy - skill hệ thống sẽ tụt về mô tả tiếng Việt cho người dùng tiếng Anh.
+    cu, _ = _read_md(d / "SKILL.md")
+    for k, v in (cu or {}).items():
+        if skill_router.la_khoa_ngon_ngu(k) and k not in meta:
+            meta[k] = v
     _write_md(d / "SKILL.md", meta, body or f"# {name}\n\n{description}")
     try:
         system_sync.mirror_skills(root)   # bật → cập nhật mirror; tắt (.disabled) → mirror bỏ qua
@@ -5481,7 +5528,7 @@ def _cau_mo_dau(d: dict) -> str:
             ket = ", tức với nhịp dùng này thì gói đang đắt hơn trả theo API."
         else:
             ket = "."
-        ve.append(f"{ky} anh trả ${goi['gia_thang_usd']:g} tiền gói, "
+        ve.append(f"{ky} bạn trả ${goi['gia_thang_usd']:g} tiền gói, "
                   f"lượng việc đã chạy nếu tính theo giá API đáng ${quy:,.0f}" + ket)
     elif quy > 0:
         ve.append(f"{ky} lượng việc đã chạy quy theo giá API là khoảng ${quy:,.2f}.")
@@ -5754,7 +5801,7 @@ async def _bao_cao_tuan_neu_toi_gio() -> bool:
     dich = str(mcfg.get("bao_cao_tuan") or "").strip()
     if not dich:
         return False
-    gio = datetime.now(timezone(timedelta(hours=7)))
+    gio = localefmt.now()
     if gio.weekday() != 0 or gio.hour < 8:
         return False
     tuan = f"tuan-{gio.isocalendar()[0]}-{gio.isocalendar()[1]}"
@@ -6192,7 +6239,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
             # Báo lỗi và dừng, để người dùng quyết định chạy lại.
             yield {"type": "error",
                    "content": "Workflow dừng giữa chừng ở đường mới. Không tự chạy lại "
-                              "để tránh làm hai lần; anh chạy lại nếu cần."}
+                              "để tránh làm hai lần; bạn chạy lại nếu cần."}
             return
     meta, _ = _read_md(wf_file)
     steps = meta.get("steps", []) or []
@@ -8357,13 +8404,25 @@ async def tts(
 
 
 @app.get("/tts/voices")
-async def tts_voices():
+async def tts_voices(lang: str = Query("")):
+    """Giọng Edge cho MỘT ngôn ngữ. Không truyền `lang` = ngôn ngữ trả lời đang cấu hình.
+
+    Trước đây hàm này lọc cứng `Locale.startswith("vi")`, nên dù Javis có trả lời tiếng Anh
+    thì ô chọn giọng vẫn chỉ hiện giọng Việt - và một câu tiếng Anh đọc bằng giọng Việt thì
+    nghe như máy hỏng. Danh sách ngôn ngữ lấy từ sổ đăng ký chứ không khai lại ở đây.
+    """
     import edge_tts   # lazy - xem ghi chú ở đầu file
+    ma = lang_registry.chuan_hoa(lang) or localefmt.ngon_ngu_tra_loi()
+    # Tiền tố locale suy từ giọng mặc định của ngôn ngữ đó ("vi-VN-HoaiMyNeural" -> "vi-VN"),
+    # để thêm ngôn ngữ vẫn chỉ là thêm một dòng trong sổ đăng ký.
+    giong_mac_dinh = lang_registry.giong_tts(ma, "edge")
+    tien_to = "-".join(giong_mac_dinh.split("-")[:2]) if giong_mac_dinh else ma
     voices = await edge_tts.list_voices()
     return {
+        "lang": ma,
         "voices": [
             {"name": v["ShortName"], "gender": v["Gender"], "display": v["FriendlyName"]}
-            for v in voices if v["Locale"].startswith("vi")
+            for v in voices if v["Locale"].startswith(tien_to)
         ]
     }
 
@@ -8460,7 +8519,23 @@ async def websocket_endpoint(ws: WebSocket):
         async def _do_turn(conv_sid, user_message, brain, turn_tag, runtime_trace=None,
                            has_attachments=False):
             ws = _SendProxy(conv_sid, runtime_trace)  # các nhánh engine bên dưới dùng ws proxy này
-            mcfg = cfgmod.read_settings().get("model", {})
+            _cfg_all = cfgmod.read_settings()
+            mcfg = _cfg_all.get("model", {})
+            # NGÔN NGỮ chốt MỘT LẦN cho cả lượt, ngay đây. Chốt sớm và chốt một chỗ là để câu
+            # trả lời, giọng đọc và các cổng chặn không bao giờ hiểu khác nhau trong cùng một
+            # lượt. Không ai ghim gì thì `resolve` trả `theo_nguoi_dung=True` và chính MODEL
+            # bám theo thứ tiếng người dùng vừa viết - xem đầu file lang.py.
+            _lc = _cfg_all.get("locale") or {}
+            _lang_qd = lang_mod.resolve(
+                turn_text=user_message,
+                reply_pref=_lc.get("reply_lang") or "auto",
+                ui_lang=_lc.get("ui_lang") or "",
+            )
+            try:
+                _CONTEXT_RUNTIME.record_runtime_event(runtime_trace, "lang.resolved",
+                                                      _lang_qd.as_trace())
+            except Exception:
+                pass
             prov, kind, api_key, api_model = _chat_provider(mcfg)
             reasoning = _reasoning_level(mcfg)
             _CONTEXT_RUNTIME.set_route(
@@ -8492,7 +8567,7 @@ async def websocket_endpoint(ws: WebSocket):
             def _legacy_system_prompt():
                 nonlocal sysprompt
                 if sysprompt is None:
-                    sysprompt = build_system_prompt(brain) + channel_context.build_channel_block(
+                    sysprompt = build_system_prompt(brain, lang=_lang_qd) + channel_context.build_channel_block(
                         "dashboard", {"session_id": conv_sid}, telegram_running=bool(_TG_BOT),
                         port=_javis_port(), brain_root=_brain_root(brain),
                     )
@@ -8515,7 +8590,8 @@ async def websocket_endpoint(ws: WebSocket):
                 """
                 def _base(include_memory: bool, include_skills: bool) -> str:
                     return build_system_prompt(
-                        brain, include_memory=include_memory, include_skills=include_skills
+                        brain, include_memory=include_memory, include_skills=include_skills,
+                        lang=_lang_qd,
                     ) + channel_context.build_channel_block(
                         "dashboard", {"session_id": conv_sid}, telegram_running=bool(_TG_BOT),
                         port=_javis_port(), brain_root=_brain_root(brain),
@@ -8553,7 +8629,7 @@ async def websocket_endpoint(ws: WebSocket):
                         "dashboard", prov,
                         _codex_safe_model(api_model) if kind == "oauth"
                         else (api_model or mcfg.get("claude_model") or "mặc định"),
-                        kind, bool(has_attachments),
+                        kind, bool(has_attachments), _lang_qd.lang_cau_hoi, _lang_qd.lang,
                     )
                     # Chỉ nhận "execute". "reject" của đường tắt là lời từ chối dựa trên
                     # TRẦN TỰ KHAI của gói thuê bao, không phải hạn mức nhà cung cấp nói ra -
@@ -8725,7 +8801,7 @@ async def websocket_endpoint(ws: WebSocket):
                     final_text = ("⚠ Chưa cài Antigravity CLI trên máy này. Cài một lần:\n\n"
                                   f"`{antigravity_cli.lenh_cai()}`\n\n"
                                   "Rồi gõ `agy` một lần để đăng nhập Google (qua SSH thì nó in "
-                                  "ra một link để mở trên máy anh).")
+                                  "ra một link để mở trên máy bạn).")
                     await ws.send_text(json.dumps({
                         "type": "response", "content": final_text, "engine": "antigravity-cli",
                         "model": actual_model or "", "session_id": conv_sid,
@@ -8974,6 +9050,7 @@ async def websocket_endpoint(ws: WebSocket):
                                     _FAST_PATH.prepare, runtime_trace, user_message,
                                     _brain_root(brain), "dashboard", prov,
                                     api_model or "?", kind, bool(has_attachments),
+                                    _lang_qd.lang_cau_hoi, _lang_qd.lang,
                                 )
                             except Exception as _exc:
                                 fast_plan = None
@@ -10074,7 +10151,7 @@ def _limit_autoshrink_message(provider: str, model: str, hit: dict) -> str:
         loi = f'\n\n{provider} nói nguyên văn: "{raw}"' if raw else ""
         if remedy == "wait" and cho:
             return (f"{provider} đang chặn nhịp gọi, bảo chờ {cho:.0f} giây. "
-                    f"Anh hỏi lại sau chừng đó là được.{loi}")
+                    f"Bạn hỏi lại sau chừng đó là được.{loi}")
         return (f"{provider} từ chối lượt này vì hạn mức, nhưng không nói rõ hạn mức nào nên "
                 f"Javis chưa biết phải làm gì để qua.{loi}")
 
@@ -11222,6 +11299,27 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
     reasoning = _reasoning_level(mcfg)
     runtime_trace = context_runtime.current_trace()
 
+    # NGÔN NGỮ cho lượt này. Dính theo TỪNG CUỘC CHAT (chat_id), không theo tiến trình: một
+    # bot Telegram phục vụ nhiều người, và ngôn ngữ của người này không được tràn sang người
+    # kia.
+    #
+    # Với bot chuyên trách thì ngôn ngữ do BẢN GHI BOT quyết, và cố ý KHÔNG truyền
+    # `reply_pref` của chủ xuống: bot ghim "auto" nghĩa là "bám theo khách", còn tràn cài đặt
+    # của chủ vào đó là phá đúng lý do trường `ngon_ngu` tồn tại - chủ người Việt bán cho
+    # khách Nhật thì ngôn ngữ của chủ là thông tin SAI để suy ra ngôn ngữ của bot.
+    _lc_kenh = cfgmod.read_settings().get("locale") or {}
+    _lang_qd = lang_mod.resolve(
+        turn_text=text,
+        chatbot_pin=(bot or {}).get("ngon_ngu") or "",
+        reply_pref=("" if bot else (_lc_kenh.get("reply_lang") or "auto")),
+        channel_default=("vi" if channel == "zalo" and not bot else ""),
+        ui_lang=("" if bot else (_lc_kenh.get("ui_lang") or "")),
+    )
+    try:
+        _CONTEXT_RUNTIME.record_runtime_event(runtime_trace, "lang.resolved", _lang_qd.as_trace())
+    except Exception:
+        pass
+
     async def _p(s):
         # Báo trạng thái trung gian về kênh (Telegram) cho user đỡ lo khi chờ. Bỏ qua nếu lỗi.
         if progress:
@@ -11297,7 +11395,7 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
     # dashboard (bản đầy đủ còn TO HƠN cái vừa bị từ chối vì quá to), nhưng ở kênh này ta chưa
     # có đường nào khác để đi, nên cứ chạy tiếp và để nhà cung cấp nói nếu thật sự quá hạn mức.
     if not sysprompt:
-        sysprompt = build_system_prompt(brain)
+        sysprompt = build_system_prompt(brain, lang=_lang_qd)
     sysprompt += channel_context.build_channel_block(
         channel, meta, telegram_running=(channel == "telegram"), port=_javis_port(),
         brain_root=_brain_root(brain))
@@ -11319,7 +11417,8 @@ async def _tg_answer_engine(text, meta, progress, *, chat_id, sess, brain, mcfg,
         try:
             _fp = await asyncio.to_thread(
                 _FAST_PATH.prepare, runtime_trace, text, _brain_root(brain), channel, prov,
-                api_model or mcfg.get("claude_model") or "mặc định", kind, False)
+                api_model or mcfg.get("claude_model") or "mặc định", kind, False,
+                _lang_qd.lang_cau_hoi, _lang_qd.lang)
         except Exception as _e:
             _fp = None
             _CONTEXT_RUNTIME.record_runtime_event(
@@ -11978,7 +12077,7 @@ async def _tg_command(cmd, arg, chat=None, meta=None):
             if len(_ung_vien) > 1:
                 _ten = ", ".join(_tg_prov_label(p) for p in _ung_vien)
                 return {"reply": f"⚠ '{a}' có ở nhiều nhà cung cấp ({_ten}) nên không đoán "
-                                 f"được ý anh. Gõ /model rồi chọn bằng nút cho chắc."}
+                                 f"được ý bạn. Gõ /model rồi chọn bằng nút cho chắc."}
             # Không provider nào khai model này (danh sách hỏng, hoặc tên mới tinh) → về mấy
             # luật đoán cũ: id chứa "/" = OpenRouter; gpt*/*-codex = ChatGPT; còn lại = Claude.
             if "/" in a:
@@ -12050,8 +12149,23 @@ async def _stt_nghe(data, ten=""):
     bot. Đọc lúc dựng bot thì key mới dán nằm im tới lần khởi động sau, mà chẳng có gì trên
     màn hình nói cho người ta biết điều đó.
     """
-    key = (cfgmod.read_settings().get("model") or {}).get("groq_api_key") or ""
-    return await stt.groq_nghe(data, ten, key)
+    _cfg = cfgmod.read_settings()
+    key = (_cfg.get("model") or {}).get("groq_api_key") or ""
+    # Gợi ý ngôn ngữ theo cấu hình. reply_lang="auto" -> truyền "" để Whisper TỰ DÒ, thay vì
+    # ép "vi" như trước: người nói tiếng Anh vào một Javis đang để "auto" thì cái ép đó biến
+    # câu của họ thành một câu tiếng Việt sai nghĩa.
+    _lc2 = _cfg.get("locale") or {}
+    # Thứ tự: ngôn ngữ trả lời đã GHIM -> ngôn ngữ giao diện -> để Whisper tự dò.
+    #
+    # `ui_lang` ở giữa là để CHỮA MỘT HỒI QUY chứ không phải cho đẹp: `reply_lang` mặc định
+    # là "auto", nên nếu chỉ đọc mỗi nó thì mọi máy đang chạy đột nhiên mất gợi ý "vi" mà chủ
+    # máy không đổi cài đặt gì. Whisper không có gợi ý thì câu tiếng Việt NGẮN hay bị đoán
+    # nhầm sang tiếng khác rồi dịch luôn, ra một câu không ai gõ bao giờ - đúng lý do gợi ý
+    # này tồn tại từ đầu.
+    _ma = (lang_registry.chuan_hoa(_lc2.get("reply_lang") or "")
+           or lang_registry.chuan_hoa(_lc2.get("ui_lang") or ""))
+    return await stt.groq_nghe(data, ten, key,
+                               ngon_ngu=(lang_registry.get(_ma).stt if _ma else ""))
 
 
 # ============================================================
@@ -12315,7 +12429,7 @@ async def chatbots_list(brain: str = ""):
     # Nhãn + cảnh báo rủi ro của từng mức quyền đi kèm luôn: giao diện KHÔNG được giữ bản chép
     # riêng. Chép riêng thì một hôm server siết thêm một rào mà ô cảnh báo vẫn hứa như cũ, và
     # chủ bấm đồng ý dựa trên một câu đã sai.
-    return {"bots": out, "muc_quyen": [
+    return {"bots": out, "lang_list": lang_registry.cho_giao_dien(), "muc_quyen": [
         {"id": m, "nhan": chatbot_store.MUC_NHAN.get(m, m),
          "canh_bao": chatbot_store.canh_bao_muc(m),
          "can_xac_nhan": m in chatbot_store.MUC_NANG}
@@ -12408,7 +12522,8 @@ async def chatbots_create(name: str = Form(...), agent_slug: str = Form(...),
                           bot_username: str = Form(""), handoff_to: str = Form(""),
                           nguon_tra_loi: str = Form(""), muc_quyen: str = Form(""),
                           groups: str = Form(""), reply_when: str = Form(""),
-                          channel: str = Form(""), xac_nhan_rui_ro: str = Form("")):
+                          channel: str = Form(""), xac_nhan_rui_ro: str = Form(""),
+                          ngon_ngu: str = Form("")):
     # Bot sống TRONG một brain: Agent nó dùng và tài liệu nó đọc là cùng một chỗ. Nhận cả hai
     # tên tham số và tự bù cho nhau, nên người gọi chỉ cần gửi một cái.
     br = (brain or agent_brain or "").strip()
@@ -12424,6 +12539,9 @@ async def chatbots_create(name: str = Form(...), agent_slug: str = Form(...),
         # Nhóm khai được NGAY LÚC TẠO. Bản trước chỉ cho khai ở form Sửa, nên đường đi tự nhiên
         # nhất ("tạo bot, thả vào nhóm, gọi tên") luôn kết thúc bằng một con bot im lặng.
         "groups": groups, "reply_when": reply_when,
+        # Ngôn ngữ bot trả lời KHÁCH. "auto" = bám theo khách; ghim một mã khi khách của chủ
+        # nói cùng một thứ tiếng. Cố ý KHÔNG thừa hưởng ngôn ngữ của chủ, xem chatbot_store.
+        "ngon_ngu": ngon_ngu,
     })
     if err:
         return JSONResponse({"ok": False, "error": err}, status_code=400)

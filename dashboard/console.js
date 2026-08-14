@@ -7,6 +7,10 @@
 (function () {
   "use strict";
 
+  // Locale để định dạng số/ngày. Lấy từ i18n chứ KHÔNG khoá "vi-VN": người dùng đổi
+  // ngôn ngữ giao diện thì ngày giờ phải đổi theo, nếu không thì nửa màn hình tiếng Anh
+  // mà ngày vẫn dd/mm/yyyy kiểu Việt.
+  const LOC = () => (window.JavisI18n && JavisI18n.locale()) || "vi-VN";
   // ---- Khai báo các mục trên rail (mở rộng = thêm dòng ở đây) ----
   // type 'view' = render trong cview ; có launch() = nút mở overlay/modal sẵn có.
   const APP_VERSION = "0.4.3";   // fallback hiển thị tức thời; nguồn thật là /version (file VERSION)
@@ -71,44 +75,30 @@
   const SAVE_ICON = ic("save");
   const X_ICON = ic("x");
 
+  // Nhãn rail lấy từ TỪ ĐIỂN (thư mục dashboard/i18n) chứ không viết cứng. `t()` suy biến về
+  // tiếng Việt khi thiếu key, nên một bản dịch làm dở không bao giờ để lại key trần trên rail.
   const RAIL_ITEMS = [
-    { id: "home",        icon: ICON.home,        label: "Javis" },
-    { id: "chat",        icon: ICON.chat,        label: "Trò chuyện" },
-    { id: "settings",    icon: ICON.settings,    label: "Cài đặt" },
-    { id: "workflows",   icon: ICON.workflows,   label: "Workflows" },
-    { id: "agents",      icon: ICON.agents,      label: "Agents" },
-    { id: "skills",      icon: ICON.skills,      label: "Skills" },
-    { id: "chatbots",    icon: ICON.chatbots,    label: "Chatbot" },
-    { id: "files",       icon: ICON.files,       label: "Tệp tin" },
-    { id: "terminal",    icon: ICON.terminal,    label: "Terminal" },
-    { id: "selfimprove", icon: ICON.selfimprove, label: "Việc định kỳ" },
-    { id: "learn",       icon: ICON.learn,       label: "Tự học" },
-    { id: "kanban",      icon: ICON.kanban,      label: "Việc" },
-    { id: "models",      icon: ICON.models,      label: "Models" },
-    { id: "channels",    icon: ICON.channels,    label: "Kênh" },
-    { id: "mcp",         icon: ICON.mcp,         label: "Kết nối" },
-    { id: "plugins",     icon: ICON.plugins,     label: "Plugins" },
-    { id: "logs",        icon: ICON.logs,        label: "Cập nhật" },
-    { id: "account",     icon: ICON.account,     label: "Tài khoản" },
-    { id: "usage",       icon: ICON.usage,       label: "Mức dùng" },
-  ];
+    "home", "chat", "settings", "workflows", "agents", "skills", "chatbots", "files",
+    "terminal", "selfimprove", "learn", "kanban", "models", "channels", "mcp", "plugins",
+    "logs", "account", "usage",
+  ].map(id => ({ id, icon: ICON[id], get label() { return t(`page.${id}.label`); } }));
 
   // ---- Gom rail thành nhóm theo chức năng (dễ tìm hơn danh sách phẳng 18 mục) ----
   // Nhóm cuối (foot:true) được ghim xuống ĐÁY rail; các nhóm còn lại cuộn ở giữa.
   // Thứ tự & thành viên đổi ở đây; RAIL_ITEMS vẫn là nguồn icon/label + tra cứu cho go().
   const RAIL_GROUPS = [
-    { label: "Trợ lý",      icon: GICON["Trợ lý"],   ids: ["home", "chat"] },
-    { label: "Bộ não",      icon: GICON["Bộ não"],   ids: ["files", "learn"] },
+    { get label() { return t("nav.group.tro_ly"); },      icon: GICON["Trợ lý"],   ids: ["home", "chat"] },
+    { get label() { return t("nav.group.bo_nao"); },      icon: GICON["Bộ não"],   ids: ["files", "learn"] },
     // "Code" là NHÓM riêng, không phải một mục nhét vào "Bộ não". Đây là một KHU VỰC làm việc
     // sẽ dày lên (Terminal hôm nay, các công cụ lập trình khác sau này), chứ không phải một
     // chức năng của Second Brain - chủ repo nói rõ điều đó khi thấy bản đầu xếp nhầm.
     // Thêm chức năng Code mới = thêm 1 mục vào RAIL_ITEMS + 1 id vào đây + 1 dòng trong
     // CHUC_NANG của dashboard/code-term.js.
-    { label: "Code",        icon: GICON["Code"],     ids: ["terminal"] },
-    { label: "Năng lực",    icon: GICON["Năng lực"], ids: ["agents", "chatbots", "skills", "workflows", "plugins"] },
-    { label: "Việc",        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
-    { label: "Kết nối",     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
-    { label: "Hệ thống",    icon: GICON["Hệ thống"], ids: ["usage", "settings", "logs", "account"], foot: true },
+    { get label() { return t("nav.group.code"); },        icon: GICON["Code"],     ids: ["terminal"] },
+    { get label() { return t("nav.group.nang_luc"); },    icon: GICON["Năng lực"], ids: ["agents", "chatbots", "skills", "workflows", "plugins"] },
+    { get label() { return t("nav.group.viec"); },        icon: GICON["Việc"],     ids: ["kanban", "selfimprove"] },
+    { get label() { return t("nav.group.ket_noi"); },     icon: GICON["Kết nối"],  ids: ["mcp", "channels", "models"] },
+    { get label() { return t("nav.group.he_thong"); },    icon: GICON["Hệ thống"], ids: ["usage", "settings", "logs", "account"], foot: true },
   ];
   const RAIL_BY_ID = Object.fromEntries(RAIL_ITEMS.map(i => [i.id, i]));
   // Trả về [{label, foot, items:[...]}], bỏ id không tồn tại. Mục nào chưa xếp nhóm → dồn vào "Khác".
@@ -133,27 +123,22 @@
 
   // icon lấy từ VIEW_ICON ở đầu file - đừng khai icon riêng ở đây, hai bảng
   // lệch nhau là lỗi đã xảy ra một lần rồi.
-  const VIEW_META = {
-    home:        { icon: VIEW_ICON.home, label: "Javis OS", sub: "" },
-    chat:        { icon: VIEW_ICON.chat, label: "Trò chuyện", sub: "Khung chat rộng · lịch sử hội thoại" },
-    settings:    { icon: VIEW_ICON.settings, label: "Cài đặt", sub: "Hệ thống · giao diện · giọng nói · truy cập" },
-    workflows:   { icon: VIEW_ICON.workflows, label: "Workflows", sub: "Chuỗi agent tự động" },
-    agents:      { icon: VIEW_ICON.agents, label: "Agents", sub: "Trợ lý chuyên biệt" },
-    skills:      { icon: VIEW_ICON.skills, label: "Skills", sub: "Kỹ năng khả dụng" },
-    files:       { icon: VIEW_ICON.files, label: "Tệp tin", sub: "Duyệt · sửa · tải file trong brain" },
-    terminal:    { icon: VIEW_ICON.terminal, label: "Terminal", sub: "Dòng lệnh chạy thẳng trên máy đang chạy Javis" },
-    selfimprove: { icon: VIEW_ICON.selfimprove, label: "Việc định kỳ", sub: "Việc định kỳ + nhắc hẹn đang chờ" },
-    chatbots:    { icon: VIEW_ICON.chatbots, label: "Chatbot", sub: "Bot chuyên trách trả lời khách qua Telegram" },
-    learn:       { icon: VIEW_ICON.learn, label: "Tự học", sub: "Rewire Memory · Wiki · Skill (an toàn, undo được)" },
-    kanban:      { icon: VIEW_ICON.kanban, label: "Việc (Kanban)", sub: "AI tự đặc tả, điều phối và chạy task nền" },
-    models:      { icon: VIEW_ICON.models, label: "Models", sub: "Main model & providers" },
-    channels:    { icon: VIEW_ICON.channels, label: "Kênh kết nối", sub: "Telegram & hơn nữa" },
-    mcp:         { icon: VIEW_ICON.mcp, label: "Kết nối", sub: "Nguồn dữ liệu & công cụ" },
-    plugins:     { icon: VIEW_ICON.plugins, label: "Plugins", sub: "Tool/hook native cho mọi engine" },
-    logs:        { icon: VIEW_ICON.logs, label: "Nhật ký cập nhật", sub: "Phiên bản & tính năng mới" },
-    account:     { icon: VIEW_ICON.account, label: "Tài khoản", sub: "Đăng nhập, workspace, token API" },
-    usage:       { icon: VIEW_ICON.usage, label: "Mức dùng", sub: "Mức tiết kiệm token, và token đã tiêu theo ngày" },
-  };
+  // Tiêu đề + phụ đề của mỗi trang, lấy từ TỪ ĐIỂN. Dùng getter chứ không đọc `t()` một lần
+  // lúc nạp: từ điển về bất đồng bộ, và đọc sớm thì mọi nhãn đóng băng ở giá trị lúc chưa có.
+  //
+  // `page.<id>.title` cho phép tiêu đề trang KHÁC nhãn trên rail khi cần (rail chật nên
+  // "Việc", trang rộng nên "Việc (Kanban)"); thiếu key đó thì tự rơi về `page.<id>.label`.
+  const VIEW_META = Object.fromEntries(["home", "chat", "settings", "workflows", "agents", "skills", "files", "terminal", "selfimprove", "chatbots", "learn", "kanban", "models", "channels", "mcp", "plugins", "logs", "account", "usage"].map(id => [id, {
+    icon: VIEW_ICON[id],
+    get label() {
+      const rieng = t(`page.${id}.title`);
+      return rieng === `page.${id}.title` ? t(`page.${id}.label`) : rieng;
+    },
+    get sub() {
+      const v = t(`page.${id}.sub`);
+      return v === `page.${id}.sub` ? "" : v;
+    },
+  }]));
 
   // 4 trang tách từ Studio cũ - render container rồi gọi loader trong studio.js (window.JavisStudio).
   const STUDIO_PAGES = ["workflows", "agents", "skills"];
@@ -1502,13 +1487,13 @@
     let pollTimer = null;       // 1 chuỗi poll duy nhất (clearTimeout trước khi đặt lại)
     el.innerHTML = `<div class="cview-section"><div class="empty">Đang tải...</div></div>`;
     const GNAME = { business: "Kinh doanh", brain: "Bộ não", product: "Cải thiện Javis", custom: "Tự định nghĩa" };
-    const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : "-";
+    const fmtT = ts => ts ? new Date(ts * 1000).toLocaleTimeString(LOC(), { hour: "2-digit", minute: "2-digit" }) : "-";
     // Giờ TRẦN (chỉ "07:00") không cho biết là hôm nay, mai hay tuần sau - nhìn thẻ việc vẫn
     // không biết bao giờ nó chạy. fmtWhen luôn nói rõ NGÀY khi không phải hôm nay.
     function fmtWhen(ts) {
       if (!ts) return "-";
       const d = new Date(ts * 1000), now = new Date();
-      const hm = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+      const hm = d.toLocaleTimeString(LOC(), { hour: "2-digit", minute: "2-digit" });
       const day = x => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
       const tomorrow = new Date(now.getTime() + 86400000);
       if (day(d) === day(now)) return `hôm nay ${hm}`;
@@ -1529,7 +1514,7 @@
     }
 
     el.innerHTML = `<div class="cview-section">
-      <p style="color:var(--text3);font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> anh mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để anh duyệt.</p>
+      <p style="color:var(--text3);font-size:15px;max-width:680px;margin:0 0 14px">Nhiều <b>loop</b> chạy ngầm: mỗi loop tự thức theo chu kỳ, làm <b>một việc</b> bạn mô tả, tự kiểm chứng rồi ghi log. Thực thi <b>tuần tự</b> (1 vòng/lúc). Loop <b>đọc được dữ liệu thật qua MCP</b> (POS, quảng cáo, lịch...) để làm việc, nhưng KHÔNG tự tạo đơn/tiêu tiền/đăng bài - chỉ ghi nháp để bạn duyệt.</p>
       <div class="si-actions" style="margin-bottom:14px">
         <button class="s-btn" id="lpNew">+ Thêm việc</button>
         <button class="s-btn-ghost" id="lpStop">■ Dừng vòng đang chạy</button>
@@ -1565,14 +1550,14 @@
                 <button class="si-chip" data-mq="auto">Ghi file</button>
                 <button class="si-chip sel" data-mq="full">Toàn quyền</button></div></div>
             </div>
-            <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc anh; "Tự làm rồi báo" = Javis chạy đúng việc này rồi báo kết quả.</div>
+            <div class="dim" style="font-size:12px;color:var(--text3);margin-top:4px">Nhắc một lần: "30 phút nữa", "8h30", "2026-07-20 09:00". Lặp theo giờ cố định: cron 5 trường (vd "0 7 * * *" = 7h sáng mỗi ngày). "Chỉ nhắc" = bắn tin nhắc bạn; "Tự làm rồi báo" = Javis chạy đúng việc này rồi báo kết quả.</div>
             <div id="lpRemMqWarn" style="display:none;margin-top:6px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
               <b>${WARN_ICON} TOÀN QUYỀN.</b> Tới giờ việc này chạy <b>một mình</b>, với đầy đủ quyền như lúc bạn đang ngồi chat: nó dùng được mọi công cụ đã đấu, nên tuỳ việc bạn giao mà nó có thể <b>gửi tin, đăng bài, đặt lịch, tạo đơn hoặc tiêu tiền thật</b>. Ở bước đó không có ai duyệt lại, và phần lớn những việc đó <b>không rút lại được</b>. Chỉ giao thứ bạn sẵn sàng để nó tự làm; muốn nó chỉ đọc rồi báo lại thì chọn <b>Chỉ đọc</b>.
             </div>
           </div>
           <div class="si-field"><label>Brain (nơi lưu việc)</label><select id="lpBrain" class="loop-sel" style="min-width:180px"></select></div>
           <div id="lpFullWarn" style="display:none;margin-top:4px;padding:10px 12px;border:1px solid rgba(224,102,74,.5);border-radius:8px;background:rgba(224,102,74,.08);color:var(--red);font-size:13px;line-height:1.5">
-            <b>${WARN_ICON} CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi anh đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
+            <b>${WARN_ICON} CHẾ ĐỘ TOÀN QUYỀN - rủi ro cao.</b> Loop sẽ tự thao tác THẬT qua MCP không cần hỏi: có thể <b>tạo/sửa đơn hàng, chạy quảng cáo (tiêu tiền thật), gửi tin nhắn/email, đăng bài</b>. Nó chạy nền theo lịch, KHÔNG có người duyệt từng bước, và <b>hành động thật không hoàn tác được</b>. Chỉ bật khi bạn đã tin tưởng loop này và mô tả nhiệm vụ thật rõ ràng, giới hạn phạm vi. Nên chạy thử ở "Đề xuất" hoặc "Tự làm (an toàn)" trước.
           </div>
           <div class="dim" id="lpLoopNote" style="font-size:12px;color:var(--text3);margin-top:2px">Đề xuất = chỉ đọc + gợi ý. Tự làm (an toàn) = ghi nháp file + đọc MCP, KHÔNG tiền/đơn/đăng bài. Toàn quyền = tự thao tác mọi thứ. · Tinh chỉnh nâng cao (giờ im lặng, trần vòng/ngày, thư mục code): sửa file <code>Javis/loops/&lt;tên&gt;.md</code>.</div>
           <div class="si-actions"><button class="s-btn" id="lpSave">${SAVE_ICON} Lưu</button><button class="s-btn-ghost" id="lpCancel">Huỷ</button><span class="dim" id="lpFormMsg" style="font-size:13px;color:var(--warn-ink)"></span></div>
@@ -2376,7 +2361,7 @@
       <div class="kn-health">
         <div class="kn-kpi"><span>Worker đang chạy</span><b id="knKpiActive">0</b></div>
         <div class="kn-kpi"><span>Đang chờ</span><b id="knKpiQueue">0</b></div>
-        <div class="kn-kpi"><span>Cần anh xử lý</span><b id="knKpiAttention">0</b></div>
+        <div class="kn-kpi"><span>Cần bạn xử lý</span><b id="knKpiAttention">0</b></div>
         <div class="kn-kpi"><span>Hoàn thành 24h</span><b id="knKpiDone">0</b></div>
       </div>
       <div class="si-field" style="margin-bottom:14px"><label>Chế độ dispatcher</label><div class="si-row" id="knOrch"></div></div>
@@ -2396,7 +2381,7 @@
           <section class="kn-panel"><div class="kn-panel-head"><b>Hàng đợi AI</b><span id="knQueueCount">0 task</span></div><div class="kn-list" id="knQueue"></div></section>
         </div>
         <div style="display:flex;flex-direction:column;gap:14px">
-          <section class="kn-panel"><div class="kn-panel-head"><b style="color:var(--accent-ink)">Cần anh xử lý</b><span id="knAttentionCount">0 ngoại lệ</span></div><div class="kn-list" id="knAttention"></div></section>
+          <section class="kn-panel"><div class="kn-panel-head"><b style="color:var(--accent-ink)">Cần bạn xử lý</b><span id="knAttentionCount">0 ngoại lệ</span></div><div class="kn-list" id="knAttention"></div></section>
           <section class="kn-panel"><div class="kn-panel-head"><b>Lịch sử gần đây</b><span>24 giờ và mới nhất</span></div><div class="kn-list" id="knHistory"></div></section>
         </div>
       </div>
@@ -2834,7 +2819,7 @@
         on ? (j.ly_do ? "bật nhưng không chạy" : "bật") : "tắt";
       const meta = document.getElementById("ovAutoMeta");
       meta.innerHTML = on
-        ? "Javis tự chạy nền mỗi khi anh đăng nhập Windows - không cần bật tay. Chạy ẩn, mở <code>localhost:7777</code> để dùng."
+        ? "Javis tự chạy nền mỗi khi bạn đăng nhập Windows - không cần bật tay. Chạy ẩn, mở <code>localhost:7777</code> để dùng."
         : "Bật để Javis tự khởi động mỗi khi mở máy. Chạy ẩn ở nền, không hiện cửa sổ.";
       if (j.ly_do) meta.innerHTML += '<br><span class="dim">' + WARN_ICON + " " + esc(j.ly_do) + "</span>";
       const btn = document.getElementById("ovAutoToggle");
@@ -2960,7 +2945,7 @@
           : (p.cli_found ? "○ Đã cài CLI, chưa đăng nhập" : "○ Chưa cài Antigravity CLI");
         return `<div class="prov-card ${p.is_main ? "main" : ""}">
           ${provHead(p, on, "MCP/skill", st)}
-          <div class="prov-note">Dùng <b>gói Google của anh</b>, không cần mua API key. Đây là
+          <div class="prov-note">Dùng <b>gói Google của bạn</b>, không cần mua API key. Đây là
             bản Google chỉ định thay cho Gemini CLI, và cho chọn <b>đúng dàn model của
             Antigravity IDE</b> - gồm cả model không phải của Google.</div>
           ${p.cli_found ? "" : `<div class="prov-steps">
@@ -3335,7 +3320,7 @@
     try { window.open(r.authorize_url, "_blank"); } catch (e) {}
     if (hop) hop.innerHTML = `
       <div class="prov-steps">
-        <div><b>1)</b> Mở link này rồi đăng nhập bằng tài khoản Google của anh:<br>
+        <div><b>1)</b> Mở link này rồi đăng nhập bằng tài khoản Google của bạn:<br>
           <a href="${esc(safeHref(r.authorize_url))}" target="_blank" rel="noopener"
              style="color:var(--link-ink);word-break:break-all">${esc(r.authorize_url.slice(0, 90))}…</a></div>
         <div><b>2)</b> Đồng ý xong, Google hiện ra <b>một mã</b>. Chép mã đó dán vào đây:</div>
@@ -4478,7 +4463,7 @@
         <div class="gcard" style="max-width:560px">
           <div class="gcard-meta">Token để <b>Javis CLI</b> (hoặc script) gọi được Javis từ máy khác. Không có token nào sẵn - chưa tạo thì không đường nào vào ngoài trình duyệt.</div>
           <label class="js-lbl">Tên token</label>
-          <input class="js-input" id="tkName" placeholder="Ví dụ: laptop của anh">
+          <input class="js-input" id="tkName" placeholder="Ví dụ: laptop của bạn">
           <label class="js-lbl">Phạm vi</label>
           <select class="js-input" id="tkScope">
             <option value="chat">Chỉ chat - vào được /chat, /version, /health, /sessions</option>
@@ -4604,7 +4589,7 @@
         + ` Còn <b>${con}</b> mã khôi phục.`
         + (con <= 2 ? ' <span class="tfa-warn">Sắp hết - nên tạo bộ mới.</span>' : "");
       body.innerHTML = `
-        <label class="js-lbl">Mật khẩu (xác nhận là chính anh)</label>
+        <label class="js-lbl">Mật khẩu (xác nhận là chính bạn)</label>
         <input class="js-input" id="tfaPw" type="password" placeholder="Mật khẩu đang dùng">
         <label class="js-lbl">Mã 6 số (chỉ cần khi TẮT)</label>
         <input class="js-input" id="tfaCode" inputmode="numeric" placeholder="Mã đang hiện, hoặc mã khôi phục">
@@ -4636,7 +4621,7 @@
     // Chưa bật. `totp_suggested` = lúc cài người dùng đã CHỌN bật 2FA (install.sh ghi cờ vào
     // .env), nên nói rõ ra thay vì để họ tự nhớ mình đã chọn gì mấy phút trước.
     head.innerHTML = a.totp_suggested
-      ? ic("shield") + " <b>Anh đã chọn bật 2 lớp lúc cài.</b> Bấm Bật để quét QR và hoàn tất."
+      ? ic("shield") + " <b>Bạn đã chọn bật 2 lớp lúc cài.</b> Bấm Bật để quét QR và hoàn tất."
       : ic("shield") + " Chưa bật. Bật thì mật khẩu lộ ra ngoài cũng chưa đủ để vào được Javis.";
     body.innerHTML = `<div class="js-actions"><button class="gcard-btn" id="tfaOn">Bật xác thực 2 lớp</button></div>`;
     document.getElementById("tfaOn").onclick = async () => {
@@ -4665,7 +4650,7 @@
         // Mã khôi phục chỉ hiện ĐÚNG LÚC NÀY. Server giữ bản băm nên không có đường nào xem lại.
         hienMaKhoiPhuc(body, d.recovery,
           "Đã bật. Chép 10 mã khôi phục dưới đây ra chỗ an toàn NGAY - chúng chỉ hiện một lần, "
-          + "và là đường vào duy nhất nếu anh mất điện thoại:");
+          + "và là đường vào duy nhất nếu bạn mất điện thoại:");
         bao("Đã bật xác thực 2 lớp.");
       };
       document.getElementById("tfaConfirm").onclick = xacNhan;
@@ -4703,7 +4688,7 @@
     if (!ds.length) { box.innerHTML = '<div class="gcard-meta">Chưa có token nào.</div>'; return; }
     box.innerHTML = ds.map(t => {
       const dung = Number(t.last_used_at) > 0
-        ? "dùng lần cuối " + new Date(Number(t.last_used_at) * 1000).toLocaleString("vi-VN")
+        ? "dùng lần cuối " + new Date(Number(t.last_used_at) * 1000).toLocaleString(LOC())
         : "chưa dùng lần nào";
       const pv = t.scope === "chat" ? "chỉ chat" : "toàn quyền";
       return `<div class="tk-row">
@@ -4809,6 +4794,31 @@
     const currentModel = model.main?.model || (mainProviderId === "openrouter" ? model.openrouter_model : model.claude_model) || "Mặc định";
     const opt = (val, label, cur) => `<option value="${esc(val)}"${val === cur ? " selected" : ""}>${esc(label)}</option>`;
     const oaVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"];
+    // NGÔN NGỮ TRẢ LỜI. Danh sách lấy từ /lang/list (sổ đăng ký phía server) chứ KHÔNG khai
+    // lại ở đây: khai hai nơi thì thêm ngôn ngữ mới lại phải nhớ sửa cả hai, và chỗ bị quên
+    // là chỗ hỏng trong im lặng.
+    const lc = s.locale || {};
+    const langs = (s.lang_list || []);
+    const replyLang = lc.reply_lang || "auto";
+    const uiLang = (window.JavisI18n && JavisI18n.lang()) || "vi";
+    const langHtml = `
+      <div class="qs-block">
+        <div class="popover-label">${esc(t("settings.ui_lang.title"))}</div>
+        <select class="js-input" id="vpUiLang">
+          ${langs.map(l => opt(l.ma, l.ten, uiLang)).join("")}
+        </select>
+        <div class="qs-hint">${esc(t("settings.ui_lang.hint"))}
+          <b>${esc(t("settings.ui_lang.beta"))}</b></div>
+      </div>
+      <div class="qs-block">
+        <div class="popover-label">${esc(t("settings.lang.title"))}</div>
+        <select class="js-input" id="vpReplyLang">
+          ${opt("auto", t("settings.lang.auto"), replyLang)}
+          ${langs.map(l => opt(l.ma, l.ten, replyLang)).join("")}
+        </select>
+        <div class="qs-hint">${esc(t("settings.lang.hint"))}</div>
+      </div>`;
+
     // Nhà cung cấp giọng đọc - gộp NGAY trong nhóm giọng nói (render vào #ttsProviderHost), không tách section riêng.
     const provHtml = `
       <div class="qs-block">
@@ -4910,6 +4920,23 @@
     // không hiện ra, và nút Lưu tưởng là chưa có tài khoản nên bấm không ăn.
     if (window.__javisRefreshAuthRow) { try { await window.__javisRefreshAuthRow(); } catch (e) {} }
     if (window.__javisRefreshExtras) { try { window.__javisRefreshExtras(); } catch (e) {} }  // nạp lại avatar/tên miền
+    const langHost = document.getElementById("replyLangHost");
+    if (langHost) {
+      langHost.innerHTML = langHtml;
+      const sel = document.getElementById("vpReplyLang");
+      if (sel) sel.onchange = async () => {
+        const r = await saveSetting("locale", { reply_lang: sel.value });
+        toast(r && r.ok ? t("settings.lang.saved") : t("settings.save_failed"), !(r && r.ok));
+      };
+      const selUi = document.getElementById("vpUiLang");
+      if (selUi) selUi.onchange = async () => {
+        // Đổi NGAY trên máy này trước, rồi mới lưu lên server. Ngôn ngữ giao diện là lựa chọn
+        // THEO THIẾT BỊ (người dùng mở Javis từ nhiều máy), nên trải nghiệm phải tức thì và
+        // không được phụ thuộc vào việc gọi mạng có thành công hay không.
+        try { await JavisI18n.setLang(selUi.value); } catch (e) { /* noop */ }
+        await saveSetting("locale", { ui_lang: selUi.value });
+      };
+    }
     const provHost = document.getElementById("ttsProviderHost");   // điểm neo trong nhóm giọng nói (index.html)
     if (provHost) provHost.innerHTML = provHtml;
 
@@ -4999,7 +5026,7 @@
       // trang Tổng quan lẫn trang Cài đặt, viết hai bản thì sớm muộn hai bản nói khác nhau.
       // Bản trước trang này bỏ qua hẳn cờ `stale`, nên cùng một máy hỏng mà hai trang nói khác nhau.
       document.getElementById("setAutoMeta").innerHTML = (on
-        ? "Javis tự chạy nền khi anh đăng nhập Windows; mở <code>localhost:7777</code> để dùng."
+        ? "Javis tự chạy nền khi bạn đăng nhập Windows; mở <code>localhost:7777</code> để dùng."
         : "Bật để Javis tự khởi động ở nền mỗi khi mở máy.")
         + (j.ly_do ? '<br><span class="dim">' + WARN_ICON + " " + esc(j.ly_do) + "</span>" : "");
       const button = document.getElementById("setAutoToggle");
@@ -5280,8 +5307,12 @@
       openGroup: groupLabelOf("home"),   // accordion 2 tầng: nhóm đang mở (mặc định nhóm chứa trang đầu)
       collapsed: (() => { try { return localStorage.getItem("javis_rail_collapsed") === "1"; } catch (e) { return false; } })(),
       collapseIcon: COLLAPSE_ICON,
-      get groups() { return railGroups(); },
-      get meta() { return VIEW_META[this.active] || VIEW_META.home; },
+      // Alpine không biết từ điển i18n đổi (nó là object thuần), nên phải có một biến
+      // ĐẾM phản ứng để đá vào getter. Thiếu nó thì đổi ngôn ngữ xong rail vẫn chữ cũ
+      // cho tới khi F5 - một kiểu hỏng nhìn như "lưu không ăn".
+      i18nTick: 0,
+      get groups() { void this.i18nTick; return railGroups(); },
+      get meta() { void this.i18nTick; return VIEW_META[this.active] || VIEW_META.home; },
       isOpen(label) { return this.openGroup === label; },
       toggleGroup(label) { this.openGroup = (this.openGroup === label) ? null : label; },   // 1 nhóm mở 1 lúc; bấm lại để đóng
       toggleCollapsed() {   // thu/mở sidebar: thu → chỉ còn icon; mở → đầy chữ. Nhớ lựa chọn qua localStorage.
@@ -6052,6 +6083,16 @@
   }
 
   // Tooltip NHANH cho rail khi thu gọn (native title trễ ~500ms). 1 node body-level, thoát mọi overflow clip.
+  // Từ điển i18n về (hoặc user đổi ngôn ngữ giao diện): đá biến đếm cho Alpine vẽ lại rail
+  // và tiêu đề trang, rồi quét lại các nhãn tĩnh trong index.html.
+  window.addEventListener("javis:i18n", () => {
+    try {
+      const st = window.Alpine && Alpine.store("nav");
+      if (st) st.i18nTick++;
+    } catch (e) { /* Alpine chưa dựng xong - lát nữa nó đọc từ điển đã đầy rồi */ }
+    try { window.JavisI18n && JavisI18n.applyDom(); } catch (e) { /* noop */ }
+  });
+
   function initRailTooltip() {
     const nav = document.querySelector(".rail-nav"); if (!nav) return;
     let tip = document.getElementById("railTip");
