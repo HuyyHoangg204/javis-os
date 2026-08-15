@@ -14,8 +14,9 @@ class JavisVoice {
     this.recognition = null;
     this.synth = window.speechSynthesis;
     this.isListening = false;
-    // Nhớ lựa chọn bật/tắt đọc qua reload (khách hàng nhiều khi không muốn có voice).
-    this.ttsEnabled = (localStorage.getItem("javis.ttsEnabled") !== "0");
+    // Nhớ lựa chọn bật/tắt đọc qua reload. MẶC ĐỊNH TẮT: người dùng mới vào phải im lặng,
+    // chỉ đọc thành tiếng khi họ tự bật công tắc (lưu "1" vào localStorage).
+    this.ttsEnabled = (localStorage.getItem("javis.ttsEnabled") === "1");
     this.vietnameseVoice = null;
 
     // Edge TTS backend (server)
@@ -213,15 +214,16 @@ class JavisVoice {
   }
 
   // Đọc NGAY: ngắt phần đang đọc + xoá hàng đợi, rồi đọc đoạn này.
-  speak(text) {
+  // opts.force = đọc kể cả khi đang tắt tiếng (dùng cho nút "nghe thử giọng").
+  speak(text, opts = {}) {
     this.stopSpeaking();
-    this.enqueueSpeak(text);
+    this.enqueueSpeak(text, opts);
   }
 
   // Đọc NỐI TIẾP: thêm vào cuối hàng đợi, KHÔNG cắt ngang đoạn đang đọc.
   // Dùng cho các cập nhật ở bước trung gian (stream).
-  enqueueSpeak(text) {
-    if (!this.ttsEnabled) return;
+  enqueueSpeak(text, opts = {}) {
+    if (!this.ttsEnabled && !opts.force) return;
     const clean = this._cleanForTTS(text);
     if (!clean) return;
     this.speechQueue.push(clean);

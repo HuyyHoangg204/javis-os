@@ -5,7 +5,8 @@
   "use strict";
   function $(id) { return document.getElementById(id); }
   function getVoice() { try { return (typeof voice !== "undefined") ? voice : null; } catch (e) { return null; } }
-  function isOff() { return localStorage.getItem("javis.ttsEnabled") === "0"; }
+  // Mặc định TẮT: chưa từng bật (chưa có khoá, hoặc "0") thì coi như đang tắt tiếng.
+  function isOff() { return localStorage.getItem("javis.ttsEnabled") !== "1"; }
   function persist(on) { try { localStorage.setItem("javis.ttsEnabled", on ? "1" : "0"); } catch (e) {} }
 
   // Cập nhật MỌI chỗ hiển thị trạng thái đọc-giọng (header + sidebar + nút trên khung chat).

@@ -1774,7 +1774,8 @@ document.querySelectorAll('input[name="recognitionLang"]').forEach(r => r.addEve
 rateSlider.addEventListener("input", () => { const r = parseFloat(rateSlider.value); rateLabel.textContent = r.toFixed(2) + "×"; voice.setRate(rateToPct(r)); localStorage.setItem("javis.rate", r.toString()); });
 document.getElementById("testVoiceBtn").addEventListener("click", () => {
   const v = document.querySelector('input[name="voice"]:checked').value;
-  voice.speak(v.includes("HoaiMy") ? "Xin chào, em là HoaiMy, trợ lý của bạn." : "Xin chào, tôi là NamMinh, trợ lý của bạn.");
+  // force: nghe thử là hành động chủ động của user, phải kêu kể cả khi đang tắt tiếng (mặc định).
+  voice.speak(v.includes("HoaiMy") ? "Xin chào, em là HoaiMy, trợ lý của bạn." : "Xin chào, tôi là NamMinh, trợ lý của bạn.", { force: true });
 });
 ttsToggle.addEventListener("click", () => {
   const enabled = voice.toggleTTS();

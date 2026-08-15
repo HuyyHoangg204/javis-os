@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.1] - 2026-08-15
+### Cải thiện
+- **Javis mặc định im lặng.** Mở lần đầu là chỉ hiện chữ, không tự đọc thành tiếng nữa - đỡ giật mình khi đang ở chỗ đông người hay quên bật loa nhỏ. Muốn nghe thì bấm nút loa ở khung chat hoặc bật **Đọc trả lời bằng giọng** trong Cài đặt nhanh; đã bật rồi thì Javis nhớ, F5 vẫn giữ nguyên. Ai đang bật sẵn từ trước cũng không bị tắt.
+
 ## [0.35.0] - 2026-08-14
 ### Thêm mới
 - **Javis trả lời bằng đúng thứ tiếng bạn gõ.** Không chỉ tiếng Việt với tiếng Anh - gõ tiếng Nhật, Thái, Pháp hay bất kỳ thứ tiếng nào thì Javis đáp lại bằng chính thứ tiếng đó, không phải cài gì. Muốn ghim cứng một thứ tiếng thì vào **Cài đặt**, mục ngôn ngữ.
