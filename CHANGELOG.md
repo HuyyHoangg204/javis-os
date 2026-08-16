@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.10] - 2026-08-16
+### Sửa lỗi
+- **Claude Code hết "thi thoảng tự đăng xuất".** Thủ phạm: khi Javis dừng một lượt chạy quá lâu, tiến trình claude có thể bị giết đúng lúc đang ghi file đăng nhập - file đứt nửa chừng là lần sau coi như chưa đăng nhập (ChatGPT không bị vì Javis tự giữ token hộ). Hai lớp vá: dừng tiến trình giờ có vài giây ân hạn để nó kịp đóng file, và Javis tự sao lưu file đăng nhập lành mạnh mỗi 5 phút - file hỏng hay biến mất là tự phục hồi ngay, có ghi log rõ ràng. Bấm Ngắt chủ động thì vẫn ngắt thật, không bị "hồi sinh".
+
 ## [0.35.9] - 2026-08-16
 ### Thêm mới
 - **Chọn nhiều rồi tải về một gói ở Studio.** Ba trang Skills, Workflows, Agents đều có ô tick trên từng thẻ và nút Chọn tất cả; bấm "Tải đã chọn" là mọi thứ đã tick về chung MỘT file .zip, kèm luôn agent và skill phụ thuộc. Hết cảnh muốn chia sẻ 10 skill phải bấm Xuất 10 lần nhận 10 file. Gói này nhập lại một phát ở nút Nhập như gói thường.

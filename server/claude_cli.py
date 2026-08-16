@@ -66,20 +66,47 @@ def cancel_all(tag=None):
     return n
 
 
-def _kill_tree(p):
+def _kill_tree(p, grace_s: float = 2.0):
     """Giết 1 tiến trình claude/codex VÀ TOÀN BỘ cây con (node) - dùng cho watchdog idle-timeout.
     Tiến trình treo (kẹt auth / flail trên path không tồn tại) nếu không giết sẽ sống mãi, ngốn
-    RAM/CPU và làm treo server một-tiến-trình. POSIX dùng killpg (cần start_new_session=True)."""
+    RAM/CPU và làm treo server một-tiến-trình. POSIX dùng killpg (cần start_new_session=True).
+
+    TERM trước, KILL sau (16/08): SIGKILL thẳng tay có thể rơi đúng lúc CLI đang GHI
+    ~/.claude/.credentials.json (refresh token OAuth) - file cụt nửa chừng là "tự nhiên bị
+    đăng xuất", đúng triệu chứng chủ báo. Cho `grace_s` giây để nó kịp đóng file; vẫn lì
+    thì KILL như cũ. Hàm chạy trong THREAD watchdog nên chờ 2 giây không chặn event loop."""
     try:
         if os.name == "nt":
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
                            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            import signal as _signal
-            try:
-                os.killpg(os.getpgid(p.pid), _signal.SIGKILL)
-            except Exception:
+            return
+        import signal as _signal
+        try:
+            pgid = os.getpgid(p.pid)
+        except Exception:
+            pgid = None
+        try:
+            if pgid is not None:
+                os.killpg(pgid, _signal.SIGTERM)
+            else:
+                p.terminate()
+        except Exception:
+            pass
+        het = time.time() + max(0.0, grace_s)
+        while time.time() < het:
+            if p.poll() is not None:
+                return
+            time.sleep(0.1)
+        try:
+            if pgid is not None:
+                os.killpg(pgid, _signal.SIGKILL)
+            else:
                 p.kill()
+        except Exception:
+            try:
+                p.kill()
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -205,6 +232,12 @@ def auth_status(bo_qua_cache: bool = False):
         d = json.loads((r.stdout or "").strip() or "{}")
         ra = {"connected": bool(d.get("loggedIn")), "email": d.get("email", ""),
               "plan": d.get("subscriptionType", "") or d.get("authMethod", ""), "org": d.get("orgName", "")}
+        cu = _AUTH_CACHE["val"] or {}
+        if cu.get("connected") and not ra["connected"]:
+            # Đang đăng nhập mà CLI báo mất - in dấu vết CÓ GIỜ để lần sau chủ báo "thi thoảng
+            # bị đăng xuất" thì log nói được nó xảy ra lúc nào, cạnh sự kiện gì.
+            print(f"[claude auth] CLI báo ĐÃ ĐĂNG XUẤT (trước đó đang đăng nhập) lúc "
+                  f"{time.strftime('%Y-%m-%d %H:%M:%S')}", file=sys.stderr)
         _AUTH_CACHE.update(ts=now, val=dict(ra))
         return ra
     except Exception as e:
@@ -222,6 +255,100 @@ def auth_quen_cache():
     _AUTH_CACHE.update(ts=0.0, val=None)
 
 
+# ---- Vệ sĩ credentials (16/08): chống "tự nhiên bị đăng xuất" ----
+# Claude CLI TỰ quản token trong ~/.claude/.credentials.json và tự ghi lại file đó mỗi lần
+# refresh OAuth. Javis chạy nhiều tiến trình claude song song và có watchdog giết tiến trình
+# treo - kill rơi đúng lúc CLI đang ghi là file cụt nửa chừng, lượt sau CLI đọc không ra và
+# coi như chưa đăng nhập. Codex không bao giờ bị vì token ChatGPT do CHÍNH JAVIS giữ và ghi
+# nguyên tử. Vệ sĩ: thấy bản lành thì sao lưu; thấy file HỎNG/MẤT mà có bản sao lưu thì phục
+# hồi + hô to. Đăng xuất CHỦ ĐỘNG (file lành nhưng không còn token, hoặc bấm Ngắt trên UI)
+# thì xoá bản sao lưu - tôn trọng ý người dùng, không "hồi sinh" phiên họ vừa ngắt.
+def _cred_path() -> Path:
+    return _home_dir() / ".claude" / ".credentials.json"
+
+
+def _cred_bak_path() -> Path:
+    return _cred_path().with_name(".credentials.json.javis-bak")
+
+
+def _cred_co_token(raw: str) -> bool:
+    try:
+        oa = (json.loads(raw) or {}).get("claudeAiOauth") or {}
+        return bool(oa.get("accessToken") or oa.get("refreshToken"))
+    except Exception:
+        return False
+
+
+def giu_credentials() -> str:
+    """Một vòng vệ sĩ. Trả nhãn việc đã làm: backup | restore | logout | hong | '' (yên)."""
+    p, b = _cred_path(), _cred_bak_path()
+    try:
+        raw = None
+        try:
+            raw = p.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            raw = None
+        except Exception:
+            return ""                      # đọc lỗi lạ (quyền...) → không kết luận, không đụng
+        if raw is not None:
+            try:
+                json.loads(raw)
+                hop_le = True
+            except Exception:
+                hop_le = False
+            if hop_le and _cred_co_token(raw):
+                # Bản lành → sao lưu (chỉ ghi khi khác, ghi nguyên tử, quyền 600 như bản gốc).
+                try:
+                    if not b.exists() or b.read_text(encoding="utf-8") != raw:
+                        tmp = b.with_name(b.name + ".tmp")
+                        tmp.write_text(raw, encoding="utf-8")
+                        try:
+                            os.chmod(tmp, 0o600)
+                        except Exception:
+                            pass
+                        os.replace(tmp, b)
+                        return "backup"
+                except Exception:
+                    pass
+                return ""
+            if hop_le:
+                # JSON lành nhưng KHÔNG còn token = CLI đã đăng xuất tử tế → xoá bản sao lưu.
+                try:
+                    b.unlink(missing_ok=True)
+                except Exception:
+                    pass
+                return "logout"
+        # Tới đây: file MẤT hoặc JSON HỎNG. Có bản sao lưu lành thì phục hồi.
+        # macOS (token trong Keychain, file không bao giờ tồn tại) tự an toàn: không có file
+        # lành thì bản sao lưu chưa từng được tạo, nhánh này không bao giờ chạy.
+        try:
+            bak = b.read_text(encoding="utf-8")
+        except Exception:
+            if raw is not None:
+                print("[claude auth] .credentials.json HỎNG (JSON không đọc được) và không có "
+                      "bản sao lưu - phải đăng nhập lại.", file=sys.stderr)
+                return "hong"
+            return ""
+        if not _cred_co_token(bak):
+            return ""
+        tmp = p.with_name(p.name + ".tmp")
+        tmp.write_text(bak, encoding="utf-8")
+        try:
+            os.chmod(tmp, 0o600)
+        except Exception:
+            pass
+        os.replace(tmp, p)
+        auth_quen_cache()
+        print("[claude auth] .credentials.json "
+              + ("hỏng" if raw is not None else "biến mất")
+              + " - đã PHỤC HỒI từ bản sao lưu. Đây là dấu vết của một tiến trình claude bị "
+              "giết giữa lúc ghi file token.", file=sys.stderr)
+        return "restore"
+    except Exception as e:
+        print(f"[claude auth] vệ sĩ credentials lỗi: {type(e).__name__}: {e}", file=sys.stderr)
+        return ""
+
+
 def auth_logout():
     cli = find_claude_cli()
     if not cli:
@@ -229,6 +356,12 @@ def auth_logout():
     try:
         subprocess.run([cli, "auth", "logout"], capture_output=True, text=True, timeout=25, creationflags=_no_window())
         auth_quen_cache()   # ngắt xong thẻ phải đổi NGAY, không chờ hết 90 giây nhớ
+        try:
+            # Ngắt CHỦ ĐỘNG thì xoá luôn bản sao lưu của vệ sĩ credentials - không thì vòng
+            # vệ sĩ kế tiếp "hồi sinh" đúng phiên người dùng vừa cố tình ngắt.
+            _cred_bak_path().unlink(missing_ok=True)
+        except Exception:
+            pass
         return {"ok": True}
     except Exception as e:
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}

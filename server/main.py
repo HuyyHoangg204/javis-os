@@ -13040,6 +13040,23 @@ async def telegram_send_file(payload: dict = Body(...)):
 
 
 @app.on_event("startup")
+async def _ve_si_claude_creds():
+    """Vòng vệ sĩ ~/.claude/.credentials.json mỗi 5 phút: bản lành thì sao lưu, file hỏng/mất
+    thì phục hồi + hô to. Chống vụ "thi thoảng Claude Code tự đăng xuất" (16/08) - tiến trình
+    claude bị watchdog giết đúng lúc đang ghi file token là file cụt, CLI coi như chưa đăng
+    nhập. Codex không bị vì token ChatGPT do chính Javis giữ."""
+    async def _vong():
+        while True:
+            try:
+                import claude_cli as _ccli
+                await asyncio.to_thread(_ccli.giu_credentials)
+            except Exception:
+                pass
+            await asyncio.sleep(300)
+    asyncio.create_task(_vong())
+
+
+@app.on_event("startup")
 async def _soat_secret_hong():
     """Soi các secret mã hoá không giải mã được (mất/đổi .secret_key) và HÔ TO ngay lúc
     boot. Trước đây lỗi này chỉ hiện một dòng stderr chung chung của secrets_store rồi
