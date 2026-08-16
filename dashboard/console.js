@@ -4583,6 +4583,25 @@
     }
     const bao = (m, loi) => { if (st) st.innerHTML = (loi ? WARN_ICON : OK_ICON) + " " + esc(m); };
 
+    // 2FA bật trong cấu hình nhưng máy chủ KHÔNG giải mã được khoá (mất/đổi file
+    // .secret_key trong thư mục state - hay gặp khi đổi volume/chép state thiếu file ẩn).
+    // Nói thẳng thay vì hiện "Chưa bật" như trước: chủ bật 2FA mà thấy "Chưa bật" là
+    // tưởng cập nhật đè mất, còn thực tế cổng đăng nhập đang đòi mã khôi phục.
+    if (a.totp_broken) {
+      head.innerHTML = WARN_ICON + " <b>Đang bật nhưng khoá bị lỗi.</b> Máy chủ không giải mã được "
+        + "khoá 2FA (file <code>.secret_key</code> trong thư mục state bị mất hoặc đổi). "
+        + "Mã 6 số từ app KHÔNG dùng được nữa - đăng nhập tạm bằng <b>mã khôi phục</b>. "
+        + "Bấm nút dưới để bật lại với khoá mới (mục cũ trong app Authenticator sẽ hết hiệu lực).";
+      body.innerHTML = `<div class="js-actions"><button class="gcard-btn" id="tfaOn">Bật lại xác thực 2 lớp</button></div>`;
+      const nutBatLai = document.getElementById("tfaOn");
+      if (nutBatLai) nutBatLai.onclick = async () => {
+        const r = await (await fetch("/auth/2fa/start", { method: "POST" })).json();
+        if (!r.ok) { bao(r.error || "Không bắt đầu được.", true); return; }
+        batLuong2Fa(body, r, bao, rootEl);
+      };
+      return;
+    }
+
     if (a.totp_enabled) {
       const con = Number(a.totp_recovery_left || 0);
       head.innerHTML = ic("shield") + " <b>Đang bật.</b> Mỗi lần đăng nhập sẽ hỏi thêm mã 6 số."
@@ -4627,36 +4646,42 @@
     document.getElementById("tfaOn").onclick = async () => {
       const r = await (await fetch("/auth/2fa/start", { method: "POST" })).json();
       if (!r.ok) { bao(r.error || "Không bắt đầu được.", true); return; }
-      body.innerHTML = `
-        <div class="tfa-steps">
-          <div class="tfa-step"><b>1.</b> Mở app Authenticator (Google Authenticator, Microsoft
-            Authenticator, 1Password, Bitwarden... cái nào cũng được) rồi quét mã dưới đây.</div>
-          <div class="tfa-qr">${r.qr_svg || '<div class="gcard-meta">Máy chủ chưa cài segno nên không vẽ được QR - nhập tay khoá bên dưới.</div>'}</div>
-          <div class="tfa-step"><b>2.</b> Quét không được thì nhập tay khoá này:
-            <code class="tfa-secret">${esc(r.secret)}</code></div>
-          <div class="tfa-step"><b>3.</b> Nhập mã 6 số đang hiện trong app để xác nhận:</div>
-          <input class="js-input" id="tfaVerify" inputmode="numeric" placeholder="Mã 6 số">
-          <div class="js-actions">
-            <button class="gcard-btn" id="tfaConfirm">Xác nhận và bật</button>
-            <button class="gcard-btn ghost" id="tfaCancel">Huỷ</button>
-          </div>
-        </div>`;
-      const inp = document.getElementById("tfaVerify");
-      inp.focus();
-      const xacNhan = async () => {
-        const fd = new FormData(); fd.append("code", inp.value.trim());
-        const d = await (await fetch("/auth/2fa/enable", { method: "POST", body: fd })).json();
-        if (!d.ok) { bao(d.error || "Mã không đúng.", true); inp.select(); return; }
-        // Mã khôi phục chỉ hiện ĐÚNG LÚC NÀY. Server giữ bản băm nên không có đường nào xem lại.
-        hienMaKhoiPhuc(body, d.recovery,
-          "Đã bật. Chép 10 mã khôi phục dưới đây ra chỗ an toàn NGAY - chúng chỉ hiện một lần, "
-          + "và là đường vào duy nhất nếu bạn mất điện thoại:");
-        bao("Đã bật xác thực 2 lớp.");
-      };
-      document.getElementById("tfaConfirm").onclick = xacNhan;
-      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") xacNhan(); });
-      document.getElementById("tfaCancel").onclick = () => renderTfa(rootEl);
+      batLuong2Fa(body, r, bao, rootEl);
     };
+  }
+
+  // Luồng quét QR + xác nhận mã. Tách hàm vì có HAI cửa vào: bật lần đầu, và bật LẠI khi
+  // khoá cũ hỏng (mất .secret_key) - hai cửa phải ra cùng một luồng, không chép đôi.
+  function batLuong2Fa(body, r, bao, rootEl) {
+    body.innerHTML = `
+      <div class="tfa-steps">
+        <div class="tfa-step"><b>1.</b> Mở app Authenticator (Google Authenticator, Microsoft
+          Authenticator, 1Password, Bitwarden... cái nào cũng được) rồi quét mã dưới đây.</div>
+        <div class="tfa-qr">${r.qr_svg || '<div class="gcard-meta">Máy chủ chưa cài segno nên không vẽ được QR - nhập tay khoá bên dưới.</div>'}</div>
+        <div class="tfa-step"><b>2.</b> Quét không được thì nhập tay khoá này:
+          <code class="tfa-secret">${esc(r.secret)}</code></div>
+        <div class="tfa-step"><b>3.</b> Nhập mã 6 số đang hiện trong app để xác nhận:</div>
+        <input class="js-input" id="tfaVerify" inputmode="numeric" placeholder="Mã 6 số">
+        <div class="js-actions">
+          <button class="gcard-btn" id="tfaConfirm">Xác nhận và bật</button>
+          <button class="gcard-btn ghost" id="tfaCancel">Huỷ</button>
+        </div>
+      </div>`;
+    const inp = document.getElementById("tfaVerify");
+    inp.focus();
+    const xacNhan = async () => {
+      const fd = new FormData(); fd.append("code", inp.value.trim());
+      const d = await (await fetch("/auth/2fa/enable", { method: "POST", body: fd })).json();
+      if (!d.ok) { bao(d.error || "Mã không đúng.", true); inp.select(); return; }
+      // Mã khôi phục chỉ hiện ĐÚNG LÚC NÀY. Server giữ bản băm nên không có đường nào xem lại.
+      hienMaKhoiPhuc(body, d.recovery,
+        "Đã bật. Chép 10 mã khôi phục dưới đây ra chỗ an toàn NGAY - chúng chỉ hiện một lần, "
+        + "và là đường vào duy nhất nếu bạn mất điện thoại:");
+      bao("Đã bật xác thực 2 lớp.");
+    };
+    document.getElementById("tfaConfirm").onclick = xacNhan;
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") xacNhan(); });
+    document.getElementById("tfaCancel").onclick = () => renderTfa(rootEl);
   }
 
   function hienMaKhoiPhuc(body, ds, loiNhan) {
@@ -4763,7 +4788,13 @@
     }
     const con = Number(a.totp_recovery_left || 0);
     row.hidden = false;
-    row.innerHTML = a.totp_enabled
+    // totp_broken đứng TRƯỚC: khoá hỏng mà hiện "chưa bật" là chủ tưởng cập nhật đè mất
+    // 2FA, trong khi thật ra cổng đang đòi mã khôi phục (vụ 16/08).
+    row.innerHTML = a.totp_broken
+      ? `${ic("shield")} Xác thực 2 lớp: <b class="tfa-low">đang bật nhưng khoá bị lỗi</b>`
+        + ` - đăng nhập bằng mã khôi phục, rồi bật lại với khoá mới.`
+        + ` <button class="s-btn" data-settings-go="account">Sửa ngay</button>`
+      : a.totp_enabled
       ? `${ic("shield")} Xác thực 2 lớp: <b class="tfa-on">đang bật</b>`
         + ` · còn ${con} mã khôi phục`
         + (con <= 2 ? ` <b class="tfa-low">(sắp hết)</b>` : "")

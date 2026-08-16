@@ -671,6 +671,20 @@ def write_settings(cfg):
         _transform_secret_fields(out, secrets_store.encrypt)   # encrypt idempotent (bỏ qua enc:/plain:)
     except Exception as e:
         print(f"[config] mã hoá secret lỗi: {e}", file=__import__('sys').stderr)
+    # KHÔNG PHÁ blob 2FA khi khoá đang lỗi: mất .secret_key thì read_settings giải mã
+    # secret ra "", và nếu ghi thẳng "" xuống là blob mã hoá BAY MÀU vĩnh viễn - sau đó
+    # có khôi phục lại đúng key cũ cũng không cứu được nữa. enabled=true + secret rỗng
+    # + file cũ CÓ secret → giữ nguyên giá trị cũ. Tắt 2FA thật (totp_tat) đặt
+    # enabled=false nên không rơi vào nhánh này, vẫn xoá được như thường.
+    try:
+        t = (out.get("auth") or {}).get("totp")
+        if isinstance(t, dict) and t.get("enabled") and not str(t.get("secret") or ""):
+            raw_cu = json.loads(SETTINGS_PATH.read_text(encoding="utf-8")) if SETTINGS_PATH.exists() else {}
+            cu = str((((raw_cu.get("auth") or {}).get("totp") or {}).get("secret")) or "")
+            if cu:
+                t["secret"] = cu
+    except Exception:
+        pass
     SETTINGS_PATH.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -763,6 +777,47 @@ def totp_enabled(cfg=None):
 
 def totp_secret(cfg=None):
     return str(_totp_conf(cfg).get("secret") or "")
+
+
+def totp_hong(cfg=None):
+    """2FA đang BẬT trong file nhưng secret KHÔNG GIẢI MÃ ĐƯỢC - thường do file
+    .secret_key trong STATE_DIR bị mất/đổi (đổi volume, chép state thiếu file ẩn),
+    hoặc máy thiếu lib cryptography.
+
+    Vụ 16/08: chủ bật 2FA, cập nhật xong UI báo "Chưa bật" trong khi settings.json vẫn
+    ghi enabled=true. Trước đây trạng thái này ÂM THẦM thành fail-open: totp_enabled
+    trả False nên cổng đăng nhập thôi hỏi mã luôn - ai có mật khẩu là vào thẳng, đúng
+    thứ 2FA phải chặn. Nó phải LỘ RA (UI + log) và cổng phải fail-closed (nhận mã
+    khôi phục - mã đó BĂM chứ không mã hoá nên sống sót qua mất key)."""
+    try:
+        raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8")) if SETTINGS_PATH.exists() else {}
+    except Exception:
+        return False
+    t = (raw.get("auth") or {}).get("totp") or {}
+    if not (isinstance(t, dict) and t.get("enabled") and str(t.get("secret") or "").strip()):
+        return False
+    return not totp_secret(cfg)   # file CÓ secret mà đọc ra rỗng → giải mã hỏng
+
+
+def secret_paths_hong():
+    """Các trường trong _SECRET_PATHS đang mã hoá trong file mà giải mã ra RỖNG (mất
+    key). Cho dòng log to lúc khởi động - lỗi này trước giờ chỉ hiện một dòng stderr
+    chung chung của secrets_store rồi chìm."""
+    try:
+        raw = json.loads(SETTINGS_PATH.read_text(encoding="utf-8")) if SETTINGS_PATH.exists() else {}
+    except Exception:
+        return []
+    cfg = read_settings()
+    hong = []
+    for path in _SECRET_PATHS:
+        parts = path.split(".")
+        r, c = raw, cfg
+        for p in parts:
+            r = r.get(p) if isinstance(r, dict) else None
+            c = c.get(p) if isinstance(c, dict) else None
+        if isinstance(r, str) and r.startswith("enc:") and not (c or ""):
+            hong.append(path)
+    return hong
 
 
 def totp_last_step(cfg=None):

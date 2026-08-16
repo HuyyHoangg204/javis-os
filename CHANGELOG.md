@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.6] - 2026-08-16
+### Bảo mật
+- **2FA hết kiểu "tự tắt" âm thầm sau cập nhật.** Khoá mã hoá trên máy chủ (file .secret_key) mà mất hoặc đổi thì trước đây 2FA lặng lẽ ngừng hỏi mã và giao diện báo "Chưa bật" - ai có mật khẩu là vào thẳng. Giờ Javis nói thẳng "đang bật nhưng khoá bị lỗi", cổng đăng nhập vẫn chặn và nhận mã khôi phục, có nút bật lại với khoá mới ngay trên trang Tài khoản.
+- **Không còn mất trắng khoá 2FA vì một lần lưu cài đặt.** Trước đây khi khoá đang lỗi, chỉ cần lưu bất kỳ cài đặt nào là bản mã hoá của khoá 2FA bị ghi đè thành rỗng vĩnh viễn. Giờ nó được giữ nguyên - tìm lại được file khoá cũ là 2FA sống lại, không cần làm gì.
+
 ## [0.35.5] - 2026-08-16
 ### Cải thiện
 - **Chat cũ tuyệt đối không tự đổi model nữa.** Mỗi cuộc trò chuyện được đóng dấu model đang chạy ngay từ tin nhắn đầu tiên, kể cả khi bạn chưa từng đổi tay trong đó. Đổi mặc định chung ở trang Models chỉ áp cho cuộc mở sau, không đổi ngược cuộc đang dở; muốn cuộc cũ chạy model mới thì đổi ngay trong khung chat của nó.

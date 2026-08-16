@@ -688,6 +688,10 @@ async def auth_status(request: Request):
             # hay không, mà việc "tài khoản này có 2FA" thì kẻ tấn công cũng biết ngay sau lần
             # nhập mật khẩu đầu tiên. Số mã khôi phục còn lại thì chỉ trả khi ĐÃ đăng nhập.
             "totp_enabled": cfgmod.totp_enabled(cfg),
+            # 2FA bật trong file mà secret không giải mã được (mất/đổi .secret_key). Lộ ra
+            # cùng lý lẽ với totp_enabled: sau lần nhập mật khẩu đầu thì kẻ tấn công cũng
+            # tự biết, còn CHỦ thì cần biết NGAY để khỏi tưởng 2FA "tự tắt".
+            "totp_broken": cfgmod.totp_hong(cfg),
             "totp_recovery_left": (cfgmod.totp_recovery_left(cfg) if authed else None),
             # install.sh có thể ghi JAVIS_SETUP_2FA=1 vào .env khi người cài chọn bật 2FA.
             # Đây chỉ là LỜI NHẮC cho giao diện mở sẵn màn bật, không phải một cơ chế bảo mật.
@@ -751,13 +755,20 @@ async def auth_login(request: Request, username: str = Form(...), password: str 
         _login_fail(ip)
         await asyncio.sleep(0.5)   # làm chậm brute-force online
         return JSONResponse({"ok": False, "error": "Sai tài khoản hoặc mật khẩu"}, status_code=401)
-    if cfgmod.totp_enabled(cfg):
+    # totp_hong: 2FA bật trong file nhưng secret không giải mã được (mất .secret_key).
+    # Vẫn PHẢI hỏi mã (fail-closed) - chỉ mã khôi phục qua được vì nó băm, không mã hoá.
+    # Trước 0.35.6 nhánh này fail-open: totp_enabled trả False nên cổng thôi hỏi mã luôn,
+    # tức 2FA âm thầm biến mất đúng lúc chủ tin là nó đang bật.
+    _tfa_hong = cfgmod.totp_hong(cfg)
+    if cfgmod.totp_enabled(cfg) or _tfa_hong:
         ma = (code or "").strip()
         if not ma:
             # 401 kèm needs_2fa để giao diện hiện ô mã. KHÔNG tính là một lần sai: người dùng
             # chưa gõ gì cả, tính vào hạn mức là tự khoá chính chủ sau vài lần mở màn đăng nhập.
             return JSONResponse({"ok": False, "needs_2fa": True,
-                                 "error": "Nhập mã xác thực 2 lớp."}, status_code=401)
+                                 "error": ("Máy chủ không giải mã được khoá 2FA - nhập MÃ KHÔI PHỤC "
+                                           "để vào." if _tfa_hong else "Nhập mã xác thực 2 lớp.")},
+                                status_code=401)
         buoc = totp.kiem(cfgmod.totp_secret(cfg), ma,
                          buoc_da_dung=cfgmod.totp_last_step(cfg))
         if buoc is not None:
@@ -769,7 +780,12 @@ async def auth_login(request: Request, username: str = Form(...), password: str 
             _login_fail(ip)
             await asyncio.sleep(0.5)
             return JSONResponse({"ok": False, "needs_2fa": True,
-                                 "error": "Mã xác thực không đúng hoặc đã dùng rồi."},
+                                 "error": ("Khoá 2FA trên máy chủ không giải mã được (file "
+                                           ".secret_key đổi/mất?) nên mã 6 số KHÔNG dùng được - "
+                                           "chỉ MÃ KHÔI PHỤC vào được. Mất cả mã khôi phục thì "
+                                           "SSH vào server xoá khối auth.totp trong "
+                                           "settings.json." if _tfa_hong
+                                           else "Mã xác thực không đúng hoặc đã dùng rồi.")},
                                 status_code=401)
     _LOGIN_FAILS.pop(ip, None)
     return _session_cookie(JSONResponse({"ok": True}), cfgmod.new_session(), request)
@@ -12993,6 +13009,25 @@ async def telegram_send_file(payload: dict = Body(...)):
         except Exception:
             pass
     return {"ok": ok, "error": err}
+
+
+@app.on_event("startup")
+async def _soat_secret_hong():
+    """Soi các secret mã hoá không giải mã được (mất/đổi .secret_key) và HÔ TO ngay lúc
+    boot. Trước đây lỗi này chỉ hiện một dòng stderr chung chung của secrets_store rồi
+    chìm giữa log; hậu quả thật (16/08): 2FA âm thầm thành fail-open, chủ tưởng nó
+    "tự tắt" sau cập nhật."""
+    try:
+        hong = cfgmod.secret_paths_hong()
+        if hong:
+            print("=" * 68 + f"\n[secrets] {len(hong)} secret MÃ HOÁ KHÔNG GIẢI MÃ ĐƯỢC "
+                  f"(file .secret_key trong {cfgmod.STATE_DIR} bị mất/đổi?):\n"
+                  + "\n".join(f"  - {p}" for p in hong)
+                  + "\nCác giá trị này cần nhập lại (2FA: đăng nhập bằng mã khôi phục rồi "
+                    "bật lại).\n" + "=" * 68,
+                  file=__import__('sys').stderr)
+    except Exception:
+        pass
 
 
 @app.on_event("startup")
