@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.9] - 2026-08-16
+### Thêm mới
+- **Chọn nhiều rồi tải về một gói ở Studio.** Ba trang Skills, Workflows, Agents đều có ô tick trên từng thẻ và nút Chọn tất cả; bấm "Tải đã chọn" là mọi thứ đã tick về chung MỘT file .zip, kèm luôn agent và skill phụ thuộc. Hết cảnh muốn chia sẻ 10 skill phải bấm Xuất 10 lần nhận 10 file. Gói này nhập lại một phát ở nút Nhập như gói thường.
+
 ## [0.35.8] - 2026-08-16
 ### Cải thiện
 - **Terminal trong tab Code giờ là cmd gốc của máy.** Shell mở ở thư mục HOME như mọi terminal bình thường, không còn đứng trong thư mục brain - cài và đăng nhập CLI (như `agy` của Antigravity) hết vướng. Cần vào brain thì gõ `cd "$JAVIS_BRAIN"` là về. Muốn kiểu cũ thì đặt `JAVIS_TERMINAL_CWD`.

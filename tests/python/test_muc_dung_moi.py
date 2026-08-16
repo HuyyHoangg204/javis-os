@@ -279,7 +279,10 @@ check("model lạ vẫn trả 0, không đoán bừa", up._khoa_gia("mo-hinh-la-
 # ============================================================
 # 7. So nhịp giữa các engine
 # ============================================================
-_seed(_now - timedelta(hours=2), 90_000, 3, provider="api", path="p2",
+# Seed tại _now chứ KHÔNG lùi giờ: nhịp engine lọc theo NGÀY, mà lùi 2 giờ thì ở khung
+# 0h-2h sáng (giờ locale) dòng này rơi sang hôm trước và "today" trống - test đỏ oan
+# mỗi đêm (cùng họ với vụ neo-hôm-nay ở dưới, bắt được 17/08 lúc 0h sáng +07).
+_seed(_now, 90_000, 3, provider="api", path="p2",
       activity="background", model="openai/gpt-5")
 _nhip = ui.nhip_engine("today")
 check("có bảng so nhịp engine", isinstance(_nhip, list) and len(_nhip) >= 1)
@@ -465,6 +468,11 @@ for _pv in ("groq", "gemini", "openrouter", "openai", "anthropic-api", "ollama")
 
 # Mẫu số của tiết kiệm phải là lượt CỦA JAVIS. Lượt người dùng tự gõ `claude` trong terminal
 # không đi qua prompt của Javis nên chế độ tiết kiệm không làm chúng rẻ đi.
+# Neo MỘT lượt Javis đúng thời điểm hiện tại: mọi seed phía trên đều lùi 1-4 giờ, và ở
+# khung 0h-4h sáng (giờ locale) chúng rơi sang NGÀY HÔM TRƯỚC - "today" hết sạch lượt
+# Javis và check "_tong_moi > 0" đỏ oan mỗi đêm (bắt được 17/08 lúc 00:24 +07, test đỏ
+# cả trên bản sạch). Neo tại _now thì bất biến đúng ở mọi giờ chạy.
+_seed(_now, 1000, 7, path="p-neo-hom-nay")
 _seed(_now, 5000, 100, provider="claude", path="p-manual", activity="manual", source="manual")
 _luot = ui.luot_theo_ngay("today")
 _tong_moi = sum(x["turns"] for x in _luot)

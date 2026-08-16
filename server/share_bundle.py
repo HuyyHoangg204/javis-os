@@ -71,7 +71,16 @@ def _valid_slug(s: str) -> bool:
 
 def build_bundle(kind, slug, *, agents_dir, workflows_dir, skills_root,
                  include_deps=True, system_slugs=frozenset(), app_version=""):
-    """Trả (zip_bytes, filename) cho 1 năng lực + phụ thuộc; (None, None) nếu không tìm thấy."""
+    """Trả (zip_bytes, filename) cho MỘT hoặc NHIỀU năng lực cùng loại + phụ thuộc.
+
+    `slug` nhận str (một cái, như cũ) hoặc list/tuple (chọn nhiều - 16/08: trang Studio
+    thêm chọn tất cả / tải về đã chọn). Nhiều cái vẫn ra MỘT gói javis-bundle duy nhất:
+    manifest.items đã là danh sách từ đầu nên phía NHẬP không cần biết gì mới - gói 5
+    workflow nhập y như gói 1 workflow kèm 4 phụ thuộc. (None, None) nếu không có gì.
+    """
+    slugs = [str(s) for s in ([slug] if isinstance(slug, str) else list(slug or [])) if str(s or "").strip()]
+    if not slugs:
+        return None, None
     agents_dir, workflows_dir, skills_root = Path(agents_dir), Path(workflows_dir), Path(skills_root)
     files: dict[str, bytes] = {}
     items: list[dict] = []
@@ -127,14 +136,20 @@ def build_bundle(kind, slug, *, agents_dir, workflows_dir, skills_root,
                     add_agent(st.get("agent"))
                     add_agent(st.get("verify_agent"))
 
-    {"agent": add_agent, "skill": add_skill, "workflow": add_workflow}.get(kind, lambda _s: None)(slug)
+    adder = {"agent": add_agent, "skill": add_skill, "workflow": add_workflow}.get(kind, lambda _s: None)
+    for s in slugs:
+        adder(s)
     if not files:
         return None, None
 
-    prim = next((i for i in items if i["type"] == kind and i["slug"] == slug), None)
+    # primary = cái ĐẦU TIÊN tìm thấy - giữ nguyên hình dạng manifest v1 để gói chọn-nhiều
+    # mở được bằng mọi bản Javis cũ (import chỉ đọc items + file, không đọc primary).
+    goc = [i for i in items if i["type"] == kind and i["slug"] in slugs]
+    prim = goc[0] if goc else None
     manifest = {
         "format": "javis-bundle", "version": 1, "kind": kind,
-        "primary": {"type": kind, "slug": slug, "name": (prim or {}).get("name", slug)},
+        "primary": {"type": kind, "slug": (prim or {}).get("slug", slugs[0]),
+                    "name": (prim or {}).get("name", slugs[0])},
         "items": items, "app_version": app_version,
         "created": localefmt.now().isoformat(timespec="seconds"),
     }
@@ -143,7 +158,9 @@ def build_bundle(kind, slug, *, agents_dir, workflows_dir, skills_root,
         z.writestr("javis-bundle.json", json.dumps(manifest, ensure_ascii=False, indent=1))
         for arc, data in files.items():
             z.writestr(arc, data)
-    return buf.getvalue(), f"{_safe_name((prim or {}).get('name') or slug)}.javis.zip"
+    ten = (f"{_safe_name((prim or {}).get('name') or slugs[0])}.javis.zip" if len(goc) <= 1
+           else f"javis-{kind}-x{len(goc)}.javis.zip")
+    return buf.getvalue(), ten
 
 
 # ────────────────────────── NHẬP ──────────────────────────

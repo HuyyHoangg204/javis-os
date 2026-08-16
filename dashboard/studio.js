@@ -21,8 +21,35 @@
   const fd = (obj) => { const f = new FormData(); Object.entries(obj).forEach(([k, v]) => f.append(k, v)); return f; };
 
   // ===== Xuất / Nhập năng lực (chia sẻ agent/skill/workflow qua file .zip) =====
-  const exportUrl = (kind, slug) => `/export?kind=${kind}&slug=${encodeURIComponent(slug)}&brain=${encodeURIComponent(brain())}&deps=1`;
+  // slug nhận 1 chuỗi hoặc mảng (chọn nhiều) - server gói tất cả vào MỘT file .zip.
+  const exportUrl = (kind, slug) => `/export?kind=${kind}&slug=${encodeURIComponent(Array.isArray(slug) ? slug.join(",") : slug)}&brain=${encodeURIComponent(brain())}&deps=1`;
   function exportItem(kind, slug) { window.open(exportUrl(kind, slug), "_blank"); }
+
+  // ===== Chọn nhiều để tải về (16/08): tick từng thẻ hoặc Chọn tất cả, tải MỘT gói =====
+  const _sel = { workflow: new Set(), agent: new Set(), skill: new Set() };
+  function taiDaChon(kind) {
+    const ds = [..._sel[kind]];
+    if (ds.length) window.open(exportUrl(kind, ds), "_blank");
+  }
+  function capNhatNutTai(kind, btnId) {
+    const b = document.getElementById(btnId);
+    if (!b) return;
+    const n = _sel[kind].size;
+    b.disabled = !n;
+    b.textContent = "⤓ Tải đã chọn" + (n ? ` (${n})` : "");
+  }
+  // Tick một thẻ. `boxCls` là class của ô tick để Chọn tất cả gom được cả trang.
+  function noiSel(kind, btnId, el, slug) {
+    el.onchange = () => { el.checked ? _sel[kind].add(slug) : _sel[kind].delete(slug); capNhatNutTai(kind, btnId); };
+    el.checked = _sel[kind].has(slug);
+  }
+  // Chọn tất cả <-> bỏ chọn: đã chọn đủ thì bấm lần nữa là bỏ hết.
+  function chonTatCa(kind, btnId, boxCls, slugsHienCo) {
+    const duTat = slugsHienCo.length && slugsHienCo.every(s => _sel[kind].has(s));
+    _sel[kind] = new Set(duTat ? [] : slugsHienCo);
+    document.querySelectorAll("." + boxCls).forEach(c => { c.checked = _sel[kind].has(c.dataset.slug); });
+    capNhatNutTai(kind, btnId);
+  }
   function importItems(reload) {
     const inp = document.createElement("input");
     inp.type = "file"; inp.accept = ".zip,.md,.skill,application/zip";
@@ -79,12 +106,15 @@
 
   async function loadWorkflows() {
     const panel = document.getElementById("panel-workflows");
-    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="wf-list" id="wfCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Workflows</h3><div class="pb-actions"><button class="s-btn-ghost" id="wfSelAll" title="Chọn / bỏ chọn toàn bộ workflow">Chọn tất cả</button><button class="s-btn-ghost" id="wfDl" disabled title="Tải các workflow đã tick về MỘT gói .zip (kèm agent + skill phụ thuộc)">⤓ Tải đã chọn</button><button class="s-btn-ghost" id="wfImport">⤒ Nhập</button><button class="s-btn-ghost" id="seedBtn">Tạo mẫu</button><button class="s-btn" id="newWf">+ Workflow</button></div></div><div class="wf-list" id="wfCards">Đang tải...</div>`;
     document.getElementById("newWf").onclick = () => editWorkflow(null);
     document.getElementById("wfImport").onclick = () => importItems(loadWorkflows);
     document.getElementById("seedBtn").onclick = async () => { await api("/studio/seed", { method: "POST", body: fd({ brain: brain() }) }); loadWorkflows(); };
+    document.getElementById("wfDl").onclick = () => taiDaChon("workflow");
     const d = await api(`/workflows?brain=${encodeURIComponent(brain())}`);
     const wfs = d.workflows || [];
+    _sel.workflow.clear();   // nạp lại trang là làm mới lựa chọn (danh sách có thể đã đổi)
+    document.getElementById("wfSelAll").onclick = () => chonTatCa("workflow", "wfDl", "wf-sel", wfs.map(w => w.slug));
     refreshStats();
     const cards = document.getElementById("wfCards");
     if (!wfs.length) { cards.innerHTML = `<div class="empty">Chưa có workflow. Bấm <b>Tạo mẫu</b> để có ví dụ Research → Write, hoặc <b>+ Workflow</b>.</div>`; return; }
@@ -96,6 +126,7 @@
       div.dataset.slug = w.slug;
       div.innerHTML = `
         <div class="wf-header">
+          <input type="checkbox" class="wf-sel" data-slug="${esc(w.slug)}" title="Chọn workflow này để tải về chung một gói">
           <div class="wf-name">${esc(w.name)}</div>
           <span class="wf-badge ${active ? "ready" : "off"}">${active ? "● Sẵn sàng" : "Lưu trữ"}</span>
           <span class="wf-count">${(w.steps || []).length} bước</span>
@@ -110,6 +141,7 @@
         </div>
         ${w.description ? `<div class="wf-desc">${esc(w.description)}</div>` : ''}
         <div class="wf-pipeline">${renderPipeline(w.steps)}</div>`;
+      noiSel("workflow", "wfDl", div.querySelector(".wf-sel"), w.slug);
       div.querySelector(".exp").onclick = () => exportItem("workflow", w.slug);
       div.querySelector(".archive").onclick = async () => { await api("/workflows/toggle", { method: "POST", body: fd({ slug: w.slug, brain: brain() }) }); loadWorkflows(); };
       div.querySelector(".run").onclick = () => runWorkflow(w, div);
@@ -342,17 +374,22 @@
   // ===== Agents =====
   async function loadAgents() {
     const panel = document.getElementById("panel-agents");
-    panel.innerHTML = `<div class="panel-bar"><h3>Agents</h3><div class="pb-actions"><button class="s-btn-ghost" id="agImport">⤒ Nhập</button><button class="s-btn" id="newAgent">+ Agent</button></div></div><div class="cards" id="agCards">Đang tải...</div>`;
+    panel.innerHTML = `<div class="panel-bar"><h3>Agents</h3><div class="pb-actions"><button class="s-btn-ghost" id="agSelAll" title="Chọn / bỏ chọn toàn bộ agent">Chọn tất cả</button><button class="s-btn-ghost" id="agDl" disabled title="Tải các agent đã tick về MỘT gói .zip (kèm skill của chúng)">⤓ Tải đã chọn</button><button class="s-btn-ghost" id="agImport">⤒ Nhập</button><button class="s-btn" id="newAgent">+ Agent</button></div></div><div class="cards" id="agCards">Đang tải...</div>`;
     document.getElementById("newAgent").onclick = () => editAgent(null);
     document.getElementById("agImport").onclick = () => importItems(loadAgents);
+    document.getElementById("agDl").onclick = () => taiDaChon("agent");
     const d = await api(`/agents?brain=${encodeURIComponent(brain())}`);
+    _sel.agent.clear();
+    document.getElementById("agSelAll").onclick = () =>
+      chonTatCa("agent", "agDl", "ag-sel", (d.agents || []).map(a => a.slug));
     refreshStats();
     const cards = document.getElementById("agCards");
     if (!(d.agents || []).length) { cards.innerHTML = `<div class="empty">Chưa có agent. Bấm <b>+ Agent</b> để tạo (vai trò + skills + bộ nhớ riêng).</div>`; return; }
     cards.innerHTML = "";
     d.agents.forEach(a => {
       const div = document.createElement("div"); div.className = "ag-card";
-      div.innerHTML = `<div class="ag-name">${ic("bot")} ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost exp" title="Xuất gói .zip (kèm skill) để chia sẻ">⤓ Xuất</button><button class="s-btn-ghost del">Xoá</button></div>`;
+      div.innerHTML = `<div class="ag-name"><input type="checkbox" class="ag-sel" data-slug="${esc(a.slug)}" title="Chọn agent này để tải về chung một gói"> ${ic("bot")} ${esc(a.name)} <span class="ag-model">${esc(a.model || "")}</span></div><div class="ag-role">${esc(a.role)}</div><div class="ag-skills">${(a.skills || []).map(s => `<span class="chip-skill">${esc(s)}</span>`).join("") || '<span class="dim">chưa gán skill</span>'}</div><div class="wf-actions"><button class="s-btn-ghost edit">Sửa</button><button class="s-btn-ghost exp" title="Xuất gói .zip (kèm skill) để chia sẻ">⤓ Xuất</button><button class="s-btn-ghost del">Xoá</button></div>`;
+      noiSel("agent", "agDl", div.querySelector(".ag-sel"), a.slug);
       div.querySelector(".exp").onclick = () => exportItem("agent", a.slug);
       div.querySelector(".edit").onclick = () => editAgent(a);
       div.querySelector(".del").onclick = async () => { if (confirm(`Xoá agent "${a.name}"?`)) { await api("/agents/delete", { method: "POST", body: fd({ slug: a.slug, brain: brain() }) }); loadAgents(); } };
@@ -489,6 +526,7 @@
     if (window._skCss) return; window._skCss = true;
     const css = `
     .sk2{display:flex;gap:16px;align-items:flex-start}
+    .sk2-selwrap{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text3);cursor:pointer;white-space:nowrap}
     .sk2-side{width:210px;flex:none;border:1px solid var(--hairline);border-radius:10px;padding:8px;max-height:72vh;overflow:auto}
     .sk2-side .sec{font-size:12px;letter-spacing:.08em;color:var(--text3);padding:8px 10px 4px;text-transform:uppercase}
     .sk2-side .cat{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:15px;color:var(--text)}
@@ -543,6 +581,7 @@
     let d; try { d = await api(`/skills?brain=${encodeURIComponent(brain())}`); } catch (e) { panel.innerHTML = `<div class="empty">Lỗi tải skill.</div>`; return; }
     refreshStats();
     _skState.skills = d.skills || [];
+    _sel.skill.clear();   // nạp lại là làm mới lựa chọn (danh sách có thể đã đổi)
     renderSkillUI();
   }
 
@@ -564,7 +603,7 @@
     const catHtml = cats.map(c => `<div class="cat ${_skState.cat === c ? "sel" : ""}" data-cat="${esc(c)}"><span>${c === "ALL" ? "Tất cả" : esc(c)}</span><span class="n">${c === "ALL" ? all.length : groups[c]}</span></div>`).join("");
     panel.innerHTML = `
       <div class="panel-bar"><h3>Skills <span class="dim">${enabledN}/${all.length} bật · nguồn <code>skills/</code></span></h3>
-        <div class="pb-actions"><button class="s-btn-ghost" id="skImport">⤒ Nhập</button><button class="s-btn" id="skNew">+ Skill</button></div></div>
+        <div class="pb-actions"><button class="s-btn-ghost" id="skSelAll" title="Chọn / bỏ chọn toàn bộ skill ĐANG HIỆN (theo nhóm + ô tìm). Skill hệ thống không cần tải - brain nào cũng có sẵn.">Chọn tất cả</button><button class="s-btn-ghost" id="skDl" disabled title="Tải các skill đã tick về MỘT gói .zip">⤓ Tải đã chọn</button><button class="s-btn-ghost" id="skImport">⤒ Nhập</button><button class="s-btn" id="skNew">+ Skill</button></div></div>
       ${all.length ? `<div class="sk2">
         <div class="sk2-side"><div class="sec">Nhóm</div>${catHtml}</div>
         <div class="sk2-main">
@@ -575,6 +614,12 @@
       : `<div class="empty">Brain chưa có skill. Bấm <b>+ Skill</b> để tạo (tự lưu vào <code>skills/</code> + xếp nhóm).</div>`}`;
     document.getElementById("skNew").onclick = () => openSkillForm(null);
     document.getElementById("skImport").onclick = () => importItems(loadSkills);
+    document.getElementById("skDl").onclick = () => taiDaChon("skill");
+    // Chọn tất cả = toàn bộ danh sách ĐANG HIỆN (đúng nhóm + đúng ô tìm), trừ skill hệ
+    // thống - chúng không xuất được (server bỏ qua) vì brain nào cũng có sẵn theo app.
+    document.getElementById("skSelAll").onclick = () =>
+      chonTatCa("skill", "skDl", "sk2-sel", _skFiltered().filter(s => !s.system).map(s => s.slug));
+    capNhatNutTai("skill", "skDl");
     if (!all.length) return;
     panel.querySelectorAll(".sk2-side .cat").forEach(c => c.onclick = () => { _skState.cat = c.dataset.cat; renderSkillUI(); });
     const search = document.getElementById("skSearch");
@@ -603,8 +648,10 @@
       }
       div.innerHTML = `<input type="checkbox" class="sk2-tog" ${on ? "checked" : ""} title="${on ? "Đang bật - bấm để tắt" : "Đang tắt - bấm để bật"}">
         <div class="sk2-info"><div class="nm">${ic("puzzle")} ${esc(s.name)}${sysBadge}</div><div class="ds">${esc(s.description || "")}</div><div class="gp">${ic("folder-open")} ${esc(s.group || "Chung")} · ${esc(s.slug)}${s.source === ".agents" ? " · .agents" : ""}${usageHtml}</div></div>
-        <div class="sk2-act"><button class="edit">Sửa</button>${s.system ? "" : `<button class="exp" title="Xuất gói .zip để chia sẻ">⤓ Xuất</button><button class="del danger">Xoá</button>`}</div>`;
+        <div class="sk2-act">${s.system ? "" : `<label class="sk2-selwrap" title="Chọn skill này để tải về chung một gói"><input type="checkbox" class="sk2-sel" data-slug="${esc(s.slug)}"> chọn</label>`}<button class="edit">Sửa</button>${s.system ? "" : `<button class="exp" title="Xuất gói .zip để chia sẻ">⤓ Xuất</button><button class="del danger">Xoá</button>`}</div>`;
       div.querySelector(".sk2-tog").onchange = (e) => toggleSkill(s, e.target.checked);
+      const selBox = div.querySelector(".sk2-sel");
+      if (selBox) noiSel("skill", "skDl", selBox, s.slug);
       div.querySelector(".edit").onclick = () => openSkillForm(s.slug);
       const expBtn = div.querySelector(".exp");
       if (expBtn) expBtn.onclick = () => exportItem("skill", s.slug);

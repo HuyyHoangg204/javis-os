@@ -5437,13 +5437,20 @@ def _app_version() -> str:
 @app.get("/export")
 async def export_capability(kind: str = Query(...), slug: str = Query(...),
                             brain: str = Query("brain"), deps: int = Query(1)):
-    """Xuất 1 agent/skill/workflow (kèm phụ thuộc nếu deps=1) thành gói .zip để tải về, chia sẻ."""
+    """Xuất agent/skill/workflow (kèm phụ thuộc nếu deps=1) thành gói .zip để tải về, chia sẻ.
+
+    `slug` nhận MỘT slug hoặc NHIỀU slug cách nhau bằng dấu phẩy (chọn nhiều / chọn tất
+    cả trên trang Studio, 16/08) - nhiều cái vẫn ra một gói duy nhất, nhập lại một phát."""
     if kind not in ("agent", "skill", "workflow"):
         return JSONResponse({"error": "kind phải là agent/skill/workflow"}, status_code=400)
-    if not skill_router.valid_slug(slug):
-        return JSONResponse({"error": "slug không hợp lệ"}, status_code=400)
+    slugs = [s.strip() for s in str(slug or "").split(",") if s.strip()]
+    if not slugs or len(slugs) > 200:
+        return JSONResponse({"error": "slug rỗng hoặc quá nhiều (tối đa 200)"}, status_code=400)
+    xau = [s for s in slugs if not skill_router.valid_slug(s)]
+    if xau:
+        return JSONResponse({"error": f"slug không hợp lệ: {', '.join(xau[:5])}"}, status_code=400)
     data, fname = share_bundle.build_bundle(
-        kind, slug,
+        kind, slugs if len(slugs) > 1 else slugs[0],
         agents_dir=_agents_dir(brain), workflows_dir=_workflows_dir(brain),
         skills_root=_skills_dir(brain), include_deps=bool(deps),
         system_slugs=system_sync.system_skill_slugs(), app_version=_app_version())
