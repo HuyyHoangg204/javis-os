@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.4] - 2026-08-16
+### Cải thiện
+- **Bộ nhớ tự học của agent giờ đặc dần thay vì dài dần.** Agent chỉ đề xuất bài học, Javis cầm bút ghi hộ vào mục riêng: tự loại trùng, giữ đúng 15 dòng mới nhất, và phần bạn viết tay không bao giờ bị chạm. Hết cảnh bài học chất đống làm agent chậm và loãng dần theo thời gian.
+- **Thanh model thôi nói dối khi ghim hỏng.** Phiên ghim một model mà provider đó đã bị gỡ key thì trước đây thanh model vẫn khoe "ghim" trong khi thực tế chạy mặc định chung. Giờ nó báo thẳng "ghim hỏng", và gửi tin nhắn là ghim hỏng tự được gỡ.
+
 ## [0.35.3] - 2026-08-16
 ### Thêm mới
 - **Mỗi cuộc trò chuyện nhớ model riêng.** Đổi model ngay trong khung chat là chọn cho riêng cuộc đó (thanh model hiện dấu ghim), sang tab khác đổi model không kéo cuộc cũ đổi theo. Cuộc chưa từng đổi tay vẫn theo mặc định chung ở trang Models.

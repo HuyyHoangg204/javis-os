@@ -104,10 +104,19 @@ check("vòng nhận WS suy engine_label từ provider hiệu lực của phiên"
 check("có endpoint ghim model theo phiên", '/sessions/{session_id}/model' in src)
 check("endpoint meta nhẹ cho model bar", '/sessions/{session_id}/meta' in src)
 
+# Ghim hỏng phải NÓI THẬT ở cả 3 tầng, không được để server chạy mặc định chung mà
+# thanh model vẫn khoe "ghim": meta trả cờ pin_ok, vòng WS tự gỡ ghim khi lượt chat
+# đã thật sự rơi về mặc định chung, UI vẽ trạng thái "ghim hỏng".
+check("meta trả cờ pin_ok (ghim còn chạy được không)", '"pin_ok"' in src)
+check("lượt chat rơi về mặc định chung thì server TỰ GỠ ghim hỏng",
+      "prov != _pin" in src)
+
 mp = (ROOT / "dashboard" / "model-picker.js").read_text(encoding="utf-8")
 check("model bar: đổi model trong phiên là ghim cho phiên", "pinToSession" in mp)
 check("model bar: vẽ lại khi đổi phiên", "javis:sessions-changed" in mp)
 check("model bar: chat trống chọn model xong mint id là ghim theo", "claimPending" in mp)
+check("model bar: ghim hỏng hiện đúng trạng thái, không nói dối",
+      "pin_ok === false" in mp and "ghim hỏng" in mp)
 
 if _fails:
     print(f"\nFAIL {len(_fails)} muc: " + ", ".join(_fails))

@@ -16,6 +16,7 @@
   const MODEL_CACHE_MS = 5 * 60 * 1000;
   let state = { providers: [], main: { provider: "", model: "" }, reasoning: "off" };
   let sessionPin = null;   // {provider, model} phiên đang mở đã ghim; null = theo mặc định chung
+  let pinBroken = false;   // phiên có ghim nhưng ghim HỎNG (provider mất key) - server đang chạy mặc định chung
   let pinSid = null;       // phiên mà sessionPin đang nói về (chống vẽ nhầm khi đổi phiên nhanh)
   let pendingPin = null;   // model chọn khi CHƯA có phiên (chat trống) - áp ngay khi mint id
   let expanded = null;     // provider đang mở rộng trong popover
@@ -59,15 +60,18 @@
   async function loadSessionPin() {
     const sid = curSid();
     pinSid = sid;
-    if (!sid) { sessionPin = null; pendingPin = null; return; }
+    if (!sid) { sessionPin = null; pinBroken = false; pendingPin = null; return; }
     pendingPin = null;
     try {
       const r = await fetch(`/sessions/${encodeURIComponent(sid)}/meta`);
       const d = r.ok ? await r.json() : null;
       if (pinSid !== sid) return;   // user đã nhảy sang phiên khác trong lúc chờ
-      sessionPin = (d && d.pinned_provider)
+      // pin_ok=false: ghim còn trong DB nhưng không chạy được (provider mất key) -
+      // server đang rơi về mặc định chung, nên hiển thị cũng phải theo mặc định chung.
+      pinBroken = !!(d && d.pinned_provider && d.pin_ok === false);
+      sessionPin = (d && d.pinned_provider && !pinBroken)
         ? { provider: d.pinned_provider, model: d.pinned_model || "" } : null;
-    } catch (e) { if (pinSid === sid) sessionPin = null; }
+    } catch (e) { if (pinSid === sid) { sessionPin = null; pinBroken = false; } }
   }
 
   function renderBar() {
@@ -76,10 +80,12 @@
     const mt = $("mbModelTxt"), et = $("mbEffortTxt");
     if (mt) {
       mt.textContent = (p ? provShort(p.label) : "Model") + " · " + short(eff.model)
-        + (sessionPin ? " · ghim" : "");
+        + (sessionPin ? " · ghim" : pinBroken ? " · ghim hỏng" : "");
       mt.title = sessionPin
         ? "Model ghim riêng cho phiên chat này (đổi ở phiên khác không ảnh hưởng)"
-        : "Theo model mặc định chung";
+        : pinBroken
+          ? "Model ghim của phiên không còn dùng được (provider đã bị gỡ key) - đang chạy model mặc định chung"
+          : "Theo model mặc định chung";
     }
     if (et) et.textContent = "Effort: " + (EFFORT.find((e) => e[0] === state.reasoning) || EFFORT[0])[1];
   }
@@ -153,6 +159,7 @@
       const sid = curSid();
       if (sid) {
         sessionPin = { provider: item.dataset.prov, model: item.dataset.model };
+        pinBroken = false;   // ghim mới đè ghim hỏng cũ
         pinSid = sid;
         await pinToSession(sid, item.dataset.prov, item.dataset.model);
       } else {

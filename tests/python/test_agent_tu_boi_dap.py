@@ -43,24 +43,59 @@ with tempfile.TemporaryDirectory() as td:
         "---\ntype: agent\nname: Chuyên viên test\nrole: Kiểm thử\n---\nThân agent.\n",
         encoding="utf-8")
 
-    _mk, _sysprompt, _log = main._workflow_agent_helpers(brain, tools=None)
-    check("helpers trả 3 giá trị (có log_run)", callable(_log))
+    _mk, _sysprompt, _log, _learn = main._workflow_agent_helpers(brain, tools=None)
+    check("helpers trả 4 giá trị (log_run + learn)", callable(_log) and callable(_learn))
 
     name, sp, model = _sysprompt("chuyen-vien-test")
     check("CANARY: agent CHƯA có ký ức vẫn thấy khối bộ nhớ (hết con gà - quả trứng)",
           "# Bộ nhớ của bạn" in sp and "chưa có ký ức" in sp)
     check("prompt chỉ rõ ĐƯỜNG DẪN file MEMORY.md", "MEMORY.md" in sp)
-    check("prompt có luật tự bồi đắp lúc dùng", "Tự bồi đắp" in sp and "## Bài học" in sp)
-    check("luật là CHỈ THÊM, không xoá phần chủ viết tay",
-          "không xoá" in sp or "không đụng" in sp)
-    check("luật có phanh chống ghi vụn vặt", "vụn vặt" in sp)
+    check("prompt có luật tự bồi đắp qua marker (model đề xuất, code ghi)",
+          "Tự bồi đắp" in sp and "JAVIS_LESSON" in sp)
+    check("luật CẤM agent tự sửa file bộ nhớ", "KHÔNG tự sửa file bộ nhớ" in sp)
+    check("luật có phanh chống ghi vụn vặt và chống lặp",
+          "ĐỪNG phát JAVIS_LESSON" in sp and "đừng lặp lại" in sp)
 
     # Có ký ức thì nội dung phải vào prompt như cũ.
     memf = Path(brain, "memory", "agents", "chuyen-vien-test")
     memf.mkdir(parents=True)
-    (memf / "MEMORY.md").write_text("- Khách quen tên Ba.\n", encoding="utf-8")
+    (memf / "MEMORY.md").write_text(
+        "# Ghi chú của chủ\n- Khách quen tên Ba.\n", encoding="utf-8")
     _, sp2, _ = _sysprompt("chuyen-vien-test")
     check("có ký ức thì ký ức vào prompt", "Khách quen tên Ba" in sp2)
+
+    # ---- Vòng "model đề xuất, code ghi" chạy THẬT qua closure _learn ----
+    out_tho = ("Đã xong việc.\nJAVIS_LESSON: Chủ thích báo cáo dạng bảng.\n"
+               "JAVIS_LESSON: Kho A thường trễ 2 ngày.\n")
+    out_sach = _learn("chuyen-vien-test", out_tho)
+    check("CANARY: marker bị BÓC khỏi output (không chảy vào {{prev}}/UI)",
+          "JAVIS_LESSON" not in out_sach and "Đã xong việc." in out_sach)
+    mem = (memf / "MEMORY.md").read_text(encoding="utf-8")
+    check("CANARY: bài học vào đúng mục tự học",
+          main._BAI_HOC_HEADER in mem and "- Chủ thích báo cáo dạng bảng." in mem)
+    check("phần chủ viết tay còn NGUYÊN", "# Ghi chú của chủ" in mem
+          and "- Khách quen tên Ba." in mem)
+
+    # Chống trùng: cùng bài học (khác hoa thường/dấu chấm) không được nhân đôi.
+    _learn("chuyen-vien-test", "ok\nJAVIS_LESSON: chủ thích báo cáo dạng bảng\n")
+    mem = (memf / "MEMORY.md").read_text(encoding="utf-8")
+    check("bài học trùng (khác hoa thường) không nhân đôi",
+          mem.count("báo cáo dạng bảng") == 1)
+
+    # Trần cứng: dồn 30 bài học, mục tự học chỉ giữ N dòng mới nhất.
+    for i in range(30):
+        main._ghi_bai_hoc(brain, "chuyen-vien-test", [f"Bài học số {i}"])
+    mem = (memf / "MEMORY.md").read_text(encoding="utf-8")
+    tu_hoc = mem.split(main._BAI_HOC_HEADER, 1)[1]
+    so_dong = sum(1 for l in tu_hoc.splitlines() if l.strip().startswith("- "))
+    check(f"CANARY: mục tự học không vượt trần {main._BAI_HOC_TRAN} dòng (bộ nhớ đặc "
+          "dần, không dài dần)", so_dong == main._BAI_HOC_TRAN)
+    check("giữ dòng MỚI nhất, bỏ dòng cũ", "Bài học số 29" in mem and "Bài học số 0" not in mem)
+    check("phần chủ viết vẫn nguyên sau 30 vòng", "- Khách quen tên Ba." in mem)
+
+    # Không có marker → không đụng file, output giữ nguyên.
+    check("output không marker thì trả nguyên xi",
+          _learn("chuyen-vien-test", "chỉ là kết quả") == "chỉ là kết quả")
 
     # ---- 3. _log_agent_run cắt cả task lẫn out ----
     main._log_agent_run(brain, "chuyen-vien-test", "T" * 9000, "O" * 9000)
@@ -70,10 +105,12 @@ with tempfile.TemporaryDirectory() as td:
     check("task bị cắt (chống phình sau retry)", noi_dung.count("T") <= 2100)
     check("kết quả bị cắt như cũ", noi_dung.count("O") <= 1600)
 
-# ---- 2. Nhật ký phủ mọi đường chạy (đối chiếu mã nguồn) ----
+# ---- 2. Nhật ký + học phủ mọi đường chạy (đối chiếu mã nguồn) ----
 src = (SERVER / "main.py").read_text(encoding="utf-8")
 check("CANARY: _run_workflow_step nhận log_run (đường graph + resume hết mù)",
-      "log_run=None" in src and src.count("log_run=log_run") >= 2)
+      "log_run=None" in src and src.count("log_run=log_run, learn=learn") >= 2)
+check("runner cũ cũng bóc bài học trước khi out thành {{prev}}",
+      "_learn(agent_slug, out)" in src)
 check("agent kiểm chứng cũng được ghi nhật ký (cả 2 đường)",
       src.count("[kiểm chứng bước của") >= 2)
 check("runner cũ vẫn ghi nhật ký qua cùng closure", "_log(agent_slug, task_f, out)" in src)

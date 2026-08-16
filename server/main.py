@@ -4174,6 +4174,64 @@ def _agent_memory(brain, slug):
     except Exception:
         return ""
 
+# ---- Agent tự bồi đắp: "model ĐỀ XUẤT, code GHI" (đúng nguyên tắc docs/22-tu-hoc) ----
+# Bản đầu (0.35.3) cho agent tự Edit MEMORY.md, rào bằng lời "chỉ thêm dòng". Rào bằng
+# lời thì model yếu có ngày Write đè cả file, và luật cấm-xoá làm bài học sai nằm vĩnh
+# viễn, bộ nhớ chỉ phình không bao giờ gọn. Nay: agent phát dòng `JAVIS_LESSON: ...`
+# cuối output, code bóc lấy và ghi vào ĐÚNG mục "## Bài học (tự học)" - trần cứng +
+# chống trùng ép bằng code, phần chủ viết tay ngoài mục đó không bao giờ bị chạm.
+_BAI_HOC_HEADER = "## Bài học (tự học)"
+_BAI_HOC_TRAN = 15          # giữ N dòng MỚI NHẤT - bộ nhớ đặc dần thay vì dài dần
+_BAI_HOC_RE = re.compile(r"^[ \t]*JAVIS_LESSON:[ \t]*(.+?)[ \t]*$", re.MULTILINE)
+
+def _boc_bai_hoc(out):
+    """Tách các dòng JAVIS_LESSON khỏi output agent. Trả (bài học, output đã sạch) -
+    phải bóc khỏi output vì `out` chảy tiếp vào {{prev}} của bước sau và lên UI."""
+    if not out or "JAVIS_LESSON" not in out:
+        return [], out
+    lessons = [m.group(1).strip()[:300] for m in _BAI_HOC_RE.finditer(out)][:3]
+    sach = re.sub(r"\n{3,}", "\n\n", _BAI_HOC_RE.sub("", out)).strip()
+    return [l for l in lessons if l], sach
+
+def _ghi_bai_hoc(brain, slug, lessons):
+    """Ghi bài học vào mục tự học của MEMORY.md. Vùng NGOÀI mục là của chủ - giữ nguyên
+    từng ký tự. Trong mục: loại trùng (chuẩn hoá bỏ dấu câu/hoa thường) rồi cắt về
+    _BAI_HOC_TRAN dòng mới nhất."""
+    if not lessons:
+        return
+    try:
+        f = _brain_memory_dir(brain) / "agents" / slug / "MEMORY.md"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        text = f.read_text(encoding="utf-8") if f.exists() else ""
+        lines = text.splitlines()
+        i0 = next((i for i, l in enumerate(lines) if l.strip() == _BAI_HOC_HEADER), None)
+        if i0 is None:
+            truoc, bullets, sau = lines, [], []
+        else:
+            i1 = next((i for i in range(i0 + 1, len(lines)) if lines[i].startswith("## ")),
+                      len(lines))
+            truoc = lines[:i0]
+            bullets = [l.rstrip() for l in lines[i0 + 1:i1] if l.strip().startswith("- ")]
+            sau = lines[i1:]
+        def _chuan(s):
+            return re.sub(r"\W+", "", s).casefold()
+        seen = {_chuan(b) for b in bullets}
+        for l in lessons:
+            b = "- " + l
+            if _chuan(b) in seen:
+                continue
+            bullets.append(b)
+            seen.add(_chuan(b))
+        bullets = bullets[-_BAI_HOC_TRAN:]
+        while truoc and not truoc[-1].strip():
+            truoc.pop()
+        moi = truoc + ([""] if truoc else []) + [_BAI_HOC_HEADER] + bullets
+        if sau:
+            moi += [""] + sau
+        _atomic_write_text(f, "\n".join(moi).rstrip() + "\n")
+    except Exception as e:
+        print(f"[agent-memory] ghi bài học lỗi ({slug}): {e}", file=sys.stderr)
+
 def _log_agent_run(brain, slug, task, out):
     try:
         d = _brain_memory_dir(brain) / "agents" / slug / "runs"
@@ -5950,7 +6008,7 @@ def _route_step_model(router, prompt, agent_model, session_id):
 
 
 async def _run_workflow_step(node, prompt, mk, agent_sysprompt, sink, router=None,
-                             session_id="", log_run=None):
+                             session_id="", log_run=None, learn=None):
     """Chạy ĐÚNG một bước theo đúng ngữ nghĩa runner cũ: agent, kiểm chứng, retry.
 
     Dùng chung cho cả hai đường. `sink` nhận event để đường graph đẩy ra SSE y như cũ.
@@ -6036,6 +6094,8 @@ async def _run_workflow_step(node, prompt, mk, agent_sysprompt, sink, router=Non
             f"# PHẢN HỒI KIỂM CHỨNG:\n- Vấn đề: {reason}\n- Cần sửa: {fixes}\n"
             "CẢI THIỆN kết quả lần trước theo phản hồi: giữ phần đã tốt, sửa đúng chỗ bị chê. Làm cho ĐẠT."
         )
+    if learn:
+        out = learn(node.agent, out)   # bóc JAVIS_LESSON + ghi bộ nhớ TRƯỚC khi out chảy tiếp
     if log_run:
         log_run(node.agent, prompt, out)
     return {"output": out, "verified": verified, "attempts": attempt + 1,
@@ -6084,11 +6144,13 @@ def _workflow_agent_helpers(brain, tools):
             f"Bạn là agent **{ameta.get('name', aslug)}**.\nVai trò: {ameta.get('role','')}\n{abody}\n\n"
             f"Skills khả dụng: {', '.join(ameta.get('skills', []) or []) or '(không)'}. Dùng skill khi cần.\n"
             + f"\n# Bộ nhớ của bạn (file: {mem_path}):\n{amem or '(chưa có ký ức nào)'}\n"
-            + "\n# Tự bồi đắp lúc dùng: cuối nhiệm vụ, nếu rút ra bài học TÁI DÙNG được cho vai này "
-              "(cách làm tốt hơn, lỗi cần tránh, ngữ cảnh riêng đã học được), THÊM 1-3 gạch đầu dòng "
-              "vào mục `## Bài học` của file bộ nhớ trên (tự tạo file/mục nếu chưa có). CHỈ THÊM dòng "
-              "mới, tuyệt đối không xoá hay viết lại phần sẵn có - phần đó có thể do chủ viết tay. "
-              "Lượt chạy bình thường không có gì đáng nhớ thì KHÔNG ghi - đừng chép nhật ký vụn vặt.\n"
+            + "\n# Tự bồi đắp lúc dùng: nếu cuối nhiệm vụ rút ra được bài học TÁI DÙNG cho vai này "
+              "(cách làm tốt hơn, lỗi cần tránh, ngữ cảnh riêng đã học được), KẾT THÚC câu trả lời "
+              "bằng tối đa 2 dòng riêng, mỗi dòng đúng dạng `JAVIS_LESSON: <bài học một câu>`. "
+              "Javis tự ghi vào mục `## Bài học (tự học)` của file bộ nhớ trên (tự loại trùng, giữ "
+              f"{_BAI_HOC_TRAN} dòng mới nhất). KHÔNG tự sửa file bộ nhớ trực tiếp - phần ngoài mục "
+              "đó là của chủ. Lượt chạy không có gì đáng nhớ thì ĐỪNG phát JAVIS_LESSON, và đừng "
+              "lặp lại bài học đã có trong bộ nhớ.\n"
             + "\nLàm việc trong vault. Tập trung hoàn thành nhiệm vụ, trả kết quả rõ ràng, ngắn gọn."
         )
         return ameta.get("name", aslug), sysprompt, (ameta.get("model") or "").strip() or None
@@ -6096,7 +6158,16 @@ def _workflow_agent_helpers(brain, tools):
     def _log_run(aslug, task, out):
         _log_agent_run(brain, aslug, task, out)
 
-    return _mk, _agent_sysprompt, _log_run
+    def _learn(aslug, out):
+        """Bóc JAVIS_LESSON khỏi output, ghi vào bộ nhớ agent, trả output ĐÃ SẠCH
+        (marker không được chảy vào {{prev}} của bước sau hay lên UI)."""
+        lessons, sach = _boc_bai_hoc(out or "")
+        if not lessons:
+            return out
+        _ghi_bai_hoc(brain, aslug, lessons)
+        return sach
+
+    return _mk, _agent_sysprompt, _log_run, _learn
 
 
 async def execute_workflow_graph(brain, slug, input="", tools=None, session_id=""):
@@ -6114,7 +6185,7 @@ async def execute_workflow_graph(brain, slug, input="", tools=None, session_id="
     if admission.action != "execute":
         _CONTEXT_RUNTIME.finish(trace, "COMPLETED", admission.reason)
         return
-    mk, agent_sysprompt, log_run = _workflow_agent_helpers(brain, tools)
+    mk, agent_sysprompt, log_run, learn = _workflow_agent_helpers(brain, tools)
     agent_policy = agent_runtime.AgentPolicy.from_settings(cfgmod.read_settings() or {})
     agent_admitted = graph.allows_replan and agent_policy.admits(
         graph.slug, session_id or f"wf:{slug}")[0]
@@ -6131,7 +6202,7 @@ async def execute_workflow_graph(brain, slug, input="", tools=None, session_id="
         return await _run_workflow_step(
             node, prompt, mk, agent_sysprompt, sink,
             router=model_router.ModelRouter(cfgmod.read_settings),
-            session_id=session_id or f"wf:{slug}", log_run=log_run)
+            session_id=session_id or f"wf:{slug}", log_run=log_run, learn=learn)
 
     async def capability_runner(node, approved):
         """Node capability của workflow.
@@ -6300,7 +6371,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
     except Exception:
         pass
 
-    _mk, _agent_sysprompt, _log = _workflow_agent_helpers(brain, tools)
+    _mk, _agent_sysprompt, _log, _learn = _workflow_agent_helpers(brain, tools)
 
     yield {"type": "start", "workflow": meta.get("name", slug), "steps": len(steps)}
     prev = ""
@@ -6379,6 +6450,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
                 "CẢI THIỆN kết quả lần trước theo phản hồi: giữ phần đã tốt, sửa đúng chỗ bị chê. Làm cho ĐẠT."
             )
 
+        out = _learn(agent_slug, out)   # bóc JAVIS_LESSON + ghi bộ nhớ trước khi out thành {{prev}}
         prev = out
         yield {"type": "step_done", "i": i, "agent": agent_name, "output": out, "verified": verified}
         _log(agent_slug, task_f, out)
@@ -6414,7 +6486,7 @@ async def execute_workflow_resume(brain, slug, task_id, node_id, code, tools=Non
         yield {"type": "error", "content": "Không tìm thấy hoặc không resume được task này."}
         return
     canary = _get_workflow_canary(brain)
-    mk, agent_sysprompt, log_run = _workflow_agent_helpers(brain, tools)
+    mk, agent_sysprompt, log_run, learn = _workflow_agent_helpers(brain, tools)
     queue: asyncio.Queue = asyncio.Queue()
 
     async def sink(event):
@@ -6426,7 +6498,7 @@ async def execute_workflow_resume(brain, slug, task_id, node_id, code, tools=Non
         return await _run_workflow_step(
             node, prompt, mk, agent_sysprompt, sink,
             router=model_router.ModelRouter(cfgmod.read_settings),
-            session_id=session_id or f"wf:{slug}", log_run=log_run)
+            session_id=session_id or f"wf:{slug}", log_run=log_run, learn=learn)
 
     async def capability_runner(node, approved):
         try:
@@ -9494,6 +9566,14 @@ async def websocket_endpoint(ws: WebSocket):
             # dọn nhầm/không dọn mạch native khi đổi engine.
             _prow = store.get_session(payload.get("session_id") or "") or {}
             prov, kind, api_key, api_model = _chat_provider_for_session(mcfg, _prow)
+            _pin = (_prow.get("pinned_provider") or "").strip()
+            if _pin and prov != _pin:
+                # Ghim hỏng (provider bị gỡ / mất key) và lượt này đã thật sự rơi về mặc
+                # định chung → GỠ ghim luôn, để thanh model thôi khoe một ghim không chạy.
+                try:
+                    store.set_pinned_model(payload.get("session_id") or "", "", "")
+                except Exception:
+                    pass
             engine_label = ("codex" if prov == "openai-oauth"
                             else "gemini-cli" if prov == "gemini-cli"
                             else "antigravity-cli" if prov == "antigravity-cli"
@@ -9711,10 +9791,20 @@ async def sessions_pin(session_id: str, pinned: str = Form("1")):
 @app.get("/sessions/{session_id}/meta")
 async def sessions_meta(session_id: str):
     """Row phiên KHÔNG kèm messages - cho model bar hỏi 'phiên này ghim model gì' mà
-    không phải kéo cả hội thoại về (GET /sessions/{id} trả nguyên cả messages)."""
+    không phải kéo cả hội thoại về (GET /sessions/{id} trả nguyên cả messages).
+
+    Kèm `pin_ok`: ghim còn dùng được không (provider còn tồn tại + còn key). Server
+    rơi về mặc định chung khi ghim hỏng, nên UI mà cứ vẽ 'ghim' theo DB là hai tầng
+    nói hai chuyện khác nhau - cờ này để thanh model nói đúng sự thật."""
     sess = get_store().get_session(session_id)
     if not sess:
         return JSONResponse({"error": "not found"}, status_code=404)
+    pp = (sess.get("pinned_provider") or "").strip()
+    if pp:
+        d = _provider_def(pp)
+        mcfg = cfgmod.read_settings().get("model", {})
+        key = mcfg.get(d["key_field"], "") if d and d.get("key_field") else ""
+        sess["pin_ok"] = bool(d) and (d.get("kind") != "api" or bool(key))
     return sess
 
 
