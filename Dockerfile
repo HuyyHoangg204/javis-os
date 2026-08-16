@@ -49,10 +49,14 @@ RUN npm install -g "@anthropic-ai/claude-code@${CLAUDE_CLI_VERSION}" \
     && npm cache clean --force \
     && claude --version
 
-# Codex CLI - cho provider ChatGPT subscription (OpenAI OAuth). BEST-EFFORT: lỗi cài KHÔNG làm hỏng
-# build (Claude vẫn chạy). Đăng nhập 1 lần bằng `codex login` trong terminal (token lưu ở volume .codex).
-RUN (npm install -g @openai/codex && npm cache clean --force && codex --version) \
-    || echo "[build] codex cài KHÔNG thành công - provider ChatGPT subscription sẽ không dùng được (các provider khác vẫn chạy)."
+# Codex CLI - cho provider ChatGPT subscription (OpenAI OAuth). Đăng nhập 1 lần trên trang Models
+# (token lưu ở volume .codex).
+#
+# HẾT best-effort từ 0.35.7: lối `|| echo` cũ nuốt lỗi cài, và nó đã xảy ra thật - có image phát
+# hành ra ngoài KHÔNG có codex, người mới cài đăng nhập ChatGPT xanh (OAuth do Javis tự lo, không
+# cần binary) rồi vào chat mới vỡ, không có lấy một dòng lỗi chỉ đường (báo cáo 16/08). Thiếu
+# codex thì build phải ĐỎ để CI chặn lại, không được ship image què.
+RUN npm install -g @openai/codex && npm cache clean --force && codex --version
 
 # Gemini CLI KHÔNG còn được cài sẵn (bỏ ở 0.29.1).
 #
@@ -116,7 +120,10 @@ EXPOSE 7777
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
     CMD python -c "import urllib.request,os,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+os.getenv('JAVIS_PORT','7777')+'/health',timeout=4).status==200 else 1)" || exit 1
 
-# tini reaps node subprocesses. uvicorn launched with --app-dir server because
-# main.py uses the "main:app" import string and `from claude_cli import ...`.
-ENTRYPOINT ["/usr/bin/tini", "--"]
+# tini reaps node subprocesses; entrypoint.sh links ~/.local, ~/.antigravity, ~/.config
+# into /data/home first so CLI người dùng tự cài (agy) + đăng nhập của nó SỐNG QUA UPDATE
+# (trước đây HOME không nằm trên volume nào → mỗi lần đổi image là cài + đăng nhập lại).
+# uvicorn launched with --app-dir server because main.py uses the "main:app" import
+# string and `from claude_cli import ...`.
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker/entrypoint.sh"]
 CMD ["sh", "-c", "python -m uvicorn main:app --app-dir server --host ${JAVIS_HOST} --port ${JAVIS_PORT}"]

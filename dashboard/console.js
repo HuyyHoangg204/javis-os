@@ -2916,12 +2916,22 @@
         </div>`;
     const provCard = (p) => {
       const on = p.configured;
+      // Máy thiếu binary CLI thì nói TẠI ĐÂY, đừng để user đăng nhập xanh rồi vào chat mới
+      // vỡ (báo cáo 16/08: người mới cài "kết nối được nhưng không sử dụng được").
+      // cli_found === false mới cảnh báo - undefined nghĩa là thẻ không thuộc diện kiểm.
+      const cliWarn = (ten) => p.cli_found === false
+        ? `<div class="prov-note warn">${WARN_ICON} <b>Máy chạy Javis chưa có lệnh <code>${ten}</code></b>
+             - ${on ? "đăng nhập đã xong nhưng" : ""} chat bằng thẻ này sẽ lỗi cho tới khi cài.
+             Bản Docker: <b>cập nhật Javis lên bản mới nhất</b> là có sẵn. Bản cài tay: mở trang
+             Code &gt; Terminal chạy <code>${esc(p.cai_lenh || "")}</code> rồi khởi động lại Javis.</div>`
+        : "";
       if (p.kind === "oauth") {
         const st = on
           ? "● Đã kết nối" + (p.plan ? " · " + esc(p.plan) : "") + " · " + p.models.length + " model"
           : "○ Chưa kết nối · " + p.models.length + " model";
         return `<div class="prov-card ${p.is_main ? "main" : ""}">
           ${provHead(p, on, "Device code", st)}
+          ${cliWarn("codex")}
           <div class="prov-action" style="flex-wrap:wrap">
             ${on
               ? `<button class="gcard-btn ghost" data-oauth-disc="1">Ngắt</button>`
@@ -3010,6 +3020,7 @@
             </div>
             ${p.is_main ? '<span class="prov-badge">MAIN</span>' : ""}
           </div>
+          ${cliWarn("claude")}
           <div class="prov-action" id="cliAction"></div>
           <div class="prov-auth">
             <div class="prov-auth-title">Chạy bằng</div>

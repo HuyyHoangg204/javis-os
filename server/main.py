@@ -1106,6 +1106,12 @@ def _providers_view(cfg):
         if p["kind"] == "oauth":
             item["account"] = oauth.get("account_id", "")
             item["plan"] = oauth.get("plan", "")
+            # Đăng nhập ChatGPT do CHÍNH JAVIS lo (OAuth device code, token ghi vào ~/.codex)
+            # nên "Đã kết nối" không chứng minh máy có binary `codex`. Máy thiếu nó là thẻ
+            # xanh mà chat vỡ - báo cáo 16/08: người mới cài kết nối được nhưng không dùng
+            # được. Lộ cli_found để thẻ nói thẳng ngay tại trang Models.
+            item["cli_found"] = bool(find_codex_cli())
+            item["cai_lenh"] = "npm install -g @openai/codex"
         if p["id"] == "gemini-cli":
             _g = gemini_cli.auth_status()
             item["cli_found"] = bool(gemini_cli.find_gemini_cli())
@@ -1135,6 +1141,10 @@ def _providers_view(cfg):
             item["auth_mode"] = claude_auth.che_do(cfg)
             item["auth_api_key_set"] = bool(claude_auth.api_key(cfg))
             item["auth_warning"] = claude_auth.canh_bao_neu_can(cfg)
+            # Cùng lý do với cli_found của Codex: key_field=None làm configured luôn True,
+            # nhưng bản cài tay thiếu binary `claude` thì chat chết ngay lượt đầu.
+            item["cli_found"] = bool(find_claude_cli())
+            item["cai_lenh"] = "npm install -g @anthropic-ai/claude-code"
         out.append(item)
     return out
 
