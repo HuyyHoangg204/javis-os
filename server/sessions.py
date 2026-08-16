@@ -285,11 +285,13 @@ class SessionStore:
                               # nhưng phải là cột RIÊNG: đổi bộ não giữa chừng mà dùng chung một
                               # cột là lượt sau đưa UUID của engine này cho engine kia resume.
                               ("gemini_session_id", "TEXT"),
-                              # Model user GHIM RIÊNG cho phiên này (đổi model ngay trong phiên).
-                              # KHÔNG tái dùng cột engine/model sẵn có: hai cột đó là NHẬT KÝ
-                              # lượt cuối, bị get_or_create ghi đè mỗi lượt - trộn nghĩa vào là
-                              # phiên "tự ghim" chính nó ngay sau tin đầu tiên. NULL/rỗng cả hai
-                              # = chưa từng đổi tay → theo mặc định chung ở settings.json.
+                              # Model GHIM RIÊNG của phiên. Hai nguồn ghi: user đổi model ngay
+                              # trong phiên, và từ 0.35.5 server tự ĐÓNG DẤU model đang chạy ở
+                              # lượt dashboard đầu tiên - nên đổi mặc định chung không bao giờ
+                              # đổi ngược cuộc đang dở. KHÔNG tái dùng cột engine/model sẵn có:
+                              # hai cột đó là NHẬT KÝ lượt cuối, bị get_or_create ghi đè mỗi
+                              # lượt. NULL/rỗng = phiên chưa có lượt dashboard nào (hoặc phiên
+                              # Telegram) → theo mặc định chung ở settings.json.
                               ("pinned_provider", "TEXT"),
                               ("pinned_model", "TEXT")):
                 if name not in cols:

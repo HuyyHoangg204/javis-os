@@ -314,6 +314,8 @@ function sendMessage(text) {
   setOrbState("thinking", "ĐANG SUY NGHĨ");
   showActivity("Javis đang suy nghĩ...");   // hiện NGAY trong khung chat, không đợi server báo
   syncActiveUI();
+  // Server đóng dấu model đang chạy cho phiên ngay từ tin đầu -> bar hiện "ghim" tại chỗ.
+  try { if (window.JavisModelBar) window.JavisModelBar.noteStamped(sid); } catch (e) {}
   ws.send(JSON.stringify({ message: outMsg, brain: currentBrainPath(), session_id: sid }));
 }
 // Chip lựa chọn (chat-ask.js) gửi đáp án qua đây: bấm chip = y như người dùng gõ tay nhãn đó.

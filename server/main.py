@@ -9566,14 +9566,6 @@ async def websocket_endpoint(ws: WebSocket):
             # dọn nhầm/không dọn mạch native khi đổi engine.
             _prow = store.get_session(payload.get("session_id") or "") or {}
             prov, kind, api_key, api_model = _chat_provider_for_session(mcfg, _prow)
-            _pin = (_prow.get("pinned_provider") or "").strip()
-            if _pin and prov != _pin:
-                # Ghim hỏng (provider bị gỡ / mất key) và lượt này đã thật sự rơi về mặc
-                # định chung → GỠ ghim luôn, để thanh model thôi khoe một ghim không chạy.
-                try:
-                    store.set_pinned_model(payload.get("session_id") or "", "", "")
-                except Exception:
-                    pass
             engine_label = ("codex" if prov == "openai-oauth"
                             else "gemini-cli" if prov == "gemini-cli"
                             else "antigravity-cli" if prov == "antigravity-cli"
@@ -9582,6 +9574,19 @@ async def websocket_endpoint(ws: WebSocket):
             conv_sid = store.get_or_create(
                 payload.get("session_id"), brain=brain, engine=engine_label,
                 model=(api_model or mcfg.get("claude_model")))
+            # ĐÓNG DẤU model từ tin đầu (chủ chốt 16/08): mỗi lượt bảo đảm ghim của
+            # phiên == model ĐANG CHẠY THẬT của lượt này. Phủ một lúc ba ca:
+            #   - phiên mới / phiên cũ chưa ghim → đóng dấu model hiệu lực, từ đây đổi
+            #     mặc định chung không bao giờ đổi ngược cuộc đang dở;
+            #   - ghim hỏng (provider mất key, đã rơi về mặc định chung) → thay bằng
+            #     model đang chạy thật, thanh model thôi khoe ghim chết;
+            #   - ghim lành → resolved == ghim, không có gì để ghi (no-op).
+            if ((_prow.get("pinned_provider") or "").strip() != prov
+                    or (_prow.get("pinned_model") or "") != (api_model or "")):
+                try:
+                    store.set_pinned_model(conv_sid, prov, api_model or "")
+                except Exception:
+                    pass
             if engine_label != "codex":
                 # Provider khác vừa chen một lượt: thread Codex cũ không chứa lượt này nữa.
                 # Xoá liên kết để lần quay lại Codex bootstrap từ SQLite thay vì resume mạch stale.

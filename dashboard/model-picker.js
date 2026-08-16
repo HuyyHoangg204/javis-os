@@ -197,6 +197,15 @@
       pendingPin = null;
       renderBar();
     },
+    // app.js gọi mỗi lần GỬI TIN: server đóng dấu model đang chạy cho phiên ngay lượt
+    // đầu, nên bar phải chuyển sang "ghim" tại chỗ - không chờ tới lần đổi phiên mới
+    // vẽ lại, kẻo trong lúc đó đổi mặc định chung ở trang Models là bar nói sai.
+    noteStamped: function (sid) {
+      if (!sid || (sessionPin && pinSid === sid)) return;
+      sessionPin = { provider: state.main.provider, model: state.main.model };
+      pinBroken = false; pinSid = sid;
+      renderBar();
+    },
   };
 
   // Đổi phiên (mở phiên cũ, chat mới, xoá phiên) → hỏi lại ghim của phiên rồi vẽ lại.

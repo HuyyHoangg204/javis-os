@@ -4,6 +4,10 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.5] - 2026-08-16
+### Cải thiện
+- **Chat cũ tuyệt đối không tự đổi model nữa.** Mỗi cuộc trò chuyện được đóng dấu model đang chạy ngay từ tin nhắn đầu tiên, kể cả khi bạn chưa từng đổi tay trong đó. Đổi mặc định chung ở trang Models chỉ áp cho cuộc mở sau, không đổi ngược cuộc đang dở; muốn cuộc cũ chạy model mới thì đổi ngay trong khung chat của nó.
+
 ## [0.35.4] - 2026-08-16
 ### Cải thiện
 - **Bộ nhớ tự học của agent giờ đặc dần thay vì dài dần.** Agent chỉ đề xuất bài học, Javis cầm bút ghi hộ vào mục riêng: tự loại trùng, giữ đúng 15 dòng mới nhất, và phần bạn viết tay không bao giờ bị chạm. Hết cảnh bài học chất đống làm agent chậm và loãng dần theo thời gian.

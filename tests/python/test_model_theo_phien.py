@@ -2,10 +2,13 @@
 
     python tests/run.py model_theo_phien     (KHÔNG mạng)
 
-Yêu cầu chủ repo (16/08): trước đây model là GLOBAL tuyệt đối - đổi model ở tab/phiên
-khác là model của phiên đang mở đổi theo, vì mọi phiên đọc chung settings.json. Nay:
-đổi model NGAY TRONG một phiên = ghim cho riêng phiên đó (cột pinned_provider/
-pinned_model trong bảng sessions); phiên chưa từng đổi tay vẫn bám mặc định chung.
+Yêu cầu chủ repo (16/08, hai vòng): trước đây model là GLOBAL tuyệt đối - đổi model ở
+tab/phiên khác là model của phiên đang mở đổi theo, vì mọi phiên đọc chung
+settings.json. Vòng 1: đổi model NGAY TRONG một phiên = ghim cho riêng phiên đó (cột
+pinned_provider/pinned_model trong bảng sessions). Vòng 2 (đóng dấu từ tin đầu): MỌI
+phiên dashboard được tự đóng dấu model đang chạy ngay lượt đầu tiên, nên chat cũ tuyệt
+đối không bị mặc định chung kéo nữa, kể cả khi chưa từng đổi tay. Chỉ phiên chưa có
+lượt chat nào (và phiên Telegram) còn theo mặc định chung.
 
 Bẫy đã né mà test phải ghim chặt:
 - KHÔNG tái dùng cột engine/model sẵn có - chúng là nhật ký lượt cuối, bị get_or_create
@@ -104,12 +107,18 @@ check("vòng nhận WS suy engine_label từ provider hiệu lực của phiên"
 check("có endpoint ghim model theo phiên", '/sessions/{session_id}/model' in src)
 check("endpoint meta nhẹ cho model bar", '/sessions/{session_id}/meta' in src)
 
-# Ghim hỏng phải NÓI THẬT ở cả 3 tầng, không được để server chạy mặc định chung mà
-# thanh model vẫn khoe "ghim": meta trả cờ pin_ok, vòng WS tự gỡ ghim khi lượt chat
-# đã thật sự rơi về mặc định chung, UI vẽ trạng thái "ghim hỏng".
+# Ghim hỏng phải NÓI THẬT: meta trả cờ pin_ok cho UI, còn ở lượt chat thì cơ chế
+# đóng dấu bên dưới tự THAY ghim hỏng bằng model đang chạy thật.
 check("meta trả cờ pin_ok (ghim còn chạy được không)", '"pin_ok"' in src)
-check("lượt chat rơi về mặc định chung thì server TỰ GỠ ghim hỏng",
-      "prov != _pin" in src)
+
+# ĐÓNG DẤU từ tin đầu (chủ chốt 16/08, vòng 2): mỗi lượt dashboard bảo đảm ghim của
+# phiên == model đang chạy thật. Phiên mới/chưa ghim được đóng dấu ngay lượt đầu nên
+# đổi mặc định chung KHÔNG BAO GIỜ đổi ngược cuộc đang dở; ghim hỏng được thay bằng
+# model thật; ghim lành là no-op (không ghi DB mỗi lượt).
+check("CANARY: vòng WS đóng dấu model đang chạy cho phiên",
+      "store.set_pinned_model(conv_sid, prov, api_model or \"\")" in src)
+check("đóng dấu chỉ ghi khi LỆCH (ghim lành không bị ghi lại mỗi lượt)",
+      '(_prow.get("pinned_provider") or "").strip() != prov' in src)
 
 mp = (ROOT / "dashboard" / "model-picker.js").read_text(encoding="utf-8")
 check("model bar: đổi model trong phiên là ghim cho phiên", "pinToSession" in mp)
@@ -117,6 +126,11 @@ check("model bar: vẽ lại khi đổi phiên", "javis:sessions-changed" in mp)
 check("model bar: chat trống chọn model xong mint id là ghim theo", "claimPending" in mp)
 check("model bar: ghim hỏng hiện đúng trạng thái, không nói dối",
       "pin_ok === false" in mp and "ghim hỏng" in mp)
+check("model bar: gửi tin là biết phiên vừa được đóng dấu (noteStamped)",
+      "noteStamped" in mp)
+
+app_js = (ROOT / "dashboard" / "app.js").read_text(encoding="utf-8")
+check("app.js gọi noteStamped lúc gửi tin", "noteStamped(sid)" in app_js)
 
 if _fails:
     print(f"\nFAIL {len(_fails)} muc: " + ", ".join(_fails))
