@@ -164,7 +164,10 @@ class McpStdioSession:
         self.proc = None
         self._id = 0
         self._lock = asyncio.Lock()   # NDJSON tuần tự - serialize request/response
-        self._stderr = deque(maxlen=20)
+        # 50 dòng: traceback Python lồng nhau (uvx crash lúc import) dễ vượt 20 dòng,
+        # mà dòng NGUYÊN NHÂN nằm cuối cùng - thiếu chỗ chứa là mất đúng dòng đó.
+        self._stderr = deque(maxlen=50)
+        self._stderr_task = None
         self._init_done = False
 
     def _argv(self):
@@ -204,10 +207,31 @@ class McpStdioSession:
         self.proc = await asyncio.create_subprocess_exec(
             *self._argv(), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE, env=env, limit=self._STREAM_LIMIT, **kwargs)
-        asyncio.ensure_future(self._drain_stderr())
+        self._stderr_task = asyncio.ensure_future(self._drain_stderr())
 
-    def _err_tail(self):
-        return " | ".join(list(self._stderr)[-5:])[:400]
+    def _err_tail(self, n=8, cap=900):
+        lines = [l for l in self._stderr if l.strip()]
+        if not lines:
+            return ""
+        tail = " | ".join(lines[-n:])
+        # Traceback Python để NGUYÊN NHÂN ở dòng CUỐI (vd "ModuleNotFoundError: ...").
+        # Cắt từ đầu như trước là giữ đúng phần vô dụng (đường dẫn cache dài của uv)
+        # và vứt đúng dòng người ta cần → phải giữ ĐUÔI.
+        return tail if len(tail) <= cap else "..." + tail[-cap:]
+
+    async def _doi_stderr_xong(self):
+        # Process vừa chết: _drain_stderr chạy bất đồng bộ nên tại thời điểm này có thể
+        # CHƯA đọc hết traceback. Đợi nó tới EOF (process chết thì EOF tới ngay) rồi hãy
+        # dựng thông báo lỗi, không thì chụp được log dở dang.
+        try:
+            await asyncio.wait_for(self.proc.wait(), timeout=1.0)
+        except Exception:
+            pass
+        if self._stderr_task:
+            try:
+                await asyncio.wait_for(asyncio.shield(self._stderr_task), timeout=0.5)
+            except Exception:
+                pass
 
     async def _rpc(self, method, params=None, notify=False, timeout=120):
         if not self.alive():
@@ -231,6 +255,7 @@ class McpStdioSession:
                 raise TimeoutError(f"tool không phản hồi sau {timeout}s")
             raw = await asyncio.wait_for(self.proc.stdout.readline(), timeout=remain)
             if not raw:
+                await self._doi_stderr_xong()
                 raise RuntimeError(f"process đóng stdout ({self._err_tail() or 'exit?'})")
             raw = raw.decode("utf-8", "replace").strip()
             if not raw:

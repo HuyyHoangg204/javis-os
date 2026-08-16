@@ -1182,11 +1182,23 @@ async def validate_connection(conn_id):
         tools = await mcp_client.pool.list_tools(spec)
     except Exception as e:
         # Kèm nội dung lỗi thật: chỉ tên loại (vd "ValueError") thì không lần ra manh mối.
-        chi_tiet = str(e)[:160]
+        # Giữ ĐUÔI chứ không giữ đầu: traceback Python để nguyên nhân ở dòng CUỐI, mà một
+        # dòng "File .../.cache/uv/..." đã ~135 ký tự nên cắt [:160] từ đầu là NUỐT đúng
+        # dòng "ModuleNotFoundError: ..." với mọi lỗi import của gói chạy qua uvx.
+        chi_tiet = str(e)
+        if len(chi_tiet) > 400:
+            chi_tiet = "..." + chi_tiet[-400:]
+        # Crash vì phụ thuộc của gói MCP thì bảo đi kiểm key là dẫn user đi sai hướng
+        # có hệ thống (họ sẽ tạo lại key/service account mãi mà không bao giờ ra).
+        la_loi_goi = any(k in chi_tiet for k in (
+            "ModuleNotFoundError", "ImportError", "Traceback", "No module named"))
+        goi_y = ("Gói MCP này hỏng phụ thuộc - lỗi nằm ở gói, KHÔNG phải key của bạn. "
+                 "Cần ghim phiên bản thư viện trong lệnh chạy (vd uvx --with 'mcp<2' ...)."
+                 if la_loi_goi else "Kiểm tra lại key/URL hoặc thử lại.")
         return {"ok": False, "label": "", "tools": 0,
                 "error": "Không kết nối được (" + type(e).__name__
                          + (": " + chi_tiet if chi_tiet else "")
-                         + "). Kiểm tra lại key/URL hoặc thử lại."}
+                         + "). " + goi_y}
     label = ""
     val = (conn.get("connector") or {}).get("validate")
     if val and val.get("tool"):

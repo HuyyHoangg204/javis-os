@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.2] - 2026-08-16
+### Sửa lỗi
+- **Thẻ Google Sheets và TikTok Ads sống lại.** Hai thẻ này chết ngay lúc kết nối với mọi người - không phải do key của bạn sai, mà do gói bên thứ ba bị thư viện mới làm gãy. Đã ghim đúng phiên bản, đấu lại là chạy. Ai đã tự đấu Google Sheets bằng nguồn tự khai để chữa cháy thì sau khi cập nhật nên quay về thẻ chính chủ và gỡ nguồn tự khai cho đỡ trùng.
+- **Thông báo lỗi kết nối MCP hết giấu bệnh.** Trước đây phần quan trọng nhất của lỗi luôn bị cắt mất và Javis đổ tại key làm bạn đi kiểm key oan nhiều giờ. Giờ nó hiện đúng dòng nguyên nhân, và khi lỗi nằm ở gói chứ không phải ở bạn thì nói thẳng như vậy.
+
 ## [0.35.1] - 2026-08-15
 ### Cải thiện
 - **Javis mặc định im lặng.** Mở lần đầu là chỉ hiện chữ, không tự đọc thành tiếng nữa - đỡ giật mình khi đang ở chỗ đông người hay quên bật loa nhỏ. Muốn nghe thì bấm nút loa ở khung chat hoặc bật **Đọc trả lời bằng giọng** trong Cài đặt nhanh; đã bật rồi thì Javis nhớ, F5 vẫn giữ nguyên. Ai đang bật sẵn từ trước cũng không bị tắt.

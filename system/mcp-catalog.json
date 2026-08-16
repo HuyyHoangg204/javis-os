@@ -235,7 +235,8 @@
       "status": "beta",
       "transport": "stdio",
       "command": "uvx",
-      "args": ["mcp-google-sheets@latest"],
+      "_args_doc": "Ghim mcp<2 vì mcp-google-sheets khai `mcp>=1.8.0` KHÔNG chặn trần, mà mcp 2.0 đã bỏ đường dẫn mcp.server.fastmcp → uvx giải phụ thuộc tươi mỗi lần chạy nên luôn kéo mcp 2.x và gói chết ngay dòng import đầu tiên (ModuleNotFoundError), trước cả khi nói gì qua stdout. Đã tái hiện và xác nhận fix 2026-08-16.",
+      "args": ["--with", "mcp<2", "mcp-google-sheets@latest"],
       "auth": {
         "type": "apikey",
         "fields": [
@@ -655,7 +656,8 @@
       "status": "beta",
       "transport": "stdio",
       "command": "uvx",
-      "args": ["tiktok-ads-mcp"],
+      "_args_doc": "Ghim mcp<2: cùng bệnh với google-sheets - gói import `from mcp.server import FastMCP` (đường dẫn mcp 1.x) mà không chặn trần dependency, nên mcp 2.x làm nó chết ngay lúc import (ImportError: cannot import name 'FastMCP'). Đã tái hiện và xác nhận fix 2026-08-16. Các thẻ uvx khác (workspace-mcp, keep-mcp, notebooklm, google-ads-mcp) đã test cùng ngày và chạy tốt với mcp 2.x - KHÔNG ghim bừa, gói cần mcp 2 mà ép <2 là gãy chiều ngược lại.",
+      "args": ["--with", "mcp<2", "tiktok-ads-mcp"],
       "auth": {
         "type": "apikey",
         "fields": [
