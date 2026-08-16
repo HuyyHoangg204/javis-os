@@ -4,6 +4,15 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.3] - 2026-08-16
+### Thêm mới
+- **Mỗi cuộc trò chuyện nhớ model riêng.** Đổi model ngay trong khung chat là chọn cho riêng cuộc đó (thanh model hiện dấu ghim), sang tab khác đổi model không kéo cuộc cũ đổi theo. Cuộc chưa từng đổi tay vẫn theo mặc định chung ở trang Models.
+- **Agent thông minh dần theo mỗi lần dùng.** Chạy xong một việc mà rút ra bài học đáng giữ, agent tự ghi thêm vào bộ nhớ riêng của nó, không đụng phần bạn viết tay. Đúng chủ trương cải thiện lúc dùng: không có job nền nào quét sửa hàng loạt.
+
+### Sửa lỗi
+- **Hết cảnh VPS đầy RAM vì kết nối.** Server của thẻ kết nối (như Google Sheets) bị bỏ rơi thành cả trăm tiến trình mồ côi, ăn gần hết RAM sau một ngày. Giờ đóng là dọn cả cây tiến trình, và kết nối được giữ ấm thay vì đập đi dựng lại mỗi 10 phút.
+- **Agent tạo qua chat hết "biến mất".** Hướng dẫn nội bộ còn trỏ thư mục cũ nên agent ghi vào chỗ app không đọc - đã xảy ra hai lần, giờ sửa tận gốc. Nhật ký chạy của agent cũng ghi đủ ở mọi đường chạy workflow, kể cả bước kiểm chứng.
+
 ## [0.35.2] - 2026-08-16
 ### Sửa lỗi
 - **Thẻ Google Sheets và TikTok Ads sống lại.** Hai thẻ này chết ngay lúc kết nối với mọi người - không phải do key của bạn sai, mà do gói bên thứ ba bị thư viện mới làm gãy. Đã ghim đúng phiên bản, đấu lại là chạy. Ai đã tự đấu Google Sheets bằng nguồn tự khai để chữa cháy thì sau khi cập nhật nên quay về thẻ chính chủ và gỡ nguồn tự khai cho đỡ trùng.

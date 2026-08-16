@@ -1,5 +1,10 @@
 // model-picker.js — đổi model (đa nhà cung cấp) + effort ngay trên khung chat.
 // Thuần frontend: đọc/ghi qua /settings + /provider/models (đã có sẵn ở backend).
+//
+// MODEL THEO PHIÊN (16/08): đổi model NGAY TRONG một phiên chat = ghim model đó cho
+// riêng phiên (POST /sessions/{id}/model) + vẫn cập nhật mặc định chung như cũ. Mở lại
+// phiên cũ là thấy đúng model đã chọn trong nó; đổi model ở phiên/tab khác không kéo
+// phiên đã ghim đổi theo. Phiên chưa từng đổi tay vẫn bám mặc định chung.
 (function () {
   "use strict";
 
@@ -10,18 +15,33 @@
   const modelCache = {};   // provider id -> {models, ts}; không giữ catalog cũ suốt cả tab
   const MODEL_CACHE_MS = 5 * 60 * 1000;
   let state = { providers: [], main: { provider: "", model: "" }, reasoning: "off" };
+  let sessionPin = null;   // {provider, model} phiên đang mở đã ghim; null = theo mặc định chung
+  let pinSid = null;       // phiên mà sessionPin đang nói về (chống vẽ nhầm khi đổi phiên nhanh)
+  let pendingPin = null;   // model chọn khi CHƯA có phiên (chat trống) - áp ngay khi mint id
   let expanded = null;     // provider đang mở rộng trong popover
   let filter = "";
 
   const short = (m) => (m || "").split("/").pop().replace(/^(claude-|gpt-)/, "").slice(0, 26) || "mặc định";
   const provShort = (lbl) => (lbl || "").split(" ")[0];
   const $ = (id) => document.getElementById(id);
+  const curSid = () => { try { return (window.JavisSessions && window.JavisSessions.current()) || null; } catch (e) { return null; } };
+  const curBrain = () => { try { return (window.JavisSessions && window.JavisSessions.brain()) || ""; } catch (e) { return ""; } };
+  // Model ĐANG HIỆU LỰC cho khung chat trước mặt: ghim của phiên thắng mặc định chung.
+  const effective = () => sessionPin || state.main;
 
   async function saveModel(patch) {
     const fd = new FormData();
     fd.append("section", "model");
     fd.append("data", JSON.stringify(patch));
     try { await fetch("/settings", { method: "POST", body: fd }); } catch (e) {}
+  }
+
+  async function pinToSession(sid, prov, model) {
+    const fd = new FormData();
+    fd.append("provider", prov);
+    fd.append("model", model || "");
+    fd.append("brain", curBrain());   // phiên chưa có hàng trong DB thì server tự tạo
+    try { await fetch(`/sessions/${encodeURIComponent(sid)}/model`, { method: "POST", body: fd }); } catch (e) {}
   }
 
   async function loadState() {
@@ -34,10 +54,33 @@
     } catch (e) {}
   }
 
+  // Hỏi server "phiên đang mở có ghim model riêng không". Đổi phiên nhanh tay thì chỉ
+  // kết quả của phiên MỚI NHẤT được vẽ (so pinSid trước khi dùng).
+  async function loadSessionPin() {
+    const sid = curSid();
+    pinSid = sid;
+    if (!sid) { sessionPin = null; pendingPin = null; return; }
+    pendingPin = null;
+    try {
+      const r = await fetch(`/sessions/${encodeURIComponent(sid)}/meta`);
+      const d = r.ok ? await r.json() : null;
+      if (pinSid !== sid) return;   // user đã nhảy sang phiên khác trong lúc chờ
+      sessionPin = (d && d.pinned_provider)
+        ? { provider: d.pinned_provider, model: d.pinned_model || "" } : null;
+    } catch (e) { if (pinSid === sid) sessionPin = null; }
+  }
+
   function renderBar() {
-    const p = state.providers.find((x) => x.id === state.main.provider);
+    const eff = effective();
+    const p = state.providers.find((x) => x.id === eff.provider);
     const mt = $("mbModelTxt"), et = $("mbEffortTxt");
-    if (mt) mt.textContent = (p ? provShort(p.label) : "Model") + " · " + short(state.main.model);
+    if (mt) {
+      mt.textContent = (p ? provShort(p.label) : "Model") + " · " + short(eff.model)
+        + (sessionPin ? " · ghim" : "");
+      mt.title = sessionPin
+        ? "Model ghim riêng cho phiên chat này (đổi ở phiên khác không ảnh hưởng)"
+        : "Theo model mặc định chung";
+    }
     if (et) et.textContent = "Effort: " + (EFFORT.find((e) => e[0] === state.reasoning) || EFFORT[0])[1];
   }
 
@@ -69,7 +112,8 @@
           html += `<div class="mb-empty">${filter ? "Không có model khớp." : "Chưa lấy được danh sách model."}</div>`;
         }
         for (const id of ids.slice(0, 60)) {
-          const cur = p.id === state.main.provider && id === state.main.model;
+          const _eff = effective();
+          const cur = p.id === _eff.provider && id === _eff.model;
           html += `<div class="mb-item ${cur ? "cur" : ""}" data-prov="${p.id}" data-model="${id.replace(/"/g, "&quot;")}">
                      <span class="tick">${cur ? ic("check", { cls: "ic-ok" }) : ""}</span><span>${short(id)}</span></div>`;
         }
@@ -103,7 +147,20 @@
     }
     const item = e.target.closest(".mb-item");
     if (item) {
+      // Ghi mặc định chung (chat mới sau này theo cái vừa chọn) + GHIM cho phiên đang
+      // mở (phiên này giữ đúng model kể cả khi mặc định chung bị đổi ở chỗ khác).
       await saveModel({ main: { provider: item.dataset.prov, model: item.dataset.model } });
+      const sid = curSid();
+      if (sid) {
+        sessionPin = { provider: item.dataset.prov, model: item.dataset.model };
+        pinSid = sid;
+        await pinToSession(sid, item.dataset.prov, item.dataset.model);
+      } else {
+        // Chat trống chưa mint id: nhớ lựa chọn, app.js gọi claimPending(sid) lúc gửi
+        // tin đầu để phiên mới sinh ra đã mang đúng ghim.
+        pendingPin = { provider: item.dataset.prov, model: item.dataset.model };
+        sessionPin = null;
+      }
       await loadState(); renderBar(); close();
       if (window.refreshEngineBadge) window.refreshEngineBadge();
       return;
@@ -121,7 +178,23 @@
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && isOpen()) close(); });
 
-  window.initModelBar = async function () { await loadState(); renderBar(); };
+  window.initModelBar = async function () { await loadState(); await loadSessionPin(); renderBar(); };
+
+  // Phiên mới mint id xong (app.js gọi ngay lúc gửi tin đầu): model đã chọn khi khung
+  // còn trống đi theo phiên vừa sinh, không bị phiên khác đổi mặc định chung đè mất.
+  window.JavisModelBar = {
+    claimPending: function (sid) {
+      if (!pendingPin || !sid) return;
+      sessionPin = pendingPin; pinSid = sid;
+      pinToSession(sid, pendingPin.provider, pendingPin.model);
+      pendingPin = null;
+      renderBar();
+    },
+  };
+
+  // Đổi phiên (mở phiên cũ, chat mới, xoá phiên) → hỏi lại ghim của phiên rồi vẽ lại.
+  window.addEventListener("javis:sessions-changed", async () => { await loadSessionPin(); renderBar(); });
+
   if (document.readyState !== "loading") window.initModelBar();
   else document.addEventListener("DOMContentLoaded", () => window.initModelBar());
 })();

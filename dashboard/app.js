@@ -261,6 +261,8 @@ function sendMessage(text) {
     // Đang mở một project ở cột Lịch sử thì hội thoại mới rơi thẳng vào project đó, khỏi phải
     // gắn tay. Gắn NGAY tại đây vì đây là chỗ duy nhất biết "id này vừa được sinh ra".
     try { if (window.JavisProjects) window.JavisProjects.claim(savedSessionId); } catch (e) {}
+    // Model đã chọn khi khung chat còn trống -> ghim luôn cho phiên vừa sinh (model-picker.js).
+    try { if (window.JavisModelBar) window.JavisModelBar.claimPending(savedSessionId); } catch (e) {}
   }
   const sid = savedSessionId;
   if (turns[sid] && turns[sid].running) return;          // phiên này đang trả lời → chưa gửi tiếp

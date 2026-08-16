@@ -1202,6 +1202,30 @@ def _chat_provider(mcfg):
     return prov, kind, key, model
 
 
+def _chat_provider_for_session(mcfg, row):
+    """Provider cho MỘT phiên chat: phiên đã GHIM model riêng (user đổi model ngay trong
+    phiên) thì theo ghim; chưa ghim thì rơi về _chat_provider (mặc định chung).
+
+    Vì sao có hàm này (16/08): đổi model ở tab/phiên khác kéo model của MỌI phiên đổi
+    theo, vì tất cả đọc chung settings.json. Chủ muốn phiên nhớ model cuối user đã chọn
+    TRONG phiên đó. Ghim hỏng (provider không còn cấu hình) thì rơi về mặc định chung
+    thay vì chết lượt chat."""
+    pprov = ((row or {}).get("pinned_provider") or "").strip()
+    if not pprov:
+        return _chat_provider(mcfg)
+    d = _provider_def(pprov)
+    if not d:
+        return _chat_provider(mcfg)
+    kind = d.get("kind", "cli")
+    key = mcfg.get(d["key_field"], "") if d.get("key_field") else ""
+    if kind == "api" and not key:
+        return _chat_provider(mcfg)   # key đã bị gỡ sau khi ghim → đừng chạy vào tường
+    model = ((row or {}).get("pinned_model") or "").strip()
+    if pprov == "openrouter":
+        model = model or mcfg.get("openrouter_model")
+    return pprov, kind, key, model
+
+
 def _claude_api_model(model: str) -> str:
     """Alias của Claude Code -> model id THẬT mà API nhận.
 
@@ -4157,7 +4181,9 @@ def _log_agent_run(brain, slug, task, out):
         from datetime import datetime, timezone, timedelta
         now = localefmt.now()
         with open(d / f"{now.strftime('%Y-%m-%d')}.md", "a", encoding="utf-8") as fh:
-            fh.write(f"\n## {now.strftime('%H:%M')}\n**Task:** {task}\n\n**Kết quả:** {out[:1500]}\n")
+            # Cắt CẢ task: prompt bước workflow sau vòng retry có thể ôm cả kết quả cũ
+            # (out[:8000] nối vào), không cắt là một lượt chạy phình cả chục KB nhật ký.
+            fh.write(f"\n## {now.strftime('%H:%M')}\n**Task:** {task[:2000]}\n\n**Kết quả:** {out[:1500]}\n")
     except Exception:
         pass
 
@@ -5924,10 +5950,12 @@ def _route_step_model(router, prompt, agent_model, session_id):
 
 
 async def _run_workflow_step(node, prompt, mk, agent_sysprompt, sink, router=None,
-                             session_id=""):
+                             session_id="", log_run=None):
     """Chạy ĐÚNG một bước theo đúng ngữ nghĩa runner cũ: agent, kiểm chứng, retry.
 
     Dùng chung cho cả hai đường. `sink` nhận event để đường graph đẩy ra SSE y như cũ.
+    `log_run(slug, task, out)`: ghi nhật ký lượt chạy vào memory/agents/<slug>/runs/.
+    Trước 0.35.3 chỉ runner cũ ghi - bật canary graph là nhật ký lặng lẽ biến mất.
     """
     agent_name, sysprompt, agent_model = agent_sysprompt(node.agent)
     # Studio định vị chỗ đổ chữ bằng CHỈ SỐ bước, không phải id node. Thiếu `i` thì
@@ -5994,6 +6022,10 @@ async def _run_workflow_step(node, prompt, mk, agent_sysprompt, sink, router=Non
         fixes = verdict.get("fixes", "")
         await sink({"type": "step_verify_result", "i": index, "node": node.id, "passed": passed,
                     "reason": reason, "attempt": attempt})
+        if log_run:
+            # Agent kiểm chứng cũng là agent đang LÀM VIỆC - nó nhìn thấy cả nhiệm vụ
+            # lẫn kết quả bị chê, là agent học được nhiều nhất mà trước giờ mất dấu.
+            log_run(node.verify_agent, f"[kiểm chứng bước của {agent_name}] {prompt}", v_out)
         verified = passed
         if passed or attempt >= node.max_retries:
             break
@@ -6004,6 +6036,8 @@ async def _run_workflow_step(node, prompt, mk, agent_sysprompt, sink, router=Non
             f"# PHẢN HỒI KIỂM CHỨNG:\n- Vấn đề: {reason}\n- Cần sửa: {fixes}\n"
             "CẢI THIỆN kết quả lần trước theo phản hồi: giữ phần đã tốt, sửa đúng chỗ bị chê. Làm cho ĐẠT."
         )
+    if log_run:
+        log_run(node.agent, prompt, out)
     return {"output": out, "verified": verified, "attempts": attempt + 1,
             "agent_name": agent_name}
 
@@ -6040,15 +6074,29 @@ def _workflow_agent_helpers(brain, tools):
     def _agent_sysprompt(aslug):
         ameta, abody = _read_md(_agents_dir(brain) / f"{aslug}.md")
         amem = _agent_memory(brain, aslug)
+        # Khối bộ nhớ + luật tự bồi đắp chèn VÔ ĐIỀU KIỆN (kể cả khi amem rỗng): điều
+        # kiện `if amem` cũ là bẫy con-gà-quả-trứng - agent chưa có ký ức thì không bao
+        # giờ được bảo là mình CÓ bộ nhớ, nên không bao giờ tạo được ký ức đầu tiên.
+        # Đây là cơ chế "tự thông minh lên LÚC DÙNG" chủ repo chốt 16/08: agent tự đúc
+        # bài học ngay trong lượt chạy, KHÔNG có job nền nào quét hàng loạt.
+        mem_path = _brain_memory_dir(brain) / "agents" / aslug / "MEMORY.md"
         sysprompt = (
             f"Bạn là agent **{ameta.get('name', aslug)}**.\nVai trò: {ameta.get('role','')}\n{abody}\n\n"
             f"Skills khả dụng: {', '.join(ameta.get('skills', []) or []) or '(không)'}. Dùng skill khi cần.\n"
-            + (f"\n# Bộ nhớ của bạn:\n{amem}\n" if amem else "")
+            + f"\n# Bộ nhớ của bạn (file: {mem_path}):\n{amem or '(chưa có ký ức nào)'}\n"
+            + "\n# Tự bồi đắp lúc dùng: cuối nhiệm vụ, nếu rút ra bài học TÁI DÙNG được cho vai này "
+              "(cách làm tốt hơn, lỗi cần tránh, ngữ cảnh riêng đã học được), THÊM 1-3 gạch đầu dòng "
+              "vào mục `## Bài học` của file bộ nhớ trên (tự tạo file/mục nếu chưa có). CHỈ THÊM dòng "
+              "mới, tuyệt đối không xoá hay viết lại phần sẵn có - phần đó có thể do chủ viết tay. "
+              "Lượt chạy bình thường không có gì đáng nhớ thì KHÔNG ghi - đừng chép nhật ký vụn vặt.\n"
             + "\nLàm việc trong vault. Tập trung hoàn thành nhiệm vụ, trả kết quả rõ ràng, ngắn gọn."
         )
         return ameta.get("name", aslug), sysprompt, (ameta.get("model") or "").strip() or None
 
-    return _mk, _agent_sysprompt
+    def _log_run(aslug, task, out):
+        _log_agent_run(brain, aslug, task, out)
+
+    return _mk, _agent_sysprompt, _log_run
 
 
 async def execute_workflow_graph(brain, slug, input="", tools=None, session_id=""):
@@ -6066,7 +6114,7 @@ async def execute_workflow_graph(brain, slug, input="", tools=None, session_id="
     if admission.action != "execute":
         _CONTEXT_RUNTIME.finish(trace, "COMPLETED", admission.reason)
         return
-    mk, agent_sysprompt = _workflow_agent_helpers(brain, tools)
+    mk, agent_sysprompt, log_run = _workflow_agent_helpers(brain, tools)
     agent_policy = agent_runtime.AgentPolicy.from_settings(cfgmod.read_settings() or {})
     agent_admitted = graph.allows_replan and agent_policy.admits(
         graph.slug, session_id or f"wf:{slug}")[0]
@@ -6083,7 +6131,7 @@ async def execute_workflow_graph(brain, slug, input="", tools=None, session_id="
         return await _run_workflow_step(
             node, prompt, mk, agent_sysprompt, sink,
             router=model_router.ModelRouter(cfgmod.read_settings),
-            session_id=session_id or f"wf:{slug}")
+            session_id=session_id or f"wf:{slug}", log_run=log_run)
 
     async def capability_runner(node, approved):
         """Node capability của workflow.
@@ -6252,7 +6300,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
     except Exception:
         pass
 
-    _mk, _agent_sysprompt = _workflow_agent_helpers(brain, tools)
+    _mk, _agent_sysprompt, _log = _workflow_agent_helpers(brain, tools)
 
     yield {"type": "start", "workflow": meta.get("name", slug), "steps": len(steps)}
     prev = ""
@@ -6317,6 +6365,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
             reason = verdict.get("reason", "")
             fixes = verdict.get("fixes", "")
             yield {"type": "step_verify_result", "i": i, "passed": passed, "reason": reason, "attempt": attempt}
+            _log(verify_slug, f"[kiểm chứng bước của {agent_name}] {task_f}", v_out)
             verified = passed
             if passed or attempt >= max_retries:
                 break
@@ -6332,7 +6381,7 @@ async def execute_workflow(brain, slug, input="", tools=None, session_id=""):
 
         prev = out
         yield {"type": "step_done", "i": i, "agent": agent_name, "output": out, "verified": verified}
-        _log_agent_run(brain, agent_slug, task_f, out)
+        _log(agent_slug, task_f, out)
     yield {"type": "done", "result": prev}
 
 
@@ -6365,7 +6414,7 @@ async def execute_workflow_resume(brain, slug, task_id, node_id, code, tools=Non
         yield {"type": "error", "content": "Không tìm thấy hoặc không resume được task này."}
         return
     canary = _get_workflow_canary(brain)
-    mk, agent_sysprompt = _workflow_agent_helpers(brain, tools)
+    mk, agent_sysprompt, log_run = _workflow_agent_helpers(brain, tools)
     queue: asyncio.Queue = asyncio.Queue()
 
     async def sink(event):
@@ -6377,7 +6426,7 @@ async def execute_workflow_resume(brain, slug, task_id, node_id, code, tools=Non
         return await _run_workflow_step(
             node, prompt, mk, agent_sysprompt, sink,
             router=model_router.ModelRouter(cfgmod.read_settings),
-            session_id=session_id or f"wf:{slug}")
+            session_id=session_id or f"wf:{slug}", log_run=log_run)
 
     async def capability_runner(node, approved):
         try:
@@ -8536,7 +8585,9 @@ async def websocket_endpoint(ws: WebSocket):
                                                       _lang_qd.as_trace())
             except Exception:
                 pass
-            prov, kind, api_key, api_model = _chat_provider(mcfg)
+            # Đọc row phiên TRƯỚC khi chọn provider: phiên có thể đã ghim model riêng.
+            _row0 = store.get_session(conv_sid) or {}
+            prov, kind, api_key, api_model = _chat_provider_for_session(mcfg, _row0)
             reasoning = _reasoning_level(mcfg)
             _CONTEXT_RUNTIME.set_route(
                 runtime_trace,
@@ -8550,7 +8601,6 @@ async def websocket_endpoint(ws: WebSocket):
                     api_model or mcfg.get("claude_model") or "mặc định", kind,
                 )
             _ctx_in = 0        # token VÀO của lượt này, để khung chat nói được nó tốn bao nhiêu
-            _row0 = store.get_session(conv_sid) or {}
             cli = claude_engine(system_prompt=SYSTEM_PROMPT, cwd=CLAUDE_CWD, tag=turn_tag)
             cli.session_id = _row0.get("cli_session_id") or None    # --resume đúng mạch phiên này
             final_text = ""
@@ -9439,7 +9489,11 @@ async def websocket_endpoint(ws: WebSocket):
                 continue
             brain = payload.get("brain", "brain")
             mcfg = cfgmod.read_settings().get("model", {})
-            prov, kind, api_key, api_model = _chat_provider(mcfg)
+            # Phiên đã ghim model riêng thì engine_label phải suy từ provider HIỆU LỰC
+            # của phiên, không phải từ mặc định chung - nhãn sai là clear_codex_thread_id
+            # dọn nhầm/không dọn mạch native khi đổi engine.
+            _prow = store.get_session(payload.get("session_id") or "") or {}
+            prov, kind, api_key, api_model = _chat_provider_for_session(mcfg, _prow)
             engine_label = ("codex" if prov == "openai-oauth"
                             else "gemini-cli" if prov == "gemini-cli"
                             else "antigravity-cli" if prov == "antigravity-cli"
@@ -9652,6 +9706,34 @@ async def sessions_pin(session_id: str, pinned: str = Form("1")):
     """Ghim hội thoại lên đầu danh sách (hoặc bỏ ghim khi pinned=0)."""
     get_store().set_pinned(session_id, str(pinned).strip() not in ("0", "false", ""))
     return {"ok": True}
+
+
+@app.get("/sessions/{session_id}/meta")
+async def sessions_meta(session_id: str):
+    """Row phiên KHÔNG kèm messages - cho model bar hỏi 'phiên này ghim model gì' mà
+    không phải kéo cả hội thoại về (GET /sessions/{id} trả nguyên cả messages)."""
+    sess = get_store().get_session(session_id)
+    if not sess:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return sess
+
+
+@app.post("/sessions/{session_id}/model")
+async def sessions_set_model(session_id: str, provider: str = Form(""),
+                             model: str = Form(""), brain: str = Form("")):
+    """Ghim model riêng cho phiên (provider rỗng = gỡ ghim, quay về mặc định chung).
+
+    Có `brain` thì tạo hàng nếu phiên chưa tồn tại - dashboard mint id phía client nên
+    user có thể đổi model trước cả tin nhắn đầu tiên (cùng khuôn /sessions/{id}/project).
+    CHỦ Ý không đi qua _set_main_model: hàm đó ghi mốc nhật ký usage cho việc đổi bộ não
+    TOÀN CỤC, ghim theo phiên mà đi qua đó là rác hoá biểu đồ token."""
+    prov = (provider or "").strip()
+    if prov and not _provider_def(prov):
+        return JSONResponse({"error": f"provider không tồn tại: {prov}"}, status_code=400)
+    ok = get_store().set_pinned_model(session_id, prov, model, brain=(brain or "").strip() or None)
+    if not ok:
+        return JSONResponse({"error": "phiên không tồn tại"}, status_code=404)
+    return {"ok": True, "pinned_provider": prov or None, "pinned_model": (model or "").strip() or None}
 
 
 @app.post("/sessions/{session_id}/project")

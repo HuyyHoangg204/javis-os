@@ -2,7 +2,7 @@
 
 Vì sao có kho RIÊNG chứ không nhét vào file Agent (bản thiết kế đầu định làm vậy, và sai):
 
-  - Agent nằm TRONG một brain (`<brain>/Javis/agents/<slug>.md`), còn bot lại đọc **brain
+  - Agent nằm TRONG một brain (`<brain>/agents/<slug>.md`), còn bot lại đọc **brain
     riêng của nó**. Khai báo bot đặt ở brain chính sẽ mô tả một thứ sống ở brain khác.
   - Token là BÍ MẬT, không được nằm trong file .md mà chủ mở ra sửa trong Obsidian.
   - Bot có VÒNG ĐỜI (đang chạy / đã tắt / lỗi). Vòng đời không thuộc về một file tài liệu.
@@ -36,7 +36,7 @@ _lock = threading.Lock()
 # Bot trả lời KHÁCH LẠ nên mọi thứ nhận từ giao diện đều phải kẹp. Trần rộng rãi nhưng hữu hạn.
 NAME_MAX = 60
 _ICON_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")     # tên icon Lucide, như projects.icon
-# Slug Agent = TÊN FILE `<brain>/Javis/agents/<slug>.md`, và tên file đó do người dùng đặt.
+# Slug Agent = TÊN FILE `<brain>/agents/<slug>.md`, và tên file đó do người dùng đặt.
 # `main._slugify` giữ nguyên chữ có dấu (nó lọc theo `\w` Unicode), nên Agent tên "Tư vấn sản
 # phẩm" ra slug "tư-vấn-sản-phẩm" - một slug HOÀN TOÀN hợp lệ, đang nằm sẵn trong ô chọn ở trang
 # Chatbot. Khuôn cũ `^[a-z0-9][a-z0-9-]{0,63}$` chỉ nhận ASCII nên nó đá bay đúng những Agent
@@ -186,7 +186,7 @@ def _slugify(name: str) -> str:
 
 
 def _agent_slug_ok(v: Any) -> bool:
-    """Slug Agent có AN TOÀN để ghép vào `Javis/agents/<slug>.md` không.
+    """Slug Agent có AN TOÀN để ghép vào `<brain>/agents/<slug>.md` không.
 
     Nhận mọi tên file người dùng đặt được (kể cả tiếng Việt có dấu, hoa/thường, khoảng trắng,
     gạch dưới); chỉ từ chối thứ trèo ra khỏi thư mục agents hoặc phá đường dẫn.
@@ -344,7 +344,7 @@ LOI_CHUA_XAC_NHAN = ("Mức quyền này cho bot làm việc THẬT ra ngoài, d
 # đã chọn Agent trong ô mà đọc "Thiếu Agent" thì không có đường nào lần ra lỗi thật.
 LOI_KHONG_CO_BOT = "Không có bot nào id đó"
 LOI_THIEU_AGENT = "Thiếu Agent cho bot (bot không có bộ não thì không trả lời được gì)"
-LOI_SLUG_AGENT = ("Tên Agent không dùng được: phải là tên file trong Javis/agents, dài tối đa "
+LOI_SLUG_AGENT = ("Tên Agent không dùng được: phải là tên file trong thư mục agents của brain, dài tối đa "
                   f"{SLUG_MAX} ký tự, không chứa '/', '\\' hay '..'.")
 
 

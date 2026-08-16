@@ -284,7 +284,14 @@ class SessionStore:
                               # Mạch native của Gemini CLI (UUID). Cùng vai với codex_thread_id
                               # nhưng phải là cột RIÊNG: đổi bộ não giữa chừng mà dùng chung một
                               # cột là lượt sau đưa UUID của engine này cho engine kia resume.
-                              ("gemini_session_id", "TEXT")):
+                              ("gemini_session_id", "TEXT"),
+                              # Model user GHIM RIÊNG cho phiên này (đổi model ngay trong phiên).
+                              # KHÔNG tái dùng cột engine/model sẵn có: hai cột đó là NHẬT KÝ
+                              # lượt cuối, bị get_or_create ghi đè mỗi lượt - trộn nghĩa vào là
+                              # phiên "tự ghim" chính nó ngay sau tin đầu tiên. NULL/rỗng cả hai
+                              # = chưa từng đổi tay → theo mặc định chung ở settings.json.
+                              ("pinned_provider", "TEXT"),
+                              ("pinned_model", "TEXT")):
                 if name not in cols:
                     self._conn.execute(f"ALTER TABLE sessions ADD COLUMN {name} {ddl}")
             # Index cho cột vừa thêm phải chạy SAU vòng ALTER: DB cũ chưa có cột thì CREATE
@@ -437,7 +444,7 @@ class SessionStore:
             f"""
             SELECT s.id, s.title, s.brain, s.engine, s.model, s.channel, s.cli_session_id,
                    s.created_at, s.updated_at, s.msg_count,
-                   s.pinned, s.project_id,
+                   s.pinned, s.project_id, s.pinned_provider, s.pinned_model,
                    (SELECT substr(content, 1, 80) FROM messages
                     WHERE session_id = s.id AND role = 'user'
                     ORDER BY ts, id LIMIT 1) AS preview
@@ -479,6 +486,25 @@ class SessionStore:
             return False
         self._write(lambda c: c.execute(
             "UPDATE sessions SET project_id = ? WHERE id = ?", (pid, session_id)))
+        return True
+
+    def set_pinned_model(self, session_id: str, provider: Optional[str],
+                         model: Optional[str], *, brain: Optional[str] = None) -> bool:
+        """Ghim model riêng cho MỘT phiên (provider rỗng = gỡ ghim, phiên quay về mặc
+        định chung). Cùng khuôn set_project: `brain` khác None thì tạo hàng nếu phiên
+        chưa kịp tồn tại - dashboard mint id phía client, user có thể đổi model trước
+        khi gửi tin đầu tiên."""
+        prov = (provider or "").strip() or None
+        mdl = (model or "").strip() or None
+        if prov is None:
+            mdl = None   # gỡ ghim là gỡ cả cặp - model mồ côi không định tuyến được
+        if brain and not self.get_session(session_id):
+            self.create_session(brain=brain, session_id=session_id)
+        if not self.get_session(session_id):
+            return False
+        self._write(lambda c: c.execute(
+            "UPDATE sessions SET pinned_provider = ?, pinned_model = ? WHERE id = ?",
+            (prov, mdl, session_id)))
         return True
 
     # ── projects (nhóm hội thoại) ──

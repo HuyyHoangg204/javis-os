@@ -17,6 +17,7 @@ import importlib
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -27,7 +28,12 @@ from pathlib import Path
 import httpx
 
 PROTOCOL = "2025-06-18"
-_IDLE_TTL = 600          # đóng session không dùng > 10 phút
+# _IDLE_TTL PHẢI LỚN HƠN connect_health.HEALTH_INTERVAL (600). Khi hai số bằng nhau,
+# session vừa bị dọn xong ngay trước mỗi vòng quét sức khoẻ → vòng nào cũng spawn server
+# stdio mới (uvx còn đi hỏi PyPI mỗi lần). Đặt TTL > interval thì chính vòng quét giữ
+# session ấm: một tiến trình sống lâu thay vì đẻ mới mỗi 10 phút. Vụ VPS Hostinger
+# 15/08: 100 tiến trình mcp-google-sheets, ăn 6,9 GB RAM.
+_IDLE_TTL = 900          # đóng session không dùng > 15 phút
 _INTERNAL = {"botcake": "botcake_mcp", "substack": "substack_mcp"}   # transport internal → tên module
 
 _DIAL_SONG_SONG = 8      # số connection dò tool CÙNG LÚC (đừng để npx nổ ra 30 tiến trình)
@@ -202,6 +208,10 @@ class McpStdioSession:
         kwargs = {}
         if os.name == "nt":
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        else:
+            # Nhóm tiến trình RIÊNG cho cả cây con - xem docstring _kill_tree (vụ 15/08:
+            # uvx bị kill nhưng server thật thành mồ côi, 96 tiến trình ăn hết RAM VPS).
+            kwargs["start_new_session"] = True
         env = dict(os.environ)
         env.update(self.env)
         self.proc = await asyncio.create_subprocess_exec(
@@ -294,10 +304,44 @@ class McpStdioSession:
             res = await self._rpc("tools/call", {"name": name, "arguments": arguments or {}}, timeout=120)
         return _format_result(res)
 
-    async def close(self):
+    def _kill_tree(self):
+        """Giết CẢ CÂY tiến trình, không riêng launcher.
+
+        start() đặt start_new_session=True nên trên POSIX pgid của nhóm == pid của child;
+        killpg theo số đó quét được cả cháu, KỂ CẢ khi launcher đã chết trước (nhóm còn
+        tồn tại chừng nào còn thành viên). Chốt an toàn hai lớp: không bao giờ đụng nhóm
+        của chính server, và nếu child không phải leader (bản cũ chưa có session riêng)
+        thì nhóm mang id đó không tồn tại → ProcessLookupError → rơi về kill() như cũ."""
+        pid = self.proc.pid
+        if os.name == "nt":
+            # Windows không có process group kiểu POSIX → taskkill /T giết cả cây.
+            try:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                               capture_output=True, timeout=10,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                return
+            except Exception:
+                pass
+        else:
+            try:
+                if pid != os.getpgid(0):
+                    os.killpg(pid, signal.SIGKILL)
+                    return
+            except ProcessLookupError:
+                pass   # cả nhóm đã chết sạch, hoặc child không phải leader → kill thường
+            except Exception:
+                pass
         try:
-            if self.alive():
-                self.proc.kill()
+            self.proc.kill()   # fallback: ít nhất giết launcher như cũ
+        except Exception:
+            pass
+
+    async def close(self):
+        # KHÔNG canh alive() ở đây: launcher chết trước (crash lúc import...) thì cháu
+        # của nó vẫn sống mồ côi - vẫn phải quét nhóm.
+        try:
+            if self.proc:
+                self._kill_tree()
                 await self.proc.wait()
         except Exception:
             pass

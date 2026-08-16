@@ -35,7 +35,7 @@ vault (brain đang chọn). Studio / trang tương ứng tự nhận file mới.
 
 ## Mẫu file (ghi CHÍNH XÁC theo đây)
 
-### Agent -> `Javis/agents/<slug>.md`
+### Agent -> `<brain>/agents/<slug>.md` (PHẲNG ở gốc brain - KHÔNG phải Javis/agents, ghi vào đó là app không thấy)
 ```
 ---
 type: agent
@@ -101,7 +101,7 @@ skill cứ thế hỏng âm thầm lúc chạy. Bạn là lớp phòng thủ duy
    mọi brain. Giờ viết skill hệ thống có cây con là hợp lệ.
 8. KHÔNG viết skill kiểu router chỉ trỏ sang skill khác.
 
-### Workflow -> `Javis/workflows/<slug>.md`
+### Workflow -> `<brain>/workflows/<slug>.md` (PHẲNG ở gốc brain - KHÔNG phải Javis/workflows)
 ```
 ---
 type: workflow
