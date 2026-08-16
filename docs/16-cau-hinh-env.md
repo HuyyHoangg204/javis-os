@@ -72,7 +72,7 @@ Chi tiết quan trọng về `JAVIS_HOST`: Javis dùng cơ chế "an toàn mặc
 | `JAVIS_ENABLE_USER_PLUGINS` | Cổng chặn CỨNG cho plugin do bạn cài. `true` mới nạp | Tắt | Bạn tự cài plugin (thư mục `plugins/` toàn cục hoặc trong brain) và muốn nó chạy. Plugin user chạy CODE PYTHON THẬT trong tiến trình server nên mặc định bị chặn. Alias cũ: `JAVIS_ENABLE_VAULT_PLUGINS`. Plugin đi kèm app (bundled) không chịu cổng này. Xem [Plugins](20-plugins.md). |
 | `JAVIS_TERMINAL` | Công tắc tắt hẳn Terminal trong nhóm Code. `0`/`off`/`false`/`no` = tắt | Bật | Không muốn có dòng lệnh nào mở được từ trình duyệt. Terminal vốn đã chỉ mở cho trình duyệt ĐÃ ĐĂNG NHẬP (token API không vào được), nhưng nhiều người vẫn muốn khoá cứng ở tầng máy chủ. Xem [Nhóm Code: Terminal](27-tab-code-terminal.md). |
 | `JAVIS_TERMINAL_SHELL` | Shell mà Terminal chạy | `$SHELL`, không có thì `bash`/`sh`. Windows: `powershell.exe` rồi `cmd.exe` | Muốn ép dùng một shell khác (`zsh`, `fish`, `cmd.exe`). |
-| `JAVIS_TERMINAL_CWD` | Thư mục terminal mở ra | Gốc brain đang chọn | Muốn shell mở sẵn ở thư mục cài Javis hoặc một thư mục dự án khác. |
+| `JAVIS_TERMINAL_CWD` | Thư mục terminal mở ra | HOME của user chạy Javis | Muốn shell mở sẵn ở gốc brain hoặc một thư mục dự án khác. |
 
 Về MÃ THIẾT LẬP: khi chạy public mà chưa có tài khoản admin, lần đầu mở app sẽ yêu cầu nhập một mã thiết lập. Mã này chỉ in ra log server lúc khởi động, nên chỉ người xem được log/terminal mới tạo được tài khoản, kẻ chỉ có URL không làm gì được. Nếu bạn đặt sẵn `JAVIS_ADMIN_USER` + `JAVIS_ADMIN_PASSWORD` thì khỏi cần mã này, cứ đăng nhập bằng tài khoản đã đặt. Xem thêm ở [Bảo mật & tài khoản](14-bao-mat-tai-khoan.md).
 

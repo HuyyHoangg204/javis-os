@@ -4,6 +4,11 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.8] - 2026-08-16
+### Cải thiện
+- **Terminal trong tab Code giờ là cmd gốc của máy.** Shell mở ở thư mục HOME như mọi terminal bình thường, không còn đứng trong thư mục brain - cài và đăng nhập CLI (như `agy` của Antigravity) hết vướng. Cần vào brain thì gõ `cd "$JAVIS_BRAIN"` là về. Muốn kiểu cũ thì đặt `JAVIS_TERMINAL_CWD`.
+- **Gõ `agy` trong terminal của Javis là thấy lệnh ngay.** Trước đây PATH của server thiếu chỗ chứa lệnh vừa cài nên gõ `agy` báo không tìm thấy, dễ tưởng cài hỏng. Kèm theo: hướng dẫn đăng nhập Antigravity nay nói thẳng lý do hay gặp nhất của cảnh "cài rồi mà Javis không nhận" - đăng nhập qua SSH bằng user khác (như root) thì Javis không thấy; đăng nhập trong trang Code của chính Javis là chắc ăn.
+
 ## [0.35.7] - 2026-08-16
 ### Sửa lỗi
 - **Đăng nhập Antigravity sống qua cập nhật.** Trước đây mỗi lần cập nhật là bay cả lệnh `agy` lẫn đăng nhập Google, phải cài và đăng nhập lại từ đầu. Giờ chúng được giữ trên vùng lưu trữ bền của máy: sau khi lên bản này, cài lại một lần cuối là từ đó cập nhật thoải mái. Không phải sửa gì trong cấu hình Docker.

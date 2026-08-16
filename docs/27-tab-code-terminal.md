@@ -19,7 +19,7 @@ Nhóm Code dựng sẵn theo hướng còn mở rộng: hôm nay trong nhóm m�
 2. Rail điều hướng bên trái, mở nhóm **Code**, bấm mục **Terminal**.
 3. Terminal tự mở và tự nối. Bấm vào khung đen rồi gõ như terminal bình thường.
 
-Shell mở sẵn ở **gốc brain đang chọn** - đúng thư mục mà trang Tệp tin đang duyệt, nên hai chỗ nhìn cùng một đống file.
+Shell mở sẵn ở **thư mục HOME của user đang chạy Javis** - đúng như một terminal bình thường của máy, hợp nhất cho việc chính của tab này: cài và đăng nhập CLI (`agy`, `codex login`...). Cần vào brain thì gõ `cd "$JAVIS_BRAIN"` - biến này luôn trỏ về gốc brain đang chọn.
 
 ## Thanh trên cùng
 
@@ -65,7 +65,7 @@ Terminal là chỗ chạy lệnh tuỳ ý trên máy chủ, tức là quyền ca
 |---|---|---|
 | `JAVIS_TERMINAL` | `0`/`off`/`false`/`no` = tắt hẳn terminal | Bật |
 | `JAVIS_TERMINAL_SHELL` | Đường dẫn shell muốn chạy | `$SHELL`, không có thì `bash`/`sh`. Windows: `powershell.exe` rồi `cmd.exe` |
-| `JAVIS_TERMINAL_CWD` | Thư mục shell mở ra | Gốc brain đang chọn |
+| `JAVIS_TERMINAL_CWD` | Thư mục shell mở ra | HOME của user chạy Javis |
 
 Chi tiết cách đặt biến xem [Cấu hình .env](16-cau-hinh-env.md).
 

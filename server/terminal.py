@@ -100,7 +100,7 @@ def shell_argv() -> list[str]:
     return ["/bin/sh"]
 
 
-def _env() -> dict:
+def _env(extra: dict | None = None) -> dict:
     e = dict(os.environ)
     # xterm-256color: cho lệnh biết terminal này vẽ được màu và di được con trỏ.
     e["TERM"] = "xterm-256color"
@@ -111,6 +111,26 @@ def _env() -> dict:
         e.setdefault("LANG", "C.UTF-8")
     # Dấu để script biết mình đang chạy trong terminal của Javis (vd muốn né tự cập nhật).
     e["JAVIS_IN_TERMINAL"] = "1"
+    # PATH của server (systemd/Docker) thường CỤT - thiếu ~/.local/bin, đúng chỗ installer
+    # chính chủ thả binary (agy, uv...). Hệ quả thật (16/08): người dùng cài agy xong, gõ
+    # `agy` trong terminal của Javis nhận "command not found", tưởng cài hỏng, không đăng
+    # nhập nổi Antigravity. Bù các ngăn quen thuộc, chỉ thêm ngăn ĐANG TỒN TẠI và chưa có
+    # trong PATH - không phát minh PATH mới, chỉ vá chỗ server nghèo hơn shell thường.
+    try:
+        home = Path.home()
+        ung_vien = [home / ".local" / "bin", home / ".antigravity" / "bin"]
+        if IS_WINDOWS:
+            ung_vien.append(Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "antigravity")
+        parts = [p for p in (e.get("PATH", "") or "").split(os.pathsep) if p]
+        for d in ung_vien:
+            ds = str(d)
+            if d.is_dir() and ds not in parts:
+                parts.insert(0, ds)
+        e["PATH"] = os.pathsep.join(parts)
+    except Exception:
+        pass
+    if extra:
+        e.update({k: str(v) for k, v in extra.items() if v is not None})
     return e
 
 
@@ -149,9 +169,10 @@ class Phien:
     phiên là cái giá rẻ hơn nhiều so với hai đường đọc khác nhau cho hai hệ điều hành.
     """
 
-    def __init__(self, sid: str, cwd: str, cols: int, rows: int, loop):
+    def __init__(self, sid: str, cwd: str, cols: int, rows: int, loop, extra_env: dict | None = None):
         self.id = sid
         self.cwd = str(cwd)
+        self.extra_env = dict(extra_env or {})   # vd JAVIS_BRAIN - đường về gốc brain đang chọn
         self.cols = _gioi_han(cols, 20, 500, 80)
         self.rows = _gioi_han(rows, 5, 200, 24)
         self.che_do = che_do()
@@ -169,7 +190,7 @@ class Phien:
 
     # ---- khởi động ----
     def _mo(self):
-        env = _env()
+        env = _env(self.extra_env)
         if CO_PTY:
             master, slave = pty.openpty()
 
@@ -397,7 +418,8 @@ class Kho:
     def lay(self, sid: str) -> Phien | None:
         return self._phien.get(sid or "")
 
-    def mo(self, sid: str, cwd: str, cols: int, rows: int, loop) -> Phien:
+    def mo(self, sid: str, cwd: str, cols: int, rows: int, loop,
+           extra_env: dict | None = None) -> Phien:
         """Nối lại phiên `sid` nếu còn sống, không thì mở phiên mới.
 
         Ném RuntimeError khi đã chạm trần số phiên - người gọi báo lỗi đó ra màn hình chứ đừng
@@ -414,7 +436,7 @@ class Kho:
         if len(song) >= MAX_PHIEN:
             raise RuntimeError(f"Đang mở {len(song)} phiên terminal rồi (tối đa {MAX_PHIEN}). "
                                "Đóng bớt một phiên rồi thử lại.")
-        p = Phien(uuid.uuid4().hex[:12], cwd, cols, rows, loop)
+        p = Phien(uuid.uuid4().hex[:12], cwd, cols, rows, loop, extra_env=extra_env)
         self._phien[p.id] = p
         self._bat_don(loop)
         return p

@@ -610,9 +610,15 @@ def auth_status(bo_qua_cache: bool = False) -> dict:
     if ds:
         d = {"connected": True, "method": "google (keyring của máy)", "email": "", "error": ""}
     else:
+        # Nói rõ chuyện ĐÚNG USER (16/08): nhiều người đã đăng nhập agy thành công qua SSH
+        # nhưng bằng user khác (vd root), còn Javis chạy bằng user riêng nên không thấy gì -
+        # "đã cài rồi mà Javis không nhận". Trang Code của dashboard mở shell bằng chính user
+        # của Javis nên đăng nhập ở đó là chắc ăn nhất.
         d = {"connected": False, "method": "", "email": "",
-             "error": "Đã cài Antigravity CLI nhưng chưa đăng nhập. Mở terminal trên máy chạy "
-                      "Javis, gõ `agy` rồi làm theo hướng dẫn đăng nhập Google."}
+             "error": "Đã cài Antigravity CLI nhưng phiên của Javis chưa đăng nhập. Mở trang "
+                      "Code (Terminal) NGAY TRONG Javis, gõ `agy` rồi làm theo hướng dẫn - "
+                      "phải đăng nhập bằng ĐÚNG user đang chạy Javis; SSH bằng user khác "
+                      "(vd root) đăng nhập xong Javis vẫn không thấy."}
     _AUTH_CACHE.update(ts=now, val=dict(d))
     return d
 
@@ -630,10 +636,11 @@ def login_huong_dan() -> dict:
     return {
         "cai": lenh_cai(),
         "dang_nhap": "agy",
-        "ghi_chu": ("Chạy `agy` một lần trong terminal của máy chạy Javis. Máy có màn hình thì "
-                    "nó tự mở trình duyệt; qua SSH thì nó in ra một đường link, mở link đó trên "
-                    "máy của bạn rồi đăng nhập Google là xong. Đăng nhập lưu trong keyring của "
-                    "hệ điều hành nên chỉ phải làm một lần."),
+        "ghi_chu": ("Dùng trang Code (Terminal) NGAY TRONG Javis - nó mở shell bằng đúng user "
+                    "đang chạy Javis, đăng nhập ở đó là Javis nhận liền. (SSH bằng user khác, "
+                    "vd root, đăng nhập xong Javis vẫn không thấy - đây là lý do hay gặp nhất "
+                    "của cảnh 'cài rồi mà không nhận'.) Gõ `agy`: nó in ra một đường link, mở "
+                    "link trên máy của bạn rồi đăng nhập Google là xong, chỉ phải làm một lần."),
     }
 
 

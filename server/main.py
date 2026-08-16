@@ -9647,12 +9647,22 @@ async def websocket_endpoint(ws: WebSocket):
 # Toàn bộ phần khó (pty, tiến trình, bộ đệm màn hình) nằm trong server/terminal.py.
 # ============================================================
 def _terminal_cwd(brain: str) -> str:
-    """Thư mục shell mở ra. Mặc định là GỐC BRAIN đang chọn - chỗ chứa skill, plugin, note của
-    người dùng, và trong Docker đó cũng là volume ghi được (code app thì chỉ-đọc). Máy nào muốn
-    khác thì đặt JAVIS_TERMINAL_CWD."""
+    """Thư mục shell mở ra. Từ 0.35.8: mặc định là HOME của user đang chạy Javis - "cmd gốc
+    của máy" như mọi terminal bình thường (chủ chốt 16/08).
+
+    Trước đây mở ở gốc brain và điều đó gây hại thật cho việc chính của tab này (cài + đăng
+    nhập CLI): `agy` coi thư mục đang đứng là project của nó nên đăng nhập trong brain vừa
+    khó vừa vấy file cấu hình vào vault. Cần thao tác brain thì shell đã có sẵn biến
+    $JAVIS_BRAIN - `cd "$JAVIS_BRAIN"` là về. Máy nào muốn khác thì đặt JAVIS_TERMINAL_CWD."""
     rieng = str(os.getenv("JAVIS_TERMINAL_CWD", "")).strip()
     if rieng and os.path.isdir(rieng):
         return rieng
+    try:
+        home = str(Path.home())
+        if os.path.isdir(home):
+            return home
+    except Exception:
+        pass
     try:
         goc = _brain_root(brain)
         if os.path.isdir(goc):
@@ -9693,7 +9703,8 @@ async def terminal_ws(ws: WebSocket, session: str = Query(""), brain: str = Quer
         await bao_loi("Terminal đang tắt trên máy này (biến môi trường JAVIS_TERMINAL=0).")
         return
     try:
-        phien = terminal.KHO.mo(session, _terminal_cwd(brain), cols, rows, asyncio.get_running_loop())
+        phien = terminal.KHO.mo(session, _terminal_cwd(brain), cols, rows, asyncio.get_running_loop(),
+                                extra_env={"JAVIS_BRAIN": str(_brain_root(brain))})
     except RuntimeError as e:
         await bao_loi(str(e))
         return
