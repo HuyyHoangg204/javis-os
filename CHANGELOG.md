@@ -4,6 +4,16 @@ Lịch sử phiên bản Javis OS. Bản mới nhất ở trên cùng. Xem ngay 
 
 Định dạng: mỗi phiên bản là một khối `## [x.y.z] - ngày`, bên dưới nhóm thay đổi theo `### Thêm mới / Sửa lỗi / Cải thiện / Bảo mật`.
 
+## [0.35.12] - 2026-08-17
+### Sửa lỗi
+- **App "Thêm vào màn hình chính" trên iPhone hết cảnh cứ đóng lại là bị đăng nhập lại.** Mỗi lần mở app từ icon là một lần khởi động nguội (khác tab Safari giữ ấm sẵn), nên câu hỏi "đã đăng nhập chưa" gửi đi lúc mạng chưa kịp lên hay bị lỗi - và trước đây hễ lỗi là Javis coi luôn như chưa đăng nhập, bắt gõ lại mật khẩu dù phiên vẫn còn hạn. Giờ hỏi lại vài lần trước khi kết luận, và có lỗi mạng thật thì để nguyên màn hình thay vì ép hiện màn đăng nhập oan.
+
+## [0.35.11] - 2026-08-17
+### Sửa lỗi
+- **Thêm vào màn hình chính iPhone giờ luôn ẩn thanh địa chỉ.** Trước đây tuỳ máy tuỳ bản iOS mà có cái ẩn có cái không, vì Javis thiếu khai báo "chạy như app riêng" đầy đủ. Lưu ý: icon đã thêm vào màn hình chính TRƯỚC bản này vẫn giữ hành vi cũ - xoá icon đó rồi bấm "Thêm vào MH chính" lại một lần là hết.
+### Cải thiện
+- **Tắt phóng to/thu nhỏ bằng hai ngón tay trên điện thoại.** Giao diện Javis không còn bị lệch khi lỡ chạm hai ngón hoặc double-tap.
+
 ## [0.35.10] - 2026-08-16
 ### Sửa lỗi
 - **Claude Code hết "thi thoảng tự đăng xuất".** Thủ phạm: khi Javis dừng một lượt chạy quá lâu, tiến trình claude có thể bị giết đúng lúc đang ghi file đăng nhập - file đứt nửa chừng là lần sau coi như chưa đăng nhập (ChatGPT không bị vì Javis tự giữ token hộ). Hai lớp vá: dừng tiến trình giờ có vài giây ân hạn để nó kịp đóng file, và Javis tự sao lưu file đăng nhập lành mạnh mỗi 5 phút - file hỏng hay biến mất là tự phục hồi ngay, có ghi log rõ ràng. Bấm Ngắt chủ động thì vẫn ngắt thật, không bị "hồi sinh".
